@@ -765,7 +765,8 @@ class MyBankCard extends HTMLElement {
   }
 
   // Un bloc par budget couvrant le mois en cours (les uns sous les autres) : barres de réalisation du mois
-  // pour les rubriques racines et leur premier niveau qui ont un montant prévu ce mois-ci, plus une barre par type.
+  // pour les rubriques racines et leur premier niveau qui ont un montant prévu ou réalisé ce mois-ci
+  // (un réalisé sans prévu est marqué « hors budget »), plus une barre par type.
   async _renderDashboardBudgets() {
     const month = isoDate(new Date()).slice(0, 7);
     const budgets = (await this._items("list_budgets"))
@@ -778,7 +779,7 @@ class MyBankCard extends HTMLElement {
       const i = r.months.indexOf(month);
       if (i < 0) return "";
       const ctx = { account: b.account_id, ...this._monthBounds(month, month) };
-      const groups = this._byKind(r.rows.filter((x) => x.depth <= 1 && Number(x.planned[i])))
+      const groups = this._byKind(r.rows.filter((x) => x.depth <= 1 && (Number(x.planned[i]) || Number(x.actual[i]))))
         .filter((g) => g.rows.length)
         .map((g) => {
           const tot = r.totals[g.kind];
@@ -2402,7 +2403,6 @@ class MyBankCard extends HTMLElement {
         <thead><tr><th class="sticky">${t("Rubrique")}</th>${months.map((m) => `<th>${esc(monthLabel(m, "short"))}</th>`).join("")}<th>${t("Total")}</th></tr></thead>
         <tbody>${body}</tbody>
         <tfoot>
-          <tr class="grand-total"><td class="sticky">${t("Total général (toutes rubriques)")}</td>${valueCells("v")}</tr>
           <tr class="net-total"><td class="sticky">${account && account.kind === "savings" ? t("Solde prévu (recettes − dépenses + épargne)") : t("Solde prévu (recettes − dépenses − épargne)")}</td>${valueCells("v")}</tr>
         </tfoot>
       </table></div>
@@ -2430,7 +2430,6 @@ class MyBankCard extends HTMLElement {
     // Totaux : chaque montant saisi compte une fois (lignes « propres »), quelle que soit l'arborescence.
     const refresh = () => {
       const byKind = {};
-      const grand = months.map(() => 0);
       const net = months.map(() => 0);
       for (const tr of rows) {
         const mine = own(tr);
@@ -2442,7 +2441,6 @@ class MyBankCard extends HTMLElement {
         byKind[kind] = byKind[kind] || months.map(() => 0);
         mine.forEach((x, i) => {
           byKind[kind][i] += x;
-          grand[i] += x;
           net[i] += direction(kind) * x;
         });
       }
@@ -2453,7 +2451,6 @@ class MyBankCard extends HTMLElement {
         tr.hidden = !parent || parent.hidden || parent.classList.contains("collapsed");
         if (parent) paint(tr, subtree(parent));
       }
-      paint(table.querySelector("tr.grand-total"), grand);
       paint(table.querySelector("tr.net-total"), net);
     };
     this._wireCollapse(content, refresh);
@@ -3883,7 +3880,6 @@ const I18N = {
     "Tiers|champ": "Payee",
     "Titre (facultatif)": "Title (optional)",
     "Total": "Total",
-    "Total général (toutes rubriques)": "Grand total (all categories)",
     "Total {name}": "Total {name}",
     "Total {total} € · part de chacun {share} €": "Total {total} € · each person's share {share} €",
     "Tous": "All",
@@ -4256,7 +4252,6 @@ const I18N = {
     "Tiers|champ": "Empfänger",
     "Titre (facultatif)": "Titel (optional)",
     "Total": "Summe",
-    "Total général (toutes rubriques)": "Gesamtsumme (alle Kategorien)",
     "Total {name}": "Summe {name}",
     "Total {total} € · part de chacun {share} €": "Summe {total} € · Anteil pro Person {share} €",
     "Tous": "Alle",
