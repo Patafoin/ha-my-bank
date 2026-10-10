@@ -1,0 +1,1682 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to My Bank API",
+        "description": "My Bank needs a running My Bank API server (Home Assistant add-on or Docker container).",
+        "data": {
+          "url": "My Bank API URL",
+          "token": "Access token"
+        },
+        "data_description": {
+          "url": "Address of the My Bank API server, e.g. http://192.168.1.10:9931. Not needed with the add-on, which is discovered automatically.",
+          "token": "Created on the server with: docker exec my-bank-api my-bank token create home-assistant (or set MYBANK_API_TOKEN)."
+        }
+      },
+      "reauth_confirm": {
+        "title": "My Bank token required",
+        "description": "My Bank API rejected the token. Enter the URL and a valid token.",
+        "data": {
+          "url": "My Bank API URL",
+          "token": "Access token"
+        },
+        "data_description": {
+          "url": "Address of the My Bank API server, e.g. http://192.168.1.10:9931. Not needed with the add-on, which is discovered automatically.",
+          "token": "Created on the server with: docker exec my-bank-api my-bank token create home-assistant (or set MYBANK_API_TOKEN)."
+        }
+      },
+      "hassio_confirm": {
+        "title": "My Bank API add-on found",
+        "description": "Connect Home Assistant to the {addon} add-on?"
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach My Bank API at this URL.",
+      "invalid_auth": "Token rejected by My Bank API."
+    },
+    "abort": {
+      "already_configured": "This My Bank API instance is already configured.",
+      "reauth_successful": "My Bank API connection updated."
+    }
+  },
+  "issues": {
+    "api_too_old": {
+      "title": "My Bank API needs an update",
+      "description": "My Bank API {version} is older than the minimum version this integration needs ({minimum}). Update the My Bank API add-on or Docker image, otherwise some features of the card will fail."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ending_schedules": {
+        "name": "Scheduled transactions ending",
+        "unit_of_measurement": "scheduled transactions",
+        "state_attributes": {
+          "jours": {
+            "name": "Days"
+          },
+          "planifications": {
+            "name": "Scheduled transactions"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "My Bank is not connected (Settings → Devices & services → My Bank)."
+    }
+  },
+  "services": {
+    "create_account": {
+      "name": "Create account",
+      "description": "Creates a bank account.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Account type."
+        },
+        "number": {
+          "name": "Number",
+          "description": "Account number."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Opening balance",
+          "description": "Balance before the first transaction, e.g. 1250.00."
+        },
+        "opening_date": {
+          "name": "Opening balance date",
+          "description": "Date of the opening balance."
+        },
+        "closed": {
+          "name": "Closed",
+          "description": "Closed account (kept for history)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        }
+      }
+    },
+    "update_account": {
+      "name": "Update account",
+      "description": "Changes an account; only the fields given are changed.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Account type."
+        },
+        "number": {
+          "name": "Number",
+          "description": "Account number."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Opening balance",
+          "description": "Balance before the first transaction, e.g. 1250.00."
+        },
+        "opening_date": {
+          "name": "Opening balance date",
+          "description": "Date of the opening balance."
+        },
+        "closed": {
+          "name": "Closed",
+          "description": "Closed account (kept for history)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        }
+      }
+    },
+    "delete_account": {
+      "name": "Delete account",
+      "description": "Deletes an account (refused if it has transactions).",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        }
+      }
+    },
+    "create_category": {
+      "name": "Create category",
+      "description": "Creates a category (income, expense or savings), at the top level or under a parent.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Category type (top-level categories only; inherited otherwise)."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Id of the parent item; empty for the top level."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        }
+      }
+    },
+    "update_category": {
+      "name": "Update category",
+      "description": "Changes a category; only the fields given are changed.",
+      "fields": {
+        "category_id": {
+          "name": "Category",
+          "description": "Category id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Category type (top-level categories only; inherited otherwise)."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Id of the parent item; empty for the top level."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        }
+      }
+    },
+    "delete_category": {
+      "name": "Delete category",
+      "description": "Deletes a category (refused if it is still used).",
+      "fields": {
+        "category_id": {
+          "name": "Category",
+          "description": "Category id."
+        }
+      }
+    },
+    "create_class": {
+      "name": "Create class",
+      "description": "Creates a class, a second classification axis independent of categories.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Id of the parent item; empty for the top level."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        }
+      }
+    },
+    "update_class": {
+      "name": "Update class",
+      "description": "Changes a class; only the fields given are changed.",
+      "fields": {
+        "class_id": {
+          "name": "Class",
+          "description": "Class id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Id of the parent item; empty for the top level."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        }
+      }
+    },
+    "delete_class": {
+      "name": "Delete class",
+      "description": "Deletes a class (refused if it is still used).",
+      "fields": {
+        "class_id": {
+          "name": "Class",
+          "description": "Class id."
+        }
+      }
+    },
+    "create_payee": {
+      "name": "Create payee",
+      "description": "Creates a payee, with its contact and bank details.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "default_category_id": {
+          "name": "Default category",
+          "description": "Category suggested for this payee's transactions."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        },
+        "short_name": {
+          "name": "Short name",
+          "description": "Short name."
+        },
+        "address1": {
+          "name": "Address line 1",
+          "description": "Address line 1."
+        },
+        "address2": {
+          "name": "Address line 2",
+          "description": "Address line 2."
+        },
+        "address3": {
+          "name": "Address line 3",
+          "description": "Address line 3."
+        },
+        "postal_code": {
+          "name": "Postcode",
+          "description": "Postcode."
+        },
+        "city": {
+          "name": "City",
+          "description": "City."
+        },
+        "region": {
+          "name": "Region",
+          "description": "Region or state."
+        },
+        "country": {
+          "name": "Country",
+          "description": "Country."
+        },
+        "phone": {
+          "name": "Phone",
+          "description": "Phone number."
+        },
+        "phone2": {
+          "name": "Phone 2",
+          "description": "Second phone number."
+        },
+        "mobile": {
+          "name": "Mobile",
+          "description": "Mobile number."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Fax number."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Second fax number."
+        },
+        "email": {
+          "name": "Email",
+          "description": "Email address."
+        },
+        "url": {
+          "name": "Website",
+          "description": "Website address."
+        },
+        "bank_name": {
+          "name": "Bank name",
+          "description": "Name of the payee's bank."
+        },
+        "bank_code": {
+          "name": "Bank code",
+          "description": "Bank code."
+        },
+        "branch_code": {
+          "name": "Branch code",
+          "description": "Branch code."
+        },
+        "account_number": {
+          "name": "Account number",
+          "description": "Payee's account number."
+        },
+        "rib_key": {
+          "name": "RIB key",
+          "description": "Key of a French bank account identifier (RIB)."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "BIC (SWIFT) code."
+        },
+        "free1": {
+          "name": "Free field 1",
+          "description": "Free field."
+        },
+        "free2": {
+          "name": "Free field 2",
+          "description": "Free field."
+        },
+        "free3": {
+          "name": "Free field 3",
+          "description": "Free field."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "external_code": {
+          "name": "External code",
+          "description": "Code in another application."
+        },
+        "payee_category": {
+          "name": "Payee category",
+          "description": "Free grouping of payees."
+        }
+      }
+    },
+    "update_payee": {
+      "name": "Update payee",
+      "description": "Changes a payee; only the fields given are changed.",
+      "fields": {
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "default_category_id": {
+          "name": "Default category",
+          "description": "Category suggested for this payee's transactions."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        },
+        "short_name": {
+          "name": "Short name",
+          "description": "Short name."
+        },
+        "address1": {
+          "name": "Address line 1",
+          "description": "Address line 1."
+        },
+        "address2": {
+          "name": "Address line 2",
+          "description": "Address line 2."
+        },
+        "address3": {
+          "name": "Address line 3",
+          "description": "Address line 3."
+        },
+        "postal_code": {
+          "name": "Postcode",
+          "description": "Postcode."
+        },
+        "city": {
+          "name": "City",
+          "description": "City."
+        },
+        "region": {
+          "name": "Region",
+          "description": "Region or state."
+        },
+        "country": {
+          "name": "Country",
+          "description": "Country."
+        },
+        "phone": {
+          "name": "Phone",
+          "description": "Phone number."
+        },
+        "phone2": {
+          "name": "Phone 2",
+          "description": "Second phone number."
+        },
+        "mobile": {
+          "name": "Mobile",
+          "description": "Mobile number."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Fax number."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Second fax number."
+        },
+        "email": {
+          "name": "Email",
+          "description": "Email address."
+        },
+        "url": {
+          "name": "Website",
+          "description": "Website address."
+        },
+        "bank_name": {
+          "name": "Bank name",
+          "description": "Name of the payee's bank."
+        },
+        "bank_code": {
+          "name": "Bank code",
+          "description": "Bank code."
+        },
+        "branch_code": {
+          "name": "Branch code",
+          "description": "Branch code."
+        },
+        "account_number": {
+          "name": "Account number",
+          "description": "Payee's account number."
+        },
+        "rib_key": {
+          "name": "RIB key",
+          "description": "Key of a French bank account identifier (RIB)."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "BIC (SWIFT) code."
+        },
+        "free1": {
+          "name": "Free field 1",
+          "description": "Free field."
+        },
+        "free2": {
+          "name": "Free field 2",
+          "description": "Free field."
+        },
+        "free3": {
+          "name": "Free field 3",
+          "description": "Free field."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "external_code": {
+          "name": "External code",
+          "description": "Code in another application."
+        },
+        "payee_category": {
+          "name": "Payee category",
+          "description": "Free grouping of payees."
+        }
+      }
+    },
+    "delete_payee": {
+      "name": "Delete payee",
+      "description": "Deletes a payee (refused if it is still used).",
+      "fields": {
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        }
+      }
+    },
+    "create_payment_method": {
+      "name": "Create payment method",
+      "description": "Creates a payment method (card, cheque, direct debit…).",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name of the payment method."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active payment method."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        }
+      }
+    },
+    "update_payment_method": {
+      "name": "Update payment method",
+      "description": "Changes a payment method.",
+      "fields": {
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name of the payment method."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active payment method."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sort order."
+        }
+      }
+    },
+    "delete_payment_method": {
+      "name": "Delete payment method",
+      "description": "Deletes a payment method (refused if it is still used).",
+      "fields": {
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        }
+      }
+    },
+    "create_transaction": {
+      "name": "Create transaction",
+      "description": "Records a transaction on an account, with one category or a split.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (YYYY-MM-DD)."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Signed amount: negative for a debit, positive for a credit, e.g. -14.80."
+        },
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        },
+        "payee_name": {
+          "name": "Payee name",
+          "description": "Payee by name, created if it does not exist."
+        },
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        },
+        "number": {
+          "name": "Cheque number",
+          "description": "Cheque number."
+        },
+        "label": {
+          "name": "Description",
+          "description": "Description of the transaction."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "state": {
+          "name": "State",
+          "description": "Not cleared, cleared or reconciled."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id, when there is no split."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id, when there is no split."
+        },
+        "splits": {
+          "name": "Split",
+          "description": "List of lines {amount, category_id, class_id, label}; their sum must equal the amount."
+        }
+      }
+    },
+    "update_transaction": {
+      "name": "Update transaction",
+      "description": "Changes a transaction; only the fields given are changed. Amount, date, account and split of a reconciled transaction are locked.",
+      "fields": {
+        "transaction_id": {
+          "name": "Transaction",
+          "description": "Transaction id."
+        },
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (YYYY-MM-DD)."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Signed amount: negative for a debit, positive for a credit, e.g. -14.80."
+        },
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        },
+        "payee_name": {
+          "name": "Payee name",
+          "description": "Payee by name, created if it does not exist."
+        },
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        },
+        "number": {
+          "name": "Cheque number",
+          "description": "Cheque number."
+        },
+        "label": {
+          "name": "Description",
+          "description": "Description of the transaction."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "state": {
+          "name": "State",
+          "description": "Not cleared, cleared or reconciled."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id, when there is no split."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id, when there is no split."
+        },
+        "splits": {
+          "name": "Split",
+          "description": "List of lines {amount, category_id, class_id, label}; their sum must equal the amount."
+        }
+      }
+    },
+    "delete_transaction": {
+      "name": "Delete transaction",
+      "description": "Deletes a transaction (both legs for a transfer).",
+      "fields": {
+        "transaction_id": {
+          "name": "Transaction",
+          "description": "Transaction id."
+        }
+      }
+    },
+    "set_transaction_state": {
+      "name": "Set transaction state",
+      "description": "Clears, reconciles or un-clears a transaction.",
+      "fields": {
+        "transaction_id": {
+          "name": "Transaction",
+          "description": "Transaction id."
+        },
+        "state": {
+          "name": "State",
+          "description": "Not cleared, cleared or reconciled."
+        }
+      }
+    },
+    "set_transactions_state": {
+      "name": "Set state of several transactions",
+      "description": "Sets the same state on several transactions at once (statement reconciliation).",
+      "fields": {
+        "ids": {
+          "name": "Transactions",
+          "description": "List of transaction ids."
+        },
+        "state": {
+          "name": "State",
+          "description": "State given to every transaction."
+        }
+      }
+    },
+    "create_transfer": {
+      "name": "Create transfer",
+      "description": "Moves money between two accounts: two twin transactions, each with its own state.",
+      "fields": {
+        "from_account_id": {
+          "name": "From account",
+          "description": "Id of the debited account."
+        },
+        "to_account_id": {
+          "name": "To account",
+          "description": "Id of the credited account."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (YYYY-MM-DD)."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Positive amount, debited from one account and credited to the other."
+        },
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        },
+        "label": {
+          "name": "Description",
+          "description": "Description of the transaction."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id, when there is no split."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id, when there is no split."
+        },
+        "from_state": {
+          "name": "State of the debit leg",
+          "description": "State of the transaction on the debited account."
+        },
+        "to_state": {
+          "name": "State of the credit leg",
+          "description": "State of the transaction on the credited account."
+        }
+      }
+    },
+    "list_accounts": {
+      "name": "List accounts",
+      "description": "Returns the accounts with their three balances (total, cleared, reconciled).",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Balances at this date (YYYY-MM-DD)."
+        },
+        "include_closed": {
+          "name": "Include closed accounts",
+          "description": "Also return closed accounts."
+        }
+      }
+    },
+    "list_categories": {
+      "name": "List categories",
+      "description": "Returns the category tree as a flat list (with path and depth)."
+    },
+    "list_classes": {
+      "name": "List classes",
+      "description": "Returns the class tree as a flat list."
+    },
+    "list_payees": {
+      "name": "List payees",
+      "description": "Returns the payees, optionally filtered.",
+      "fields": {
+        "q": {
+          "name": "Text",
+          "description": "Text to search for."
+        },
+        "active": {
+          "name": "Active only",
+          "description": "Only active payees."
+        }
+      }
+    },
+    "list_payment_methods": {
+      "name": "List payment methods",
+      "description": "Returns the payment methods."
+    },
+    "list_account_transactions": {
+      "name": "List account transactions",
+      "description": "Returns the transactions of an account over a period, with the balance after each line.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "start": {
+          "name": "Start",
+          "description": "First date (YYYY-MM-DD)."
+        },
+        "end": {
+          "name": "End",
+          "description": "Last date (YYYY-MM-DD)."
+        },
+        "state": {
+          "name": "States",
+          "description": "Only transactions in these states."
+        },
+        "order": {
+          "name": "Order",
+          "description": "Date order."
+        }
+      }
+    },
+    "search_transactions": {
+      "name": "Search transactions",
+      "description": "Searches transactions across accounts by date, state, payee, category, class or text.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "start": {
+          "name": "Start",
+          "description": "First date (YYYY-MM-DD)."
+        },
+        "end": {
+          "name": "End",
+          "description": "Last date (YYYY-MM-DD)."
+        },
+        "state": {
+          "name": "States",
+          "description": "Only transactions in these states."
+        },
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id."
+        },
+        "include_subcategories": {
+          "name": "Include subcategories",
+          "description": "Also match the subcategories of the category."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id."
+        },
+        "q": {
+          "name": "Text",
+          "description": "Text to search for."
+        },
+        "order": {
+          "name": "Order",
+          "description": "Date order."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum number of results."
+        },
+        "offset": {
+          "name": "Offset",
+          "description": "Number of results to skip (paging)."
+        }
+      }
+    },
+    "create_schedule": {
+      "name": "Create scheduled transaction",
+      "description": "Creates a periodic transaction or an instalment plan, generated automatically when due.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "label": {
+          "name": "Description",
+          "description": "Description of the scheduled transaction (default: the payee)."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Periodic (fixed amount) or instalment plan (amount per occurrence)."
+        },
+        "start_date": {
+          "name": "First occurrence",
+          "description": "Date of the first occurrence."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "Repetition unit."
+        },
+        "every": {
+          "name": "Every",
+          "description": "Every N units."
+        },
+        "end_mode": {
+          "name": "End",
+          "description": "Never, on a date, or after a number of occurrences."
+        },
+        "end_date": {
+          "name": "End date",
+          "description": "Last possible date of an occurrence."
+        },
+        "count": {
+          "name": "Number of occurrences",
+          "description": "Number of occurrences when the end is a count."
+        },
+        "amount": {
+          "name": "Base amount",
+          "description": "Signed amount of each occurrence (negative = debit)."
+        },
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        },
+        "payee_name": {
+          "name": "Payee name",
+          "description": "Payee by name, created if it does not exist."
+        },
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id."
+        },
+        "transfer_account_id": {
+          "name": "Transfer account",
+          "description": "For a transfer: the other account (negative amount = to that account)."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "auto": {
+          "name": "Automatic",
+          "description": "Enter the transaction automatically when due."
+        },
+        "lead_days": {
+          "name": "Days in advance",
+          "description": "Enter the transaction this many days before its date."
+        },
+        "generate_from": {
+          "name": "Generate from",
+          "description": "Do not enter anything automatically before this date (default: today)."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Update scheduled transaction",
+      "description": "Changes a scheduled transaction; occurrences not yet generated follow.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        },
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "label": {
+          "name": "Description",
+          "description": "Description of the scheduled transaction (default: the payee)."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Periodic (fixed amount) or instalment plan (amount per occurrence)."
+        },
+        "start_date": {
+          "name": "First occurrence",
+          "description": "Date of the first occurrence."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "Repetition unit."
+        },
+        "every": {
+          "name": "Every",
+          "description": "Every N units."
+        },
+        "end_mode": {
+          "name": "End",
+          "description": "Never, on a date, or after a number of occurrences."
+        },
+        "end_date": {
+          "name": "End date",
+          "description": "Last possible date of an occurrence."
+        },
+        "count": {
+          "name": "Number of occurrences",
+          "description": "Number of occurrences when the end is a count."
+        },
+        "amount": {
+          "name": "Base amount",
+          "description": "Signed amount of each occurrence (negative = debit)."
+        },
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id."
+        },
+        "payee_name": {
+          "name": "Payee name",
+          "description": "Payee by name, created if it does not exist."
+        },
+        "payment_method_id": {
+          "name": "Payment method",
+          "description": "Payment method id."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id."
+        },
+        "transfer_account_id": {
+          "name": "Transfer account",
+          "description": "For a transfer: the other account (negative amount = to that account)."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "auto": {
+          "name": "Automatic",
+          "description": "Enter the transaction automatically when due."
+        },
+        "lead_days": {
+          "name": "Days in advance",
+          "description": "Enter the transaction this many days before its date."
+        },
+        "generate_from": {
+          "name": "Generate from",
+          "description": "Do not enter anything automatically before this date (default: today)."
+        },
+        "active": {
+          "name": "Active",
+          "description": "Active item (inactive items are hidden from choices)."
+        }
+      }
+    },
+    "delete_schedule": {
+      "name": "Delete scheduled transaction",
+      "description": "Deletes a scheduled transaction; transactions already generated are kept.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        }
+      }
+    },
+    "set_schedule_occurrences": {
+      "name": "Set instalment plan grid",
+      "description": "Saves the amount (and optionally the date) of each occurrence of an instalment plan.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        },
+        "items": {
+          "name": "Grid",
+          "description": "List [{rank, amount, date}]; date optional, otherwise the rule's date."
+        }
+      }
+    },
+    "skip_occurrence": {
+      "name": "Skip occurrence",
+      "description": "Skips an occurrence: it will not be entered.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        },
+        "rank": {
+          "name": "Occurrence number",
+          "description": "Rank of the occurrence (1 = first)."
+        }
+      }
+    },
+    "restore_occurrence": {
+      "name": "Restore occurrence",
+      "description": "Restores a skipped occurrence.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        },
+        "rank": {
+          "name": "Occurrence number",
+          "description": "Rank of the occurrence (1 = first)."
+        }
+      }
+    },
+    "generate_occurrence": {
+      "name": "Enter occurrence now",
+      "description": "Enters the transaction of an occurrence now, without waiting for its date.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        },
+        "rank": {
+          "name": "Occurrence number",
+          "description": "Rank of the occurrence (1 = first)."
+        }
+      }
+    },
+    "generate_due_occurrences": {
+      "name": "Generate due occurrences",
+      "description": "Enters every occurrence that is due (also done every night)."
+    },
+    "create_budget": {
+      "name": "Create budget",
+      "description": "Creates a budget for an account over a range of months.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "start_month": {
+          "name": "First month",
+          "description": "First month (YYYY-MM)."
+        },
+        "months": {
+          "name": "Number of months",
+          "description": "Number of months (1 to 36)."
+        },
+        "archived": {
+          "name": "Archived",
+          "description": "Archived budget."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        }
+      }
+    },
+    "update_budget": {
+      "name": "Update budget",
+      "description": "Changes a budget; only the fields given are changed.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget id."
+        },
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "start_month": {
+          "name": "First month",
+          "description": "First month (YYYY-MM)."
+        },
+        "months": {
+          "name": "Number of months",
+          "description": "Number of months (1 to 36)."
+        },
+        "archived": {
+          "name": "Archived",
+          "description": "Archived budget."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        }
+      }
+    },
+    "delete_budget": {
+      "name": "Delete budget",
+      "description": "Deletes a budget and all its amounts.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget id."
+        }
+      }
+    },
+    "set_budget_lines": {
+      "name": "Set budget grid",
+      "description": "Saves the categories × months grid of a budget (positive amounts, in the category's direction).",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget id."
+        },
+        "lines": {
+          "name": "Cells",
+          "description": "List [{category_id, month, amount}]."
+        }
+      }
+    },
+    "copy_budget": {
+      "name": "Copy budget",
+      "description": "Copies a budget to a new period with the same amounts.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget to copy",
+          "description": "Id of the budget to copy."
+        },
+        "name": {
+          "name": "New name",
+          "description": "Name of the new budget."
+        },
+        "start_month": {
+          "name": "First month",
+          "description": "First month (YYYY-MM); default: the month after the copied budget."
+        },
+        "months": {
+          "name": "Number of months",
+          "description": "Number of months; default: same as the copied budget."
+        },
+        "account_id": {
+          "name": "Account",
+          "description": "Account id; default: the same account."
+        }
+      }
+    },
+    "list_schedules": {
+      "name": "List scheduled transactions",
+      "description": "Returns the scheduled transactions.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "active": {
+          "name": "Active only",
+          "description": "Only active scheduled transactions."
+        }
+      }
+    },
+    "list_upcoming_occurrences": {
+      "name": "List upcoming occurrences",
+      "description": "Returns the occurrences due within a number of days, and the overdue ones.",
+      "fields": {
+        "days": {
+          "name": "Horizon (days)",
+          "description": "Number of days ahead."
+        },
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        }
+      }
+    },
+    "list_schedule_occurrences": {
+      "name": "List occurrences of a schedule",
+      "description": "Returns every occurrence of a scheduled transaction with its status.",
+      "fields": {
+        "schedule_id": {
+          "name": "Scheduled transaction",
+          "description": "Scheduled transaction id."
+        },
+        "upcoming": {
+          "name": "Upcoming occurrences",
+          "description": "For a schedule without end: number of upcoming occurrences to return."
+        }
+      }
+    },
+    "list_budgets": {
+      "name": "List budgets",
+      "description": "Returns the budgets.",
+      "fields": {
+        "account_id": {
+          "name": "Account",
+          "description": "Account id."
+        },
+        "include_archived": {
+          "name": "Include archived",
+          "description": "Also return archived budgets."
+        }
+      }
+    },
+    "get_budget_lines": {
+      "name": "Get budget grid",
+      "description": "Returns the planned amounts of a budget, per category and month.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget id."
+        }
+      }
+    },
+    "get_budget_report": {
+      "name": "Get budget report",
+      "description": "Returns planned, actual and variance of a budget, per category and month.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget id."
+        }
+      }
+    },
+    "create_shared_account": {
+      "name": "Create shared account",
+      "description": "Creates a shared account to settle a group's common expenses.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "participants": {
+          "name": "Participants",
+          "description": "Names of the participants (at least two, yourself included)."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        }
+      }
+    },
+    "update_shared_account": {
+      "name": "Update shared account",
+      "description": "Renames, closes or reopens a shared account.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free notes."
+        },
+        "closed": {
+          "name": "Closed",
+          "description": "True: close (freezes expenses); false: reopen."
+        }
+      }
+    },
+    "delete_shared_account": {
+      "name": "Delete shared account",
+      "description": "Deletes a shared account with its participants and expenses.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        }
+      }
+    },
+    "add_shared_participant": {
+      "name": "Add participant",
+      "description": "Adds a participant to a shared account.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name of the participant."
+        }
+      }
+    },
+    "rename_shared_participant": {
+      "name": "Rename participant",
+      "description": "Renames a participant of a shared account.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "participant_id": {
+          "name": "Participant",
+          "description": "Participant id."
+        },
+        "name": {
+          "name": "New name",
+          "description": "New name of the participant."
+        }
+      }
+    },
+    "remove_shared_participant": {
+      "name": "Remove participant",
+      "description": "Removes a participant who has paid nothing (at least two must remain).",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "participant_id": {
+          "name": "Participant",
+          "description": "Participant id."
+        }
+      }
+    },
+    "add_shared_expense": {
+      "name": "Add shared expense",
+      "description": "Records an expense paid by a participant of a shared account.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "participant_id": {
+          "name": "Paid by",
+          "description": "Id of the participant who paid."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Positive amount paid."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (YYYY-MM-DD); default: today."
+        },
+        "label": {
+          "name": "Description",
+          "description": "What the expense was for."
+        }
+      }
+    },
+    "update_shared_expense": {
+      "name": "Update shared expense",
+      "description": "Changes an expense of a shared account.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "expense_id": {
+          "name": "Expense",
+          "description": "Expense id."
+        },
+        "participant_id": {
+          "name": "Paid by",
+          "description": "Id of the participant who paid."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Positive amount paid."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (YYYY-MM-DD)."
+        },
+        "label": {
+          "name": "Description",
+          "description": "What the expense was for."
+        }
+      }
+    },
+    "delete_shared_expense": {
+      "name": "Delete shared expense",
+      "description": "Deletes an expense of a shared account.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        },
+        "expense_id": {
+          "name": "Expense",
+          "description": "Expense id."
+        }
+      }
+    },
+    "list_shared_accounts": {
+      "name": "List shared accounts",
+      "description": "Returns the shared accounts with totals, next payer and repayments."
+    },
+    "get_shared_account": {
+      "name": "Get shared account",
+      "description": "Returns a shared account with its expenses, shares and repayments.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Shared account",
+          "description": "Shared account id."
+        }
+      }
+    },
+    "move_account": {
+      "name": "Move account transactions",
+      "description": "Moves every transaction and schedule of an account to another account.",
+      "fields": {
+        "account_id": {
+          "name": "Source account",
+          "description": "Id of the account whose transactions are moved."
+        },
+        "target_id": {
+          "name": "Target",
+          "description": "Id of the item that receives the transactions."
+        },
+        "include_reconciled": {
+          "name": "Include reconciled",
+          "description": "Also move reconciled transactions (both reconciled balances change)."
+        }
+      }
+    },
+    "move_category": {
+      "name": "Move category transactions",
+      "description": "Moves every transaction and schedule of a category to another category.",
+      "fields": {
+        "category_id": {
+          "name": "Source category",
+          "description": "Id of the category whose transactions are moved."
+        },
+        "target_id": {
+          "name": "Target",
+          "description": "Id of the item that receives the transactions."
+        }
+      }
+    },
+    "move_class": {
+      "name": "Move class transactions",
+      "description": "Moves every transaction and schedule of a class to another class.",
+      "fields": {
+        "class_id": {
+          "name": "Source class",
+          "description": "Id of the class whose transactions are moved."
+        },
+        "target_id": {
+          "name": "Target",
+          "description": "Id of the item that receives the transactions."
+        }
+      }
+    },
+    "move_payee": {
+      "name": "Move payee transactions",
+      "description": "Moves every transaction and schedule of a payee to another payee (merge).",
+      "fields": {
+        "payee_id": {
+          "name": "Source payee",
+          "description": "Id of the payee whose transactions are moved."
+        },
+        "target_id": {
+          "name": "Target",
+          "description": "Id of the item that receives the transactions."
+        }
+      }
+    }
+  },
+  "selector": {
+    "account_kind": {
+      "options": {
+        "checking": "Checking",
+        "savings": "Savings",
+        "card": "Card",
+        "cash": "Cash",
+        "other": "Other"
+      }
+    },
+    "category_kind": {
+      "options": {
+        "income": "Income",
+        "expense": "Expense",
+        "savings": "Savings"
+      }
+    },
+    "transaction_state": {
+      "options": {
+        "0": "Not cleared",
+        "1": "Cleared",
+        "2": "Reconciled"
+      }
+    },
+    "order": {
+      "options": {
+        "asc": "Oldest first",
+        "desc": "Newest first"
+      }
+    },
+    "schedule_mode": {
+      "options": {
+        "periodic": "Periodic (fixed amount)",
+        "installments": "Instalment plan"
+      }
+    },
+    "unit": {
+      "options": {
+        "day": "Days",
+        "week": "Weeks",
+        "month": "Months",
+        "quarter": "Quarters",
+        "year": "Years"
+      }
+    },
+    "end_mode": {
+      "options": {
+        "never": "Never",
+        "date": "On a date",
+        "count": "After N occurrences"
+      }
+    }
+  }
+}

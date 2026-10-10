@@ -1,0 +1,1543 @@
+create_account:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+      example: Compte courant
+    kind:
+      required: false
+      selector:
+        select:
+          options:
+          - checking
+          - savings
+          - card
+          - cash
+          - other
+          translation_key: account_kind
+    number:
+      required: false
+      selector:
+        text: {}
+    iban:
+      required: false
+      selector:
+        text: {}
+    opening_balance:
+      required: false
+      selector:
+        text: {}
+      example: '0'
+    opening_date:
+      required: false
+      selector:
+        date: {}
+    closed:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+    notes:
+      required: false
+      selector:
+        text: {}
+update_account:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    kind:
+      required: false
+      selector:
+        select:
+          options:
+          - checking
+          - savings
+          - card
+          - cash
+          - other
+          translation_key: account_kind
+    number:
+      required: false
+      selector:
+        text: {}
+    iban:
+      required: false
+      selector:
+        text: {}
+    opening_balance:
+      required: false
+      selector:
+        text: {}
+      example: '0'
+    opening_date:
+      required: false
+      selector:
+        date: {}
+    closed:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+    notes:
+      required: false
+      selector:
+        text: {}
+delete_account:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+create_category:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+    kind:
+      required: false
+      selector:
+        select:
+          options:
+          - income
+          - expense
+          - savings
+          translation_key: category_kind
+    parent_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+update_category:
+  fields:
+    category_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    kind:
+      required: false
+      selector:
+        select:
+          options:
+          - income
+          - expense
+          - savings
+          translation_key: category_kind
+    parent_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+delete_category:
+  fields:
+    category_id:
+      required: true
+      selector:
+        number:
+          mode: box
+create_class:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+    parent_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+update_class:
+  fields:
+    class_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    parent_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+delete_class:
+  fields:
+    class_id:
+      required: true
+      selector:
+        number:
+          mode: box
+create_payee:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+    default_category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+    short_name:
+      required: false
+      selector:
+        text: {}
+    address1:
+      required: false
+      selector:
+        text: {}
+    address2:
+      required: false
+      selector:
+        text: {}
+    address3:
+      required: false
+      selector:
+        text: {}
+    postal_code:
+      required: false
+      selector:
+        text: {}
+    city:
+      required: false
+      selector:
+        text: {}
+    region:
+      required: false
+      selector:
+        text: {}
+    country:
+      required: false
+      selector:
+        text: {}
+    phone:
+      required: false
+      selector:
+        text: {}
+    phone2:
+      required: false
+      selector:
+        text: {}
+    mobile:
+      required: false
+      selector:
+        text: {}
+    fax:
+      required: false
+      selector:
+        text: {}
+    fax2:
+      required: false
+      selector:
+        text: {}
+    email:
+      required: false
+      selector:
+        text: {}
+    url:
+      required: false
+      selector:
+        text: {}
+    bank_name:
+      required: false
+      selector:
+        text: {}
+    bank_code:
+      required: false
+      selector:
+        text: {}
+    branch_code:
+      required: false
+      selector:
+        text: {}
+    account_number:
+      required: false
+      selector:
+        text: {}
+    rib_key:
+      required: false
+      selector:
+        text: {}
+    iban:
+      required: false
+      selector:
+        text: {}
+    swift:
+      required: false
+      selector:
+        text: {}
+    free1:
+      required: false
+      selector:
+        text: {}
+    free2:
+      required: false
+      selector:
+        text: {}
+    free3:
+      required: false
+      selector:
+        text: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+    external_code:
+      required: false
+      selector:
+        text: {}
+    payee_category:
+      required: false
+      selector:
+        text: {}
+update_payee:
+  fields:
+    payee_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    default_category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+    short_name:
+      required: false
+      selector:
+        text: {}
+    address1:
+      required: false
+      selector:
+        text: {}
+    address2:
+      required: false
+      selector:
+        text: {}
+    address3:
+      required: false
+      selector:
+        text: {}
+    postal_code:
+      required: false
+      selector:
+        text: {}
+    city:
+      required: false
+      selector:
+        text: {}
+    region:
+      required: false
+      selector:
+        text: {}
+    country:
+      required: false
+      selector:
+        text: {}
+    phone:
+      required: false
+      selector:
+        text: {}
+    phone2:
+      required: false
+      selector:
+        text: {}
+    mobile:
+      required: false
+      selector:
+        text: {}
+    fax:
+      required: false
+      selector:
+        text: {}
+    fax2:
+      required: false
+      selector:
+        text: {}
+    email:
+      required: false
+      selector:
+        text: {}
+    url:
+      required: false
+      selector:
+        text: {}
+    bank_name:
+      required: false
+      selector:
+        text: {}
+    bank_code:
+      required: false
+      selector:
+        text: {}
+    branch_code:
+      required: false
+      selector:
+        text: {}
+    account_number:
+      required: false
+      selector:
+        text: {}
+    rib_key:
+      required: false
+      selector:
+        text: {}
+    iban:
+      required: false
+      selector:
+        text: {}
+    swift:
+      required: false
+      selector:
+        text: {}
+    free1:
+      required: false
+      selector:
+        text: {}
+    free2:
+      required: false
+      selector:
+        text: {}
+    free3:
+      required: false
+      selector:
+        text: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+    external_code:
+      required: false
+      selector:
+        text: {}
+    payee_category:
+      required: false
+      selector:
+        text: {}
+delete_payee:
+  fields:
+    payee_id:
+      required: true
+      selector:
+        number:
+          mode: box
+create_payment_method:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+    active:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+update_payment_method:
+  fields:
+    payment_method_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    active:
+      required: false
+      selector:
+        boolean: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+delete_payment_method:
+  fields:
+    payment_method_id:
+      required: true
+      selector:
+        number:
+          mode: box
+create_transaction:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    date:
+      required: true
+      selector:
+        date: {}
+    amount:
+      required: true
+      selector:
+        text: {}
+      example: '-14.80'
+    payee_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    payee_name:
+      required: false
+      selector:
+        text: {}
+      example: Supermarché
+    payment_method_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    number:
+      required: false
+      selector:
+        text: {}
+    label:
+      required: false
+      selector:
+        text: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+    state:
+      required: false
+      selector:
+        select:
+          options:
+          - '0'
+          - '1'
+          - '2'
+          translation_key: transaction_state
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    splits:
+      required: false
+      selector:
+        object: {}
+      example: '[{"amount": "-10", "category_id": 3}]'
+update_transaction:
+  fields:
+    transaction_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    date:
+      required: false
+      selector:
+        date: {}
+    amount:
+      required: false
+      selector:
+        text: {}
+    payee_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    payee_name:
+      required: false
+      selector:
+        text: {}
+      example: Supermarché
+    payment_method_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    number:
+      required: false
+      selector:
+        text: {}
+    label:
+      required: false
+      selector:
+        text: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+    state:
+      required: false
+      selector:
+        select:
+          options:
+          - '0'
+          - '1'
+          - '2'
+          translation_key: transaction_state
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    splits:
+      required: false
+      selector:
+        object: {}
+      example: '[{"amount": "-10", "category_id": 3}]'
+delete_transaction:
+  fields:
+    transaction_id:
+      required: true
+      selector:
+        number:
+          mode: box
+set_transaction_state:
+  fields:
+    transaction_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    state:
+      required: true
+      selector:
+        select:
+          options:
+          - '0'
+          - '1'
+          - '2'
+          translation_key: transaction_state
+set_transactions_state:
+  fields:
+    ids:
+      required: true
+      selector:
+        object: {}
+      example: '[1, 2]'
+    state:
+      required: true
+      selector:
+        select:
+          options:
+          - '0'
+          - '1'
+          - '2'
+          translation_key: transaction_state
+create_transfer:
+  fields:
+    from_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    to_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    date:
+      required: true
+      selector:
+        date: {}
+    amount:
+      required: true
+      selector:
+        text: {}
+      example: '200'
+    payment_method_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    label:
+      required: false
+      selector:
+        text: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    from_state:
+      required: false
+      selector:
+        select:
+          options:
+          - '0'
+          - '1'
+          - '2'
+          translation_key: transaction_state
+    to_state:
+      required: false
+      selector:
+        select:
+          options:
+          - '0'
+          - '1'
+          - '2'
+          translation_key: transaction_state
+list_accounts:
+  fields:
+    date:
+      required: false
+      selector:
+        date: {}
+    include_closed:
+      required: false
+      selector:
+        boolean: {}
+list_categories: {}
+list_classes: {}
+list_payees:
+  fields:
+    q:
+      required: false
+      selector:
+        text: {}
+    active:
+      required: false
+      selector:
+        boolean: {}
+list_payment_methods: {}
+list_account_transactions:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    start:
+      required: false
+      selector:
+        date: {}
+    end:
+      required: false
+      selector:
+        date: {}
+    state:
+      required: '[0, 1]'
+      selector:
+        object: {}
+    order:
+      required: false
+      selector:
+        select:
+          options:
+          - asc
+          - desc
+          translation_key: order
+search_transactions:
+  fields:
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    start:
+      required: false
+      selector:
+        date: {}
+    end:
+      required: false
+      selector:
+        date: {}
+    state:
+      required: false
+      selector:
+        object: {}
+    payee_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    include_subcategories:
+      required: false
+      selector:
+        boolean: {}
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    q:
+      required: false
+      selector:
+        text: {}
+    order:
+      required: false
+      selector:
+        select:
+          options:
+          - asc
+          - desc
+          translation_key: order
+    limit:
+      required: false
+      selector:
+        number:
+          mode: box
+    offset:
+      required: false
+      selector:
+        number:
+          mode: box
+create_schedule:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    label:
+      required: true
+      selector:
+        text: {}
+    mode:
+      required: false
+      selector:
+        select:
+          options:
+          - periodic
+          - installments
+          translation_key: schedule_mode
+    start_date:
+      required: true
+      selector:
+        date: {}
+    unit:
+      required: false
+      selector:
+        select:
+          options:
+          - day
+          - week
+          - month
+          - quarter
+          - year
+          translation_key: unit
+    every:
+      required: false
+      selector:
+        number:
+          mode: box
+    end_mode:
+      required: false
+      selector:
+        select:
+          options:
+          - never
+          - date
+          - count
+          translation_key: end_mode
+    end_date:
+      required: false
+      selector:
+        date: {}
+    count:
+      required: false
+      selector:
+        number:
+          mode: box
+    amount:
+      required: true
+      selector:
+        text: {}
+      example: '-29.99'
+    payee_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    payee_name:
+      required: false
+      selector:
+        text: {}
+    payment_method_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    transfer_account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    notes:
+      required: false
+      selector:
+        text: {}
+    auto:
+      required: false
+      selector:
+        boolean: {}
+    lead_days:
+      required: false
+      selector:
+        number:
+          mode: box
+    generate_from:
+      required: false
+      selector:
+        date: {}
+    active:
+      required: false
+      selector:
+        boolean: {}
+update_schedule:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    label:
+      required: false
+      selector:
+        text: {}
+    mode:
+      required: false
+      selector:
+        select:
+          options:
+          - periodic
+          - installments
+          translation_key: schedule_mode
+    start_date:
+      required: false
+      selector:
+        date: {}
+    unit:
+      required: false
+      selector:
+        select:
+          options:
+          - day
+          - week
+          - month
+          - quarter
+          - year
+          translation_key: unit
+    every:
+      required: false
+      selector:
+        number:
+          mode: box
+    end_mode:
+      required: false
+      selector:
+        select:
+          options:
+          - never
+          - date
+          - count
+          translation_key: end_mode
+    end_date:
+      required: false
+      selector:
+        date: {}
+    count:
+      required: false
+      selector:
+        number:
+          mode: box
+    amount:
+      required: false
+      selector:
+        text: {}
+      example: '-29.99'
+    payee_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    payee_name:
+      required: false
+      selector:
+        text: {}
+    payment_method_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    transfer_account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    notes:
+      required: false
+      selector:
+        text: {}
+    auto:
+      required: false
+      selector:
+        boolean: {}
+    lead_days:
+      required: false
+      selector:
+        number:
+          mode: box
+    generate_from:
+      required: false
+      selector:
+        date: {}
+    active:
+      required: false
+      selector:
+        boolean: {}
+delete_schedule:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+set_schedule_occurrences:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    items:
+      required: true
+      selector:
+        object: {}
+      example: '[{"rank": 1, "amount": "-150"}, {"rank": 2, "amount": "-150", "date": "2027-09-01"}]'
+skip_occurrence:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    rank:
+      required: true
+      selector:
+        number:
+          mode: box
+restore_occurrence:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    rank:
+      required: true
+      selector:
+        number:
+          mode: box
+generate_occurrence:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    rank:
+      required: true
+      selector:
+        number:
+          mode: box
+generate_due_occurrences: {}
+create_budget:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: true
+      selector:
+        text: {}
+    start_month:
+      required: true
+      selector:
+        text: {}
+      example: 2027-01
+    months:
+      required: false
+      selector:
+        number:
+          mode: box
+    archived:
+      required: false
+      selector:
+        boolean: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+update_budget:
+  fields:
+    budget_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    start_month:
+      required: false
+      selector:
+        text: {}
+      example: 2027-01
+    months:
+      required: false
+      selector:
+        number:
+          mode: box
+    archived:
+      required: false
+      selector:
+        boolean: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+delete_budget:
+  fields:
+    budget_id:
+      required: true
+      selector:
+        number:
+          mode: box
+set_budget_lines:
+  fields:
+    budget_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    lines:
+      required: true
+      selector:
+        object: {}
+      example: '[{"category_id": 3, "month": "2027-01", "amount": "300"}]'
+copy_budget:
+  fields:
+    budget_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: true
+      selector:
+        text: {}
+    start_month:
+      required: false
+      selector:
+        text: {}
+    months:
+      required: false
+      selector:
+        number:
+          mode: box
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+list_schedules:
+  fields:
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    active:
+      required: false
+      selector:
+        boolean: {}
+list_upcoming_occurrences:
+  fields:
+    days:
+      required: false
+      selector:
+        number:
+          mode: box
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+list_schedule_occurrences:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    upcoming:
+      required: false
+      selector:
+        number:
+          mode: box
+list_budgets:
+  fields:
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    include_archived:
+      required: false
+      selector:
+        boolean: {}
+get_budget_lines:
+  fields:
+    budget_id:
+      required: true
+      selector:
+        number:
+          mode: box
+get_budget_report:
+  fields:
+    budget_id:
+      required: true
+      selector:
+        number:
+          mode: box
+create_shared_account:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+    participants:
+      required: true
+      selector:
+        text:
+          multiple: true
+    notes:
+      required: false
+      selector:
+        text: {}
+update_shared_account:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    notes:
+      required: false
+      selector:
+        text: {}
+    closed:
+      required: false
+      selector:
+        boolean: {}
+delete_shared_account:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+add_shared_participant:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: true
+      selector:
+        text: {}
+rename_shared_participant:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    participant_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: true
+      selector:
+        text: {}
+remove_shared_participant:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    participant_id:
+      required: true
+      selector:
+        number:
+          mode: box
+add_shared_expense:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    participant_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    amount:
+      required: true
+      selector:
+        text: {}
+    date:
+      required: false
+      selector:
+        text: {}
+    label:
+      required: false
+      selector:
+        text: {}
+update_shared_expense:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    expense_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    participant_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    amount:
+      required: false
+      selector:
+        text: {}
+    date:
+      required: false
+      selector:
+        text: {}
+    label:
+      required: false
+      selector:
+        text: {}
+delete_shared_expense:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    expense_id:
+      required: true
+      selector:
+        number:
+          mode: box
+list_shared_accounts: {}
+get_shared_account:
+  fields:
+    shared_account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+move_account:
+  fields:
+    account_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    target_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    include_reconciled:
+      required: false
+      selector:
+        boolean: {}
+move_category:
+  fields:
+    category_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    target_id:
+      required: true
+      selector:
+        number:
+          mode: box
+move_class:
+  fields:
+    class_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    target_id:
+      required: true
+      selector:
+        number:
+          mode: box
+move_payee:
+  fields:
+    payee_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    target_id:
+      required: true
+      selector:
+        number:
+          mode: box

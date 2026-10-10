@@ -1,0 +1,1682 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion à My Bank API",
+        "description": "My Bank a besoin d'un serveur My Bank API en service (add-on Home Assistant ou conteneur Docker).",
+        "data": {
+          "url": "URL de My Bank API",
+          "token": "Jeton d'accès"
+        },
+        "data_description": {
+          "url": "Adresse du serveur My Bank API, par exemple http://192.168.1.10:9931. Inutile avec l'add-on, découvert automatiquement.",
+          "token": "Créé sur le serveur par : docker exec my-bank-api my-bank token create home-assistant (ou variable MYBANK_API_TOKEN)."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Jeton My Bank à saisir",
+        "description": "My Bank API a refusé le jeton. Saisir l'URL et un jeton valide.",
+        "data": {
+          "url": "URL de My Bank API",
+          "token": "Jeton d'accès"
+        },
+        "data_description": {
+          "url": "Adresse du serveur My Bank API, par exemple http://192.168.1.10:9931. Inutile avec l'add-on, découvert automatiquement.",
+          "token": "Créé sur le serveur par : docker exec my-bank-api my-bank token create home-assistant (ou variable MYBANK_API_TOKEN)."
+        }
+      },
+      "hassio_confirm": {
+        "title": "Add-on My Bank API détecté",
+        "description": "Connecter Home Assistant à l'add-on {addon} ?"
+      }
+    },
+    "error": {
+      "cannot_connect": "My Bank API injoignable à cette URL.",
+      "invalid_auth": "Jeton refusé par My Bank API."
+    },
+    "abort": {
+      "already_configured": "Cette instance de My Bank API est déjà configurée.",
+      "reauth_successful": "Connexion à My Bank API mise à jour."
+    }
+  },
+  "issues": {
+    "api_too_old": {
+      "title": "My Bank API doit être mis à jour",
+      "description": "My Bank API {version} est plus ancien que la version minimale attendue par l'intégration ({minimum}). Mettre à jour l'add-on ou l'image Docker My Bank API, sinon certaines fonctions de la carte échoueront."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ending_schedules": {
+        "name": "Planifications arrivant à terme",
+        "unit_of_measurement": "planifications",
+        "state_attributes": {
+          "jours": {
+            "name": "Jours"
+          },
+          "planifications": {
+            "name": "Planifications"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "My Bank n'est pas connecté (Paramètres → Appareils et services → My Bank)."
+    }
+  },
+  "services": {
+    "create_account": {
+      "name": "Créer un compte",
+      "description": "Crée un compte bancaire.",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Type de compte."
+        },
+        "number": {
+          "name": "Numéro",
+          "description": "Numéro du compte."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Solde initial",
+          "description": "Solde avant la première opération, par exemple 1250,00."
+        },
+        "opening_date": {
+          "name": "Date du solde initial",
+          "description": "Date du solde initial."
+        },
+        "closed": {
+          "name": "Clos",
+          "description": "Compte clos (conservé pour l'historique)."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        }
+      }
+    },
+    "update_account": {
+      "name": "Modifier un compte",
+      "description": "Modifie un compte ; seuls les champs fournis changent.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Type de compte."
+        },
+        "number": {
+          "name": "Numéro",
+          "description": "Numéro du compte."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Solde initial",
+          "description": "Solde avant la première opération, par exemple 1250,00."
+        },
+        "opening_date": {
+          "name": "Date du solde initial",
+          "description": "Date du solde initial."
+        },
+        "closed": {
+          "name": "Clos",
+          "description": "Compte clos (conservé pour l'historique)."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        }
+      }
+    },
+    "delete_account": {
+      "name": "Supprimer un compte",
+      "description": "Supprime un compte (refusé s'il a des opérations).",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        }
+      }
+    },
+    "create_category": {
+      "name": "Créer une rubrique",
+      "description": "Crée une rubrique (recette, dépense ou épargne), à la racine ou sous un parent.",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Type de rubrique (rubrique racine uniquement ; hérité sinon)."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Identifiant de l'élément parent ; vide pour la racine."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        }
+      }
+    },
+    "update_category": {
+      "name": "Modifier une rubrique",
+      "description": "Modifie une rubrique ; seuls les champs fournis changent.",
+      "fields": {
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "kind": {
+          "name": "Type",
+          "description": "Type de rubrique (rubrique racine uniquement ; hérité sinon)."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Identifiant de l'élément parent ; vide pour la racine."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        }
+      }
+    },
+    "delete_category": {
+      "name": "Supprimer une rubrique",
+      "description": "Supprime une rubrique (refusé si elle est encore utilisée).",
+      "fields": {
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique."
+        }
+      }
+    },
+    "create_class": {
+      "name": "Créer une classe",
+      "description": "Crée une classe, second axe de classement indépendant des rubriques.",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Identifiant de l'élément parent ; vide pour la racine."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        }
+      }
+    },
+    "update_class": {
+      "name": "Modifier une classe",
+      "description": "Modifie une classe ; seuls les champs fournis changent.",
+      "fields": {
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "parent_id": {
+          "name": "Parent",
+          "description": "Identifiant de l'élément parent ; vide pour la racine."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        }
+      }
+    },
+    "delete_class": {
+      "name": "Supprimer une classe",
+      "description": "Supprime une classe (refusé si elle est encore utilisée).",
+      "fields": {
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe."
+        }
+      }
+    },
+    "create_payee": {
+      "name": "Créer un tiers",
+      "description": "Crée un tiers, avec ses coordonnées et références bancaires.",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "default_category_id": {
+          "name": "Rubrique par défaut",
+          "description": "Rubrique proposée pour les opérations de ce tiers."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "short_name": {
+          "name": "Nom abrégé",
+          "description": "Nom abrégé."
+        },
+        "address1": {
+          "name": "Adresse (ligne 1)",
+          "description": "Adresse, ligne 1."
+        },
+        "address2": {
+          "name": "Adresse (ligne 2)",
+          "description": "Adresse, ligne 2."
+        },
+        "address3": {
+          "name": "Adresse (ligne 3)",
+          "description": "Adresse, ligne 3."
+        },
+        "postal_code": {
+          "name": "Code postal",
+          "description": "Code postal."
+        },
+        "city": {
+          "name": "Ville",
+          "description": "Ville."
+        },
+        "region": {
+          "name": "Région",
+          "description": "Région ou département."
+        },
+        "country": {
+          "name": "Pays",
+          "description": "Pays."
+        },
+        "phone": {
+          "name": "Téléphone",
+          "description": "Numéro de téléphone."
+        },
+        "phone2": {
+          "name": "Téléphone 2",
+          "description": "Second numéro de téléphone."
+        },
+        "mobile": {
+          "name": "Mobile",
+          "description": "Numéro de mobile."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Numéro de fax."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Second numéro de fax."
+        },
+        "email": {
+          "name": "E-mail",
+          "description": "Adresse e-mail."
+        },
+        "url": {
+          "name": "Site web",
+          "description": "Adresse du site web."
+        },
+        "bank_name": {
+          "name": "Banque",
+          "description": "Nom de la banque du tiers."
+        },
+        "bank_code": {
+          "name": "Code banque",
+          "description": "Code banque."
+        },
+        "branch_code": {
+          "name": "Code guichet",
+          "description": "Code guichet."
+        },
+        "account_number": {
+          "name": "Numéro de compte",
+          "description": "Numéro de compte du tiers."
+        },
+        "rib_key": {
+          "name": "Clé RIB",
+          "description": "Clé RIB."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "Code BIC (SWIFT)."
+        },
+        "free1": {
+          "name": "Champ libre 1",
+          "description": "Champ libre."
+        },
+        "free2": {
+          "name": "Champ libre 2",
+          "description": "Champ libre."
+        },
+        "free3": {
+          "name": "Champ libre 3",
+          "description": "Champ libre."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "external_code": {
+          "name": "Code externe",
+          "description": "Code dans une autre application."
+        },
+        "payee_category": {
+          "name": "Catégorie de tiers",
+          "description": "Regroupement libre des tiers."
+        }
+      }
+    },
+    "update_payee": {
+      "name": "Modifier un tiers",
+      "description": "Modifie un tiers ; seuls les champs fournis changent.",
+      "fields": {
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "default_category_id": {
+          "name": "Rubrique par défaut",
+          "description": "Rubrique proposée pour les opérations de ce tiers."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "short_name": {
+          "name": "Nom abrégé",
+          "description": "Nom abrégé."
+        },
+        "address1": {
+          "name": "Adresse (ligne 1)",
+          "description": "Adresse, ligne 1."
+        },
+        "address2": {
+          "name": "Adresse (ligne 2)",
+          "description": "Adresse, ligne 2."
+        },
+        "address3": {
+          "name": "Adresse (ligne 3)",
+          "description": "Adresse, ligne 3."
+        },
+        "postal_code": {
+          "name": "Code postal",
+          "description": "Code postal."
+        },
+        "city": {
+          "name": "Ville",
+          "description": "Ville."
+        },
+        "region": {
+          "name": "Région",
+          "description": "Région ou département."
+        },
+        "country": {
+          "name": "Pays",
+          "description": "Pays."
+        },
+        "phone": {
+          "name": "Téléphone",
+          "description": "Numéro de téléphone."
+        },
+        "phone2": {
+          "name": "Téléphone 2",
+          "description": "Second numéro de téléphone."
+        },
+        "mobile": {
+          "name": "Mobile",
+          "description": "Numéro de mobile."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Numéro de fax."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Second numéro de fax."
+        },
+        "email": {
+          "name": "E-mail",
+          "description": "Adresse e-mail."
+        },
+        "url": {
+          "name": "Site web",
+          "description": "Adresse du site web."
+        },
+        "bank_name": {
+          "name": "Banque",
+          "description": "Nom de la banque du tiers."
+        },
+        "bank_code": {
+          "name": "Code banque",
+          "description": "Code banque."
+        },
+        "branch_code": {
+          "name": "Code guichet",
+          "description": "Code guichet."
+        },
+        "account_number": {
+          "name": "Numéro de compte",
+          "description": "Numéro de compte du tiers."
+        },
+        "rib_key": {
+          "name": "Clé RIB",
+          "description": "Clé RIB."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "Code BIC (SWIFT)."
+        },
+        "free1": {
+          "name": "Champ libre 1",
+          "description": "Champ libre."
+        },
+        "free2": {
+          "name": "Champ libre 2",
+          "description": "Champ libre."
+        },
+        "free3": {
+          "name": "Champ libre 3",
+          "description": "Champ libre."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "external_code": {
+          "name": "Code externe",
+          "description": "Code dans une autre application."
+        },
+        "payee_category": {
+          "name": "Catégorie de tiers",
+          "description": "Regroupement libre des tiers."
+        }
+      }
+    },
+    "delete_payee": {
+      "name": "Supprimer un tiers",
+      "description": "Supprime un tiers (refusé s'il est encore utilisé).",
+      "fields": {
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        }
+      }
+    },
+    "create_payment_method": {
+      "name": "Créer un mode de règlement",
+      "description": "Crée un mode de règlement (carte, chèque, prélèvement…).",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom du mode de règlement."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Mode de règlement actif."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        }
+      }
+    },
+    "update_payment_method": {
+      "name": "Modifier un mode de règlement",
+      "description": "Modifie un mode de règlement.",
+      "fields": {
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom du mode de règlement."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Mode de règlement actif."
+        },
+        "position": {
+          "name": "Ordre",
+          "description": "Ordre d'affichage."
+        }
+      }
+    },
+    "delete_payment_method": {
+      "name": "Supprimer un mode de règlement",
+      "description": "Supprime un mode de règlement (refusé s'il est encore utilisé).",
+      "fields": {
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        }
+      }
+    },
+    "create_transaction": {
+      "name": "Créer une opération",
+      "description": "Enregistre une opération sur un compte, avec une rubrique ou une ventilation.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (AAAA-MM-JJ)."
+        },
+        "amount": {
+          "name": "Montant",
+          "description": "Montant signé : négatif pour un débit, positif pour un crédit, par exemple -14,80."
+        },
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        },
+        "payee_name": {
+          "name": "Nom du tiers",
+          "description": "Tiers désigné par son nom, créé s'il n'existe pas."
+        },
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        },
+        "number": {
+          "name": "Numéro de chèque",
+          "description": "Numéro de chèque."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Libellé de l'opération."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "state": {
+          "name": "État",
+          "description": "Non pointée, pointée ou rapprochée."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique, sans ventilation."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe, sans ventilation."
+        },
+        "splits": {
+          "name": "Ventilation",
+          "description": "Liste de lignes {amount, category_id, class_id, label} ; leur somme doit égaler le montant."
+        }
+      }
+    },
+    "update_transaction": {
+      "name": "Modifier une opération",
+      "description": "Modifie une opération ; seuls les champs fournis changent. Montant, date, compte et ventilation d'une opération rapprochée sont verrouillés.",
+      "fields": {
+        "transaction_id": {
+          "name": "Opération",
+          "description": "Identifiant de l'opération."
+        },
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (AAAA-MM-JJ)."
+        },
+        "amount": {
+          "name": "Montant",
+          "description": "Montant signé : négatif pour un débit, positif pour un crédit, par exemple -14,80."
+        },
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        },
+        "payee_name": {
+          "name": "Nom du tiers",
+          "description": "Tiers désigné par son nom, créé s'il n'existe pas."
+        },
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        },
+        "number": {
+          "name": "Numéro de chèque",
+          "description": "Numéro de chèque."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Libellé de l'opération."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "state": {
+          "name": "État",
+          "description": "Non pointée, pointée ou rapprochée."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique, sans ventilation."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe, sans ventilation."
+        },
+        "splits": {
+          "name": "Ventilation",
+          "description": "Liste de lignes {amount, category_id, class_id, label} ; leur somme doit égaler le montant."
+        }
+      }
+    },
+    "delete_transaction": {
+      "name": "Supprimer une opération",
+      "description": "Supprime une opération (les deux jambes pour un virement).",
+      "fields": {
+        "transaction_id": {
+          "name": "Opération",
+          "description": "Identifiant de l'opération."
+        }
+      }
+    },
+    "set_transaction_state": {
+      "name": "Changer l'état d'une opération",
+      "description": "Pointe, rapproche ou dé-pointe une opération.",
+      "fields": {
+        "transaction_id": {
+          "name": "Opération",
+          "description": "Identifiant de l'opération."
+        },
+        "state": {
+          "name": "État",
+          "description": "Non pointée, pointée ou rapprochée."
+        }
+      }
+    },
+    "set_transactions_state": {
+      "name": "Changer l'état de plusieurs opérations",
+      "description": "Donne le même état à plusieurs opérations d'un coup (rapprochement d'un relevé).",
+      "fields": {
+        "ids": {
+          "name": "Opérations",
+          "description": "Liste d'identifiants d'opérations."
+        },
+        "state": {
+          "name": "État",
+          "description": "État donné à chaque opération."
+        }
+      }
+    },
+    "create_transfer": {
+      "name": "Créer un virement",
+      "description": "Transfère de l'argent entre deux comptes : deux opérations jumelles, chacune avec son état.",
+      "fields": {
+        "from_account_id": {
+          "name": "Compte débité",
+          "description": "Identifiant du compte débité."
+        },
+        "to_account_id": {
+          "name": "Compte crédité",
+          "description": "Identifiant du compte crédité."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (AAAA-MM-JJ)."
+        },
+        "amount": {
+          "name": "Montant",
+          "description": "Montant positif, débité d'un compte et crédité à l'autre."
+        },
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Libellé de l'opération."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique, sans ventilation."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe, sans ventilation."
+        },
+        "from_state": {
+          "name": "État côté débité",
+          "description": "État de l'opération sur le compte débité."
+        },
+        "to_state": {
+          "name": "État côté crédité",
+          "description": "État de l'opération sur le compte crédité."
+        }
+      }
+    },
+    "list_accounts": {
+      "name": "Lister les comptes",
+      "description": "Renvoie les comptes avec leurs trois soldes (total, pointé, rapproché).",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Soldes à cette date (AAAA-MM-JJ)."
+        },
+        "include_closed": {
+          "name": "Inclure les comptes clos",
+          "description": "Renvoyer aussi les comptes clos."
+        }
+      }
+    },
+    "list_categories": {
+      "name": "Lister les rubriques",
+      "description": "Renvoie l'arborescence des rubriques à plat (avec chemin et profondeur)."
+    },
+    "list_classes": {
+      "name": "Lister les classes",
+      "description": "Renvoie l'arborescence des classes à plat."
+    },
+    "list_payees": {
+      "name": "Lister les tiers",
+      "description": "Renvoie les tiers, éventuellement filtrés.",
+      "fields": {
+        "q": {
+          "name": "Texte",
+          "description": "Texte cherché."
+        },
+        "active": {
+          "name": "Actifs seulement",
+          "description": "Seulement les tiers actifs."
+        }
+      }
+    },
+    "list_payment_methods": {
+      "name": "Lister les modes de règlement",
+      "description": "Renvoie les modes de règlement."
+    },
+    "list_account_transactions": {
+      "name": "Lister les opérations d'un compte",
+      "description": "Renvoie les opérations d'un compte sur une période, avec le solde après chaque ligne.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Première date (AAAA-MM-JJ)."
+        },
+        "end": {
+          "name": "Fin",
+          "description": "Dernière date (AAAA-MM-JJ)."
+        },
+        "state": {
+          "name": "États",
+          "description": "Seulement les opérations dans ces états."
+        },
+        "order": {
+          "name": "Ordre",
+          "description": "Ordre des dates."
+        }
+      }
+    },
+    "search_transactions": {
+      "name": "Rechercher des opérations",
+      "description": "Recherche des opérations, tous comptes confondus, par date, état, tiers, rubrique, classe ou texte.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Première date (AAAA-MM-JJ)."
+        },
+        "end": {
+          "name": "Fin",
+          "description": "Dernière date (AAAA-MM-JJ)."
+        },
+        "state": {
+          "name": "États",
+          "description": "Seulement les opérations dans ces états."
+        },
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique."
+        },
+        "include_subcategories": {
+          "name": "Inclure les sous-rubriques",
+          "description": "Inclure aussi les sous-rubriques de la rubrique."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe."
+        },
+        "q": {
+          "name": "Texte",
+          "description": "Texte cherché."
+        },
+        "order": {
+          "name": "Ordre",
+          "description": "Ordre des dates."
+        },
+        "limit": {
+          "name": "Nombre max",
+          "description": "Nombre maximal de résultats."
+        },
+        "offset": {
+          "name": "Décalage",
+          "description": "Nombre de résultats à sauter (pagination)."
+        }
+      }
+    },
+    "create_schedule": {
+      "name": "Créer une opération planifiée",
+      "description": "Crée une opération périodique ou un échéancier, saisis automatiquement à échéance.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Libellé de l'opération planifiée (défaut : le tiers)."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Périodique (montant fixe) ou échéancier (montant par échéance)."
+        },
+        "start_date": {
+          "name": "Première échéance",
+          "description": "Date de la première échéance."
+        },
+        "unit": {
+          "name": "Unité",
+          "description": "Unité de répétition."
+        },
+        "every": {
+          "name": "Tous les",
+          "description": "Toutes les N unités."
+        },
+        "end_mode": {
+          "name": "Fin",
+          "description": "Jamais, à une date ou après un nombre d'échéances."
+        },
+        "end_date": {
+          "name": "Date de fin",
+          "description": "Dernière date possible d'une échéance."
+        },
+        "count": {
+          "name": "Nombre d'échéances",
+          "description": "Nombre d'échéances quand la fin est un nombre."
+        },
+        "amount": {
+          "name": "Montant de base",
+          "description": "Montant signé de chaque échéance (négatif = débit)."
+        },
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        },
+        "payee_name": {
+          "name": "Nom du tiers",
+          "description": "Tiers désigné par son nom, créé s'il n'existe pas."
+        },
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe."
+        },
+        "transfer_account_id": {
+          "name": "Compte du virement",
+          "description": "Pour un virement : l'autre compte (montant négatif = vers cet autre compte)."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "auto": {
+          "name": "Automatique",
+          "description": "Saisir l'opération automatiquement à échéance."
+        },
+        "lead_days": {
+          "name": "Jours d'anticipation",
+          "description": "Saisir l'opération ce nombre de jours avant sa date."
+        },
+        "generate_from": {
+          "name": "Générer à partir du",
+          "description": "Ne rien saisir d'office avant cette date (défaut : aujourd'hui)."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Modifier une opération planifiée",
+      "description": "Modifie une opération planifiée ; les échéances non générées suivent.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        },
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Libellé de l'opération planifiée (défaut : le tiers)."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Périodique (montant fixe) ou échéancier (montant par échéance)."
+        },
+        "start_date": {
+          "name": "Première échéance",
+          "description": "Date de la première échéance."
+        },
+        "unit": {
+          "name": "Unité",
+          "description": "Unité de répétition."
+        },
+        "every": {
+          "name": "Tous les",
+          "description": "Toutes les N unités."
+        },
+        "end_mode": {
+          "name": "Fin",
+          "description": "Jamais, à une date ou après un nombre d'échéances."
+        },
+        "end_date": {
+          "name": "Date de fin",
+          "description": "Dernière date possible d'une échéance."
+        },
+        "count": {
+          "name": "Nombre d'échéances",
+          "description": "Nombre d'échéances quand la fin est un nombre."
+        },
+        "amount": {
+          "name": "Montant de base",
+          "description": "Montant signé de chaque échéance (négatif = débit)."
+        },
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant du tiers."
+        },
+        "payee_name": {
+          "name": "Nom du tiers",
+          "description": "Tiers désigné par son nom, créé s'il n'existe pas."
+        },
+        "payment_method_id": {
+          "name": "Mode de règlement",
+          "description": "Identifiant du mode de règlement."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de la rubrique."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de la classe."
+        },
+        "transfer_account_id": {
+          "name": "Compte du virement",
+          "description": "Pour un virement : l'autre compte (montant négatif = vers cet autre compte)."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "auto": {
+          "name": "Automatique",
+          "description": "Saisir l'opération automatiquement à échéance."
+        },
+        "lead_days": {
+          "name": "Jours d'anticipation",
+          "description": "Saisir l'opération ce nombre de jours avant sa date."
+        },
+        "generate_from": {
+          "name": "Générer à partir du",
+          "description": "Ne rien saisir d'office avant cette date (défaut : aujourd'hui)."
+        },
+        "active": {
+          "name": "Actif",
+          "description": "Élément actif (les inactifs ne sont plus proposés)."
+        }
+      }
+    },
+    "delete_schedule": {
+      "name": "Supprimer une opération planifiée",
+      "description": "Supprime une opération planifiée ; les opérations déjà générées restent.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        }
+      }
+    },
+    "set_schedule_occurrences": {
+      "name": "Enregistrer la grille d'un échéancier",
+      "description": "Enregistre le montant (et au besoin la date) de chaque échéance d'un échéancier.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        },
+        "items": {
+          "name": "Grille",
+          "description": "Liste [{rank, amount, date}] ; date facultative, sinon celle de la règle."
+        }
+      }
+    },
+    "skip_occurrence": {
+      "name": "Sauter une échéance",
+      "description": "Saute une échéance : elle ne sera pas saisie.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        },
+        "rank": {
+          "name": "Rang de l'échéance",
+          "description": "Rang de l'échéance (1 = la première)."
+        }
+      }
+    },
+    "restore_occurrence": {
+      "name": "Rétablir une échéance",
+      "description": "Rétablit une échéance sautée.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        },
+        "rank": {
+          "name": "Rang de l'échéance",
+          "description": "Rang de l'échéance (1 = la première)."
+        }
+      }
+    },
+    "generate_occurrence": {
+      "name": "Saisir une échéance maintenant",
+      "description": "Saisit maintenant l'opération d'une échéance, sans attendre sa date.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        },
+        "rank": {
+          "name": "Rang de l'échéance",
+          "description": "Rang de l'échéance (1 = la première)."
+        }
+      }
+    },
+    "generate_due_occurrences": {
+      "name": "Générer les échéances dues",
+      "description": "Saisit toutes les échéances dues (fait aussi chaque nuit)."
+    },
+    "create_budget": {
+      "name": "Créer un budget",
+      "description": "Crée un budget pour un compte sur une plage de mois.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "start_month": {
+          "name": "Premier mois",
+          "description": "Premier mois (AAAA-MM)."
+        },
+        "months": {
+          "name": "Nombre de mois",
+          "description": "Nombre de mois (1 à 36)."
+        },
+        "archived": {
+          "name": "Archivé",
+          "description": "Budget archivé."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        }
+      }
+    },
+    "update_budget": {
+      "name": "Modifier un budget",
+      "description": "Modifie un budget ; seuls les champs fournis changent.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Identifiant du budget."
+        },
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "start_month": {
+          "name": "Premier mois",
+          "description": "Premier mois (AAAA-MM)."
+        },
+        "months": {
+          "name": "Nombre de mois",
+          "description": "Nombre de mois (1 à 36)."
+        },
+        "archived": {
+          "name": "Archivé",
+          "description": "Budget archivé."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        }
+      }
+    },
+    "delete_budget": {
+      "name": "Supprimer un budget",
+      "description": "Supprime un budget et tous ses montants.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Identifiant du budget."
+        }
+      }
+    },
+    "set_budget_lines": {
+      "name": "Enregistrer la grille d'un budget",
+      "description": "Enregistre la grille rubriques × mois d'un budget (montants positifs, dans le sens de la rubrique).",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Identifiant du budget."
+        },
+        "lines": {
+          "name": "Cellules",
+          "description": "Liste [{category_id, month, amount}]."
+        }
+      }
+    },
+    "copy_budget": {
+      "name": "Copier un budget",
+      "description": "Copie un budget sur une nouvelle période, avec les mêmes montants.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget à copier",
+          "description": "Identifiant du budget à copier."
+        },
+        "name": {
+          "name": "Nouveau nom",
+          "description": "Nom du nouveau budget."
+        },
+        "start_month": {
+          "name": "Premier mois",
+          "description": "Premier mois (AAAA-MM) ; défaut : à la suite du budget copié."
+        },
+        "months": {
+          "name": "Nombre de mois",
+          "description": "Nombre de mois ; défaut : comme le budget copié."
+        },
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte ; défaut : le même."
+        }
+      }
+    },
+    "list_schedules": {
+      "name": "Lister les opérations planifiées",
+      "description": "Renvoie les opérations planifiées.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "active": {
+          "name": "Actives seulement",
+          "description": "Seulement les opérations planifiées actives."
+        }
+      }
+    },
+    "list_upcoming_occurrences": {
+      "name": "Lister les échéances à venir",
+      "description": "Renvoie les échéances des prochains jours et celles en retard.",
+      "fields": {
+        "days": {
+          "name": "Horizon (jours)",
+          "description": "Nombre de jours à venir."
+        },
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        }
+      }
+    },
+    "list_schedule_occurrences": {
+      "name": "Lister les échéances d'une planification",
+      "description": "Renvoie toutes les échéances d'une opération planifiée avec leur état.",
+      "fields": {
+        "schedule_id": {
+          "name": "Opération planifiée",
+          "description": "Identifiant de l'opération planifiée."
+        },
+        "upcoming": {
+          "name": "Échéances à venir",
+          "description": "Pour une planification sans fin : nombre d'échéances à venir à renvoyer."
+        }
+      }
+    },
+    "list_budgets": {
+      "name": "Lister les budgets",
+      "description": "Renvoie les budgets.",
+      "fields": {
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        },
+        "include_archived": {
+          "name": "Inclure les archivés",
+          "description": "Renvoyer aussi les budgets archivés."
+        }
+      }
+    },
+    "get_budget_lines": {
+      "name": "Lire la grille d'un budget",
+      "description": "Renvoie les montants prévus d'un budget, par rubrique et par mois.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Identifiant du budget."
+        }
+      }
+    },
+    "get_budget_report": {
+      "name": "Rapport d'un budget",
+      "description": "Renvoie le prévu, le réalisé et l'écart d'un budget, par rubrique et par mois.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Identifiant du budget."
+        }
+      }
+    },
+    "create_shared_account": {
+      "name": "Créer un compte partagé",
+      "description": "Crée un compte partagé pour équilibrer les dépenses communes d'un groupe.",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "participants": {
+          "name": "Participants",
+          "description": "Noms des participants (au moins deux, soi-même compris)."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        }
+      }
+    },
+    "update_shared_account": {
+      "name": "Modifier un compte partagé",
+      "description": "Renomme, clôture ou rouvre un compte partagé.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Notes libres."
+        },
+        "closed": {
+          "name": "Clôturé",
+          "description": "Vrai : clôture (fige les dépenses) ; faux : réouverture."
+        }
+      }
+    },
+    "delete_shared_account": {
+      "name": "Supprimer un compte partagé",
+      "description": "Supprime un compte partagé avec ses participants et ses dépenses.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        }
+      }
+    },
+    "add_shared_participant": {
+      "name": "Ajouter un participant",
+      "description": "Ajoute un participant à un compte partagé.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom du participant."
+        }
+      }
+    },
+    "rename_shared_participant": {
+      "name": "Renommer un participant",
+      "description": "Renomme un participant d'un compte partagé.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "participant_id": {
+          "name": "Participant",
+          "description": "Identifiant du participant."
+        },
+        "name": {
+          "name": "Nouveau nom",
+          "description": "Nouveau nom du participant."
+        }
+      }
+    },
+    "remove_shared_participant": {
+      "name": "Retirer un participant",
+      "description": "Retire un participant qui n'a rien payé (il en reste au moins deux).",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "participant_id": {
+          "name": "Participant",
+          "description": "Identifiant du participant."
+        }
+      }
+    },
+    "add_shared_expense": {
+      "name": "Ajouter une dépense partagée",
+      "description": "Enregistre une dépense payée par un participant d'un compte partagé.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "participant_id": {
+          "name": "Payée par",
+          "description": "Identifiant du participant qui a payé."
+        },
+        "amount": {
+          "name": "Montant",
+          "description": "Montant payé, positif."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (AAAA-MM-JJ) ; défaut : aujourd'hui."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Objet de la dépense."
+        }
+      }
+    },
+    "update_shared_expense": {
+      "name": "Modifier une dépense partagée",
+      "description": "Modifie une dépense d'un compte partagé.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "expense_id": {
+          "name": "Dépense",
+          "description": "Identifiant de la dépense."
+        },
+        "participant_id": {
+          "name": "Payée par",
+          "description": "Identifiant du participant qui a payé."
+        },
+        "amount": {
+          "name": "Montant",
+          "description": "Montant payé, positif."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Date (AAAA-MM-JJ)."
+        },
+        "label": {
+          "name": "Libellé",
+          "description": "Objet de la dépense."
+        }
+      }
+    },
+    "delete_shared_expense": {
+      "name": "Supprimer une dépense partagée",
+      "description": "Supprime une dépense d'un compte partagé.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        },
+        "expense_id": {
+          "name": "Dépense",
+          "description": "Identifiant de la dépense."
+        }
+      }
+    },
+    "list_shared_accounts": {
+      "name": "Lister les comptes partagés",
+      "description": "Renvoie les comptes partagés avec totaux, prochain payeur et remboursements."
+    },
+    "get_shared_account": {
+      "name": "Détail d'un compte partagé",
+      "description": "Renvoie un compte partagé avec ses dépenses, parts et remboursements.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Compte partagé",
+          "description": "Identifiant du compte partagé."
+        }
+      }
+    },
+    "move_account": {
+      "name": "Déplacer les opérations d'un compte",
+      "description": "Déplace toutes les opérations et planifications d'un compte vers un autre.",
+      "fields": {
+        "account_id": {
+          "name": "Compte source",
+          "description": "Identifiant du compte dont les opérations sont déplacées."
+        },
+        "target_id": {
+          "name": "Cible",
+          "description": "Identifiant de l'élément qui reçoit les opérations."
+        },
+        "include_reconciled": {
+          "name": "Inclure les rapprochées",
+          "description": "Déplacer aussi les opérations rapprochées (les deux soldes rapprochés changent)."
+        }
+      }
+    },
+    "move_category": {
+      "name": "Déplacer les opérations d'une rubrique",
+      "description": "Déplace toutes les opérations et planifications d'une rubrique vers une autre.",
+      "fields": {
+        "category_id": {
+          "name": "Rubrique source",
+          "description": "Identifiant de la rubrique dont les opérations sont déplacées."
+        },
+        "target_id": {
+          "name": "Cible",
+          "description": "Identifiant de l'élément qui reçoit les opérations."
+        }
+      }
+    },
+    "move_class": {
+      "name": "Déplacer les opérations d'une classe",
+      "description": "Déplace toutes les opérations et planifications d'une classe vers une autre.",
+      "fields": {
+        "class_id": {
+          "name": "Classe source",
+          "description": "Identifiant de la classe dont les opérations sont déplacées."
+        },
+        "target_id": {
+          "name": "Cible",
+          "description": "Identifiant de l'élément qui reçoit les opérations."
+        }
+      }
+    },
+    "move_payee": {
+      "name": "Déplacer les opérations d'un tiers",
+      "description": "Déplace toutes les opérations et planifications d'un tiers vers un autre (fusion).",
+      "fields": {
+        "payee_id": {
+          "name": "Tiers source",
+          "description": "Identifiant du tiers dont les opérations sont déplacées."
+        },
+        "target_id": {
+          "name": "Cible",
+          "description": "Identifiant de l'élément qui reçoit les opérations."
+        }
+      }
+    }
+  },
+  "selector": {
+    "account_kind": {
+      "options": {
+        "checking": "Courant",
+        "savings": "Épargne",
+        "card": "Carte",
+        "cash": "Espèces",
+        "other": "Autre"
+      }
+    },
+    "category_kind": {
+      "options": {
+        "income": "Recette",
+        "expense": "Dépense",
+        "savings": "Épargne"
+      }
+    },
+    "transaction_state": {
+      "options": {
+        "0": "Non pointée",
+        "1": "Pointée",
+        "2": "Rapprochée"
+      }
+    },
+    "order": {
+      "options": {
+        "asc": "Plus anciennes d'abord",
+        "desc": "Plus récentes d'abord"
+      }
+    },
+    "schedule_mode": {
+      "options": {
+        "periodic": "Périodique (montant fixe)",
+        "installments": "Échéancier"
+      }
+    },
+    "unit": {
+      "options": {
+        "day": "Jours",
+        "week": "Semaines",
+        "month": "Mois",
+        "quarter": "Trimestres",
+        "year": "Années"
+      }
+    },
+    "end_mode": {
+      "options": {
+        "never": "Jamais",
+        "date": "À une date",
+        "count": "Après N échéances"
+      }
+    }
+  }
+}

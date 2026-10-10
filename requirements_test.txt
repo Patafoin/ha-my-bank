@@ -1,0 +1,5 @@
+pytest
+pytest-homeassistant-custom-component
+pytest-asyncio
+pytest-mock
+homeassistant==2026.2.3

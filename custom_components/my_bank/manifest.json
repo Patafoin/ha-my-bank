@@ -1,0 +1,17 @@
+{
+  "domain": "my_bank",
+  "name": "My Bank",
+  "codeowners": [
+    "@Patafoin"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "lovelace"
+  ],
+  "documentation": "https://github.com/Patafoin/ha-my-bank",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Patafoin/ha-my-bank/issues",
+  "requirements": [],
+  "version": "0.12.0"
+}

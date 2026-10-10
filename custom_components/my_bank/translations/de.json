@@ -1,0 +1,1682 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit My Bank API verbinden",
+        "description": "My Bank benötigt einen laufenden My-Bank-API-Server (Home-Assistant-Add-on oder Docker-Container).",
+        "data": {
+          "url": "URL der My Bank API",
+          "token": "Zugriffstoken"
+        },
+        "data_description": {
+          "url": "Adresse des My-Bank-API-Servers, z. B. http://192.168.1.10:9931. Mit dem Add-on nicht nötig, es wird automatisch erkannt.",
+          "token": "Auf dem Server erstellt mit: docker exec my-bank-api my-bank token create home-assistant (oder MYBANK_API_TOKEN setzen)."
+        }
+      },
+      "reauth_confirm": {
+        "title": "My-Bank-Token erforderlich",
+        "description": "My Bank API hat das Token abgelehnt. URL und ein gültiges Token eingeben.",
+        "data": {
+          "url": "URL der My Bank API",
+          "token": "Zugriffstoken"
+        },
+        "data_description": {
+          "url": "Adresse des My-Bank-API-Servers, z. B. http://192.168.1.10:9931. Mit dem Add-on nicht nötig, es wird automatisch erkannt.",
+          "token": "Auf dem Server erstellt mit: docker exec my-bank-api my-bank token create home-assistant (oder MYBANK_API_TOKEN setzen)."
+        }
+      },
+      "hassio_confirm": {
+        "title": "My-Bank-API-Add-on gefunden",
+        "description": "Home Assistant mit dem Add-on {addon} verbinden?"
+      }
+    },
+    "error": {
+      "cannot_connect": "My Bank API unter dieser URL nicht erreichbar.",
+      "invalid_auth": "Token von My Bank API abgelehnt."
+    },
+    "abort": {
+      "already_configured": "Diese My-Bank-API-Instanz ist bereits eingerichtet.",
+      "reauth_successful": "Verbindung zu My Bank API aktualisiert."
+    }
+  },
+  "issues": {
+    "api_too_old": {
+      "title": "My Bank API muss aktualisiert werden",
+      "description": "My Bank API {version} ist älter als die von dieser Integration benötigte Mindestversion ({minimum}). Add-on oder Docker-Image von My Bank API aktualisieren, sonst schlagen einige Funktionen der Karte fehl."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ending_schedules": {
+        "name": "Auslaufende Daueraufträge",
+        "unit_of_measurement": "Daueraufträge",
+        "state_attributes": {
+          "jours": {
+            "name": "Tage"
+          },
+          "planifications": {
+            "name": "Daueraufträge"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "My Bank ist nicht verbunden (Einstellungen → Geräte & Dienste → My Bank)."
+    }
+  },
+  "services": {
+    "create_account": {
+      "name": "Konto anlegen",
+      "description": "Legt ein Bankkonto an.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Art",
+          "description": "Kontoart."
+        },
+        "number": {
+          "name": "Nummer",
+          "description": "Kontonummer."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Anfangssaldo",
+          "description": "Saldo vor der ersten Buchung, z. B. 1250,00."
+        },
+        "opening_date": {
+          "name": "Datum des Anfangssaldos",
+          "description": "Datum des Anfangssaldos."
+        },
+        "closed": {
+          "name": "Geschlossen",
+          "description": "Geschlossenes Konto (bleibt für die Historie erhalten)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        }
+      }
+    },
+    "update_account": {
+      "name": "Konto ändern",
+      "description": "Ändert ein Konto; nur die angegebenen Felder werden geändert.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Art",
+          "description": "Kontoart."
+        },
+        "number": {
+          "name": "Nummer",
+          "description": "Kontonummer."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Anfangssaldo",
+          "description": "Saldo vor der ersten Buchung, z. B. 1250,00."
+        },
+        "opening_date": {
+          "name": "Datum des Anfangssaldos",
+          "description": "Datum des Anfangssaldos."
+        },
+        "closed": {
+          "name": "Geschlossen",
+          "description": "Geschlossenes Konto (bleibt für die Historie erhalten)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        }
+      }
+    },
+    "delete_account": {
+      "name": "Konto löschen",
+      "description": "Löscht ein Konto (abgelehnt, wenn es Buchungen hat).",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        }
+      }
+    },
+    "create_category": {
+      "name": "Kategorie anlegen",
+      "description": "Legt eine Kategorie (Einnahme, Ausgabe oder Sparen) an, oben oder unter einer übergeordneten.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Art",
+          "description": "Kategorieart (nur oberste Kategorien; sonst geerbt)."
+        },
+        "parent_id": {
+          "name": "Übergeordnet",
+          "description": "ID des übergeordneten Elements; leer für die oberste Ebene."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        }
+      }
+    },
+    "update_category": {
+      "name": "Kategorie ändern",
+      "description": "Ändert eine Kategorie; nur die angegebenen Felder werden geändert.",
+      "fields": {
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "kind": {
+          "name": "Art",
+          "description": "Kategorieart (nur oberste Kategorien; sonst geerbt)."
+        },
+        "parent_id": {
+          "name": "Übergeordnet",
+          "description": "ID des übergeordneten Elements; leer für die oberste Ebene."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        }
+      }
+    },
+    "delete_category": {
+      "name": "Kategorie löschen",
+      "description": "Löscht eine Kategorie (abgelehnt, wenn sie noch verwendet wird).",
+      "fields": {
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID."
+        }
+      }
+    },
+    "create_class": {
+      "name": "Klasse anlegen",
+      "description": "Legt eine Klasse an, eine zweite, von den Kategorien unabhängige Einteilung.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "parent_id": {
+          "name": "Übergeordnet",
+          "description": "ID des übergeordneten Elements; leer für die oberste Ebene."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        }
+      }
+    },
+    "update_class": {
+      "name": "Klasse ändern",
+      "description": "Ändert eine Klasse; nur die angegebenen Felder werden geändert.",
+      "fields": {
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "parent_id": {
+          "name": "Übergeordnet",
+          "description": "ID des übergeordneten Elements; leer für die oberste Ebene."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        }
+      }
+    },
+    "delete_class": {
+      "name": "Klasse löschen",
+      "description": "Löscht eine Klasse (abgelehnt, wenn sie noch verwendet wird).",
+      "fields": {
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID."
+        }
+      }
+    },
+    "create_payee": {
+      "name": "Empfänger anlegen",
+      "description": "Legt einen Empfänger mit Kontakt- und Bankdaten an.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "default_category_id": {
+          "name": "Standardkategorie",
+          "description": "Für Buchungen dieses Empfängers vorgeschlagene Kategorie."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "short_name": {
+          "name": "Kurzname",
+          "description": "Kurzname."
+        },
+        "address1": {
+          "name": "Adresszeile 1",
+          "description": "Adresszeile 1."
+        },
+        "address2": {
+          "name": "Adresszeile 2",
+          "description": "Adresszeile 2."
+        },
+        "address3": {
+          "name": "Adresszeile 3",
+          "description": "Adresszeile 3."
+        },
+        "postal_code": {
+          "name": "Postleitzahl",
+          "description": "Postleitzahl."
+        },
+        "city": {
+          "name": "Ort",
+          "description": "Ort."
+        },
+        "region": {
+          "name": "Region",
+          "description": "Region oder Bundesland."
+        },
+        "country": {
+          "name": "Land",
+          "description": "Land."
+        },
+        "phone": {
+          "name": "Telefon",
+          "description": "Telefonnummer."
+        },
+        "phone2": {
+          "name": "Telefon 2",
+          "description": "Zweite Telefonnummer."
+        },
+        "mobile": {
+          "name": "Mobil",
+          "description": "Mobilnummer."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Faxnummer."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Zweite Faxnummer."
+        },
+        "email": {
+          "name": "E-Mail",
+          "description": "E-Mail-Adresse."
+        },
+        "url": {
+          "name": "Website",
+          "description": "Adresse der Website."
+        },
+        "bank_name": {
+          "name": "Bankname",
+          "description": "Name der Bank des Empfängers."
+        },
+        "bank_code": {
+          "name": "Bankleitzahl",
+          "description": "Bankleitzahl."
+        },
+        "branch_code": {
+          "name": "Filialnummer",
+          "description": "Filialnummer."
+        },
+        "account_number": {
+          "name": "Kontonummer",
+          "description": "Kontonummer des Empfängers."
+        },
+        "rib_key": {
+          "name": "RIB-Schlüssel",
+          "description": "Schlüssel einer französischen Bankverbindung (RIB)."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "BIC-Code (SWIFT)."
+        },
+        "free1": {
+          "name": "Freies Feld 1",
+          "description": "Freies Feld."
+        },
+        "free2": {
+          "name": "Freies Feld 2",
+          "description": "Freies Feld."
+        },
+        "free3": {
+          "name": "Freies Feld 3",
+          "description": "Freies Feld."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "external_code": {
+          "name": "Externer Code",
+          "description": "Code in einer anderen Anwendung."
+        },
+        "payee_category": {
+          "name": "Empfängergruppe",
+          "description": "Freie Gruppierung der Empfänger."
+        }
+      }
+    },
+    "update_payee": {
+      "name": "Empfänger ändern",
+      "description": "Ändert einen Empfänger; nur die angegebenen Felder werden geändert.",
+      "fields": {
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "default_category_id": {
+          "name": "Standardkategorie",
+          "description": "Für Buchungen dieses Empfängers vorgeschlagene Kategorie."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "short_name": {
+          "name": "Kurzname",
+          "description": "Kurzname."
+        },
+        "address1": {
+          "name": "Adresszeile 1",
+          "description": "Adresszeile 1."
+        },
+        "address2": {
+          "name": "Adresszeile 2",
+          "description": "Adresszeile 2."
+        },
+        "address3": {
+          "name": "Adresszeile 3",
+          "description": "Adresszeile 3."
+        },
+        "postal_code": {
+          "name": "Postleitzahl",
+          "description": "Postleitzahl."
+        },
+        "city": {
+          "name": "Ort",
+          "description": "Ort."
+        },
+        "region": {
+          "name": "Region",
+          "description": "Region oder Bundesland."
+        },
+        "country": {
+          "name": "Land",
+          "description": "Land."
+        },
+        "phone": {
+          "name": "Telefon",
+          "description": "Telefonnummer."
+        },
+        "phone2": {
+          "name": "Telefon 2",
+          "description": "Zweite Telefonnummer."
+        },
+        "mobile": {
+          "name": "Mobil",
+          "description": "Mobilnummer."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Faxnummer."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Zweite Faxnummer."
+        },
+        "email": {
+          "name": "E-Mail",
+          "description": "E-Mail-Adresse."
+        },
+        "url": {
+          "name": "Website",
+          "description": "Adresse der Website."
+        },
+        "bank_name": {
+          "name": "Bankname",
+          "description": "Name der Bank des Empfängers."
+        },
+        "bank_code": {
+          "name": "Bankleitzahl",
+          "description": "Bankleitzahl."
+        },
+        "branch_code": {
+          "name": "Filialnummer",
+          "description": "Filialnummer."
+        },
+        "account_number": {
+          "name": "Kontonummer",
+          "description": "Kontonummer des Empfängers."
+        },
+        "rib_key": {
+          "name": "RIB-Schlüssel",
+          "description": "Schlüssel einer französischen Bankverbindung (RIB)."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "BIC-Code (SWIFT)."
+        },
+        "free1": {
+          "name": "Freies Feld 1",
+          "description": "Freies Feld."
+        },
+        "free2": {
+          "name": "Freies Feld 2",
+          "description": "Freies Feld."
+        },
+        "free3": {
+          "name": "Freies Feld 3",
+          "description": "Freies Feld."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "external_code": {
+          "name": "Externer Code",
+          "description": "Code in einer anderen Anwendung."
+        },
+        "payee_category": {
+          "name": "Empfängergruppe",
+          "description": "Freie Gruppierung der Empfänger."
+        }
+      }
+    },
+    "delete_payee": {
+      "name": "Empfänger löschen",
+      "description": "Löscht einen Empfänger (abgelehnt, wenn er noch verwendet wird).",
+      "fields": {
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        }
+      }
+    },
+    "create_payment_method": {
+      "name": "Zahlungsart anlegen",
+      "description": "Legt eine Zahlungsart an (Karte, Scheck, Lastschrift…).",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name der Zahlungsart."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktive Zahlungsart."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        }
+      }
+    },
+    "update_payment_method": {
+      "name": "Zahlungsart ändern",
+      "description": "Ändert eine Zahlungsart.",
+      "fields": {
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name der Zahlungsart."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktive Zahlungsart."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge."
+        }
+      }
+    },
+    "delete_payment_method": {
+      "name": "Zahlungsart löschen",
+      "description": "Löscht eine Zahlungsart (abgelehnt, wenn sie noch verwendet wird).",
+      "fields": {
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        }
+      }
+    },
+    "create_transaction": {
+      "name": "Buchung anlegen",
+      "description": "Erfasst eine Buchung auf einem Konto, mit einer Kategorie oder aufgeteilt.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum (JJJJ-MM-TT)."
+        },
+        "amount": {
+          "name": "Betrag",
+          "description": "Vorzeichenbehafteter Betrag: negativ für eine Belastung, positiv für eine Gutschrift, z. B. -14,80."
+        },
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        },
+        "payee_name": {
+          "name": "Empfängername",
+          "description": "Empfänger nach Name, wird angelegt, falls er nicht existiert."
+        },
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        },
+        "number": {
+          "name": "Schecknummer",
+          "description": "Schecknummer."
+        },
+        "label": {
+          "name": "Buchungstext",
+          "description": "Text der Buchung."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "state": {
+          "name": "Status",
+          "description": "Nicht abgeglichen, abgeglichen oder abgestimmt."
+        },
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID, ohne Aufteilung."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID, ohne Aufteilung."
+        },
+        "splits": {
+          "name": "Aufteilung",
+          "description": "Liste von Zeilen {amount, category_id, class_id, label}; ihre Summe muss dem Betrag entsprechen."
+        }
+      }
+    },
+    "update_transaction": {
+      "name": "Buchung ändern",
+      "description": "Ändert eine Buchung; nur die angegebenen Felder werden geändert. Betrag, Datum, Konto und Aufteilung einer abgestimmten Buchung sind gesperrt.",
+      "fields": {
+        "transaction_id": {
+          "name": "Buchung",
+          "description": "Buchungs-ID."
+        },
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum (JJJJ-MM-TT)."
+        },
+        "amount": {
+          "name": "Betrag",
+          "description": "Vorzeichenbehafteter Betrag: negativ für eine Belastung, positiv für eine Gutschrift, z. B. -14,80."
+        },
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        },
+        "payee_name": {
+          "name": "Empfängername",
+          "description": "Empfänger nach Name, wird angelegt, falls er nicht existiert."
+        },
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        },
+        "number": {
+          "name": "Schecknummer",
+          "description": "Schecknummer."
+        },
+        "label": {
+          "name": "Buchungstext",
+          "description": "Text der Buchung."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "state": {
+          "name": "Status",
+          "description": "Nicht abgeglichen, abgeglichen oder abgestimmt."
+        },
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID, ohne Aufteilung."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID, ohne Aufteilung."
+        },
+        "splits": {
+          "name": "Aufteilung",
+          "description": "Liste von Zeilen {amount, category_id, class_id, label}; ihre Summe muss dem Betrag entsprechen."
+        }
+      }
+    },
+    "delete_transaction": {
+      "name": "Buchung löschen",
+      "description": "Löscht eine Buchung (beide Seiten bei einer Umbuchung).",
+      "fields": {
+        "transaction_id": {
+          "name": "Buchung",
+          "description": "Buchungs-ID."
+        }
+      }
+    },
+    "set_transaction_state": {
+      "name": "Buchungsstatus setzen",
+      "description": "Gleicht eine Buchung ab, stimmt sie ab oder hebt den Abgleich auf.",
+      "fields": {
+        "transaction_id": {
+          "name": "Buchung",
+          "description": "Buchungs-ID."
+        },
+        "state": {
+          "name": "Status",
+          "description": "Nicht abgeglichen, abgeglichen oder abgestimmt."
+        }
+      }
+    },
+    "set_transactions_state": {
+      "name": "Status mehrerer Buchungen setzen",
+      "description": "Setzt denselben Status für mehrere Buchungen auf einmal (Kontoauszug abstimmen).",
+      "fields": {
+        "ids": {
+          "name": "Buchungen",
+          "description": "Liste von Buchungs-IDs."
+        },
+        "state": {
+          "name": "Status",
+          "description": "Status für alle Buchungen."
+        }
+      }
+    },
+    "create_transfer": {
+      "name": "Umbuchung anlegen",
+      "description": "Bucht Geld zwischen zwei Konten um: zwei verbundene Buchungen, jede mit eigenem Status.",
+      "fields": {
+        "from_account_id": {
+          "name": "Von Konto",
+          "description": "ID des belasteten Kontos."
+        },
+        "to_account_id": {
+          "name": "Auf Konto",
+          "description": "ID des gutgeschriebenen Kontos."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum (JJJJ-MM-TT)."
+        },
+        "amount": {
+          "name": "Betrag",
+          "description": "Positiver Betrag, vom einen Konto abgebucht und dem anderen gutgeschrieben."
+        },
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        },
+        "label": {
+          "name": "Buchungstext",
+          "description": "Text der Buchung."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID, ohne Aufteilung."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID, ohne Aufteilung."
+        },
+        "from_state": {
+          "name": "Status der Belastung",
+          "description": "Status der Buchung auf dem belasteten Konto."
+        },
+        "to_state": {
+          "name": "Status der Gutschrift",
+          "description": "Status der Buchung auf dem gutgeschriebenen Konto."
+        }
+      }
+    },
+    "list_accounts": {
+      "name": "Konten auflisten",
+      "description": "Gibt die Konten mit ihren drei Salden zurück (gesamt, abgeglichen, abgestimmt).",
+      "fields": {
+        "date": {
+          "name": "Datum",
+          "description": "Salden zu diesem Datum (JJJJ-MM-TT)."
+        },
+        "include_closed": {
+          "name": "Geschlossene Konten einschließen",
+          "description": "Auch geschlossene Konten zurückgeben."
+        }
+      }
+    },
+    "list_categories": {
+      "name": "Kategorien auflisten",
+      "description": "Gibt den Kategoriebaum als flache Liste zurück (mit Pfad und Tiefe)."
+    },
+    "list_classes": {
+      "name": "Klassen auflisten",
+      "description": "Gibt den Klassenbaum als flache Liste zurück."
+    },
+    "list_payees": {
+      "name": "Empfänger auflisten",
+      "description": "Gibt die Empfänger zurück, optional gefiltert.",
+      "fields": {
+        "q": {
+          "name": "Text",
+          "description": "Gesuchter Text."
+        },
+        "active": {
+          "name": "Nur aktive",
+          "description": "Nur aktive Empfänger."
+        }
+      }
+    },
+    "list_payment_methods": {
+      "name": "Zahlungsarten auflisten",
+      "description": "Gibt die Zahlungsarten zurück."
+    },
+    "list_account_transactions": {
+      "name": "Kontobuchungen auflisten",
+      "description": "Gibt die Buchungen eines Kontos in einem Zeitraum zurück, mit dem Saldo nach jeder Zeile.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "start": {
+          "name": "Beginn",
+          "description": "Erstes Datum (JJJJ-MM-TT)."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Letztes Datum (JJJJ-MM-TT)."
+        },
+        "state": {
+          "name": "Status",
+          "description": "Nur Buchungen mit diesen Status."
+        },
+        "order": {
+          "name": "Reihenfolge",
+          "description": "Reihenfolge der Daten."
+        }
+      }
+    },
+    "search_transactions": {
+      "name": "Buchungen suchen",
+      "description": "Sucht Buchungen kontenübergreifend nach Datum, Status, Empfänger, Kategorie, Klasse oder Text.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "start": {
+          "name": "Beginn",
+          "description": "Erstes Datum (JJJJ-MM-TT)."
+        },
+        "end": {
+          "name": "Ende",
+          "description": "Letztes Datum (JJJJ-MM-TT)."
+        },
+        "state": {
+          "name": "Status",
+          "description": "Nur Buchungen mit diesen Status."
+        },
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        },
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID."
+        },
+        "include_subcategories": {
+          "name": "Unterkategorien einschließen",
+          "description": "Auch die Unterkategorien der Kategorie einbeziehen."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID."
+        },
+        "q": {
+          "name": "Text",
+          "description": "Gesuchter Text."
+        },
+        "order": {
+          "name": "Reihenfolge",
+          "description": "Reihenfolge der Daten."
+        },
+        "limit": {
+          "name": "Höchstzahl",
+          "description": "Höchstzahl der Ergebnisse."
+        },
+        "offset": {
+          "name": "Versatz",
+          "description": "Anzahl zu überspringender Ergebnisse (Seitenweise)."
+        }
+      }
+    },
+    "create_schedule": {
+      "name": "Dauerauftrag anlegen",
+      "description": "Legt eine wiederkehrende Buchung oder einen Ratenplan an, der bei Fälligkeit automatisch gebucht wird.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "label": {
+          "name": "Buchungstext",
+          "description": "Text des Dauerauftrags (Standard: der Empfänger)."
+        },
+        "mode": {
+          "name": "Modus",
+          "description": "Periodisch (fester Betrag) oder Ratenplan (Betrag je Rate)."
+        },
+        "start_date": {
+          "name": "Erste Ausführung",
+          "description": "Datum der ersten Ausführung."
+        },
+        "unit": {
+          "name": "Einheit",
+          "description": "Wiederholungseinheit."
+        },
+        "every": {
+          "name": "Alle",
+          "description": "Alle N Einheiten."
+        },
+        "end_mode": {
+          "name": "Ende",
+          "description": "Nie, an einem Datum oder nach einer Anzahl von Ausführungen."
+        },
+        "end_date": {
+          "name": "Enddatum",
+          "description": "Letztes mögliches Datum einer Ausführung."
+        },
+        "count": {
+          "name": "Anzahl der Ausführungen",
+          "description": "Anzahl der Ausführungen, wenn das Ende eine Anzahl ist."
+        },
+        "amount": {
+          "name": "Grundbetrag",
+          "description": "Vorzeichenbehafteter Betrag jeder Ausführung (negativ = Belastung)."
+        },
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        },
+        "payee_name": {
+          "name": "Empfängername",
+          "description": "Empfänger nach Name, wird angelegt, falls er nicht existiert."
+        },
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        },
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID."
+        },
+        "transfer_account_id": {
+          "name": "Umbuchungskonto",
+          "description": "Bei einer Umbuchung: das andere Konto (negativer Betrag = auf dieses Konto)."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "auto": {
+          "name": "Automatisch",
+          "description": "Buchung bei Fälligkeit automatisch erfassen."
+        },
+        "lead_days": {
+          "name": "Tage im Voraus",
+          "description": "Buchung so viele Tage vor ihrem Datum erfassen."
+        },
+        "generate_from": {
+          "name": "Buchen ab",
+          "description": "Vor diesem Datum nichts automatisch buchen (Standard: heute)."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Dauerauftrag ändern",
+      "description": "Ändert einen Dauerauftrag; noch nicht erzeugte Ausführungen folgen.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        },
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "label": {
+          "name": "Buchungstext",
+          "description": "Text des Dauerauftrags (Standard: der Empfänger)."
+        },
+        "mode": {
+          "name": "Modus",
+          "description": "Periodisch (fester Betrag) oder Ratenplan (Betrag je Rate)."
+        },
+        "start_date": {
+          "name": "Erste Ausführung",
+          "description": "Datum der ersten Ausführung."
+        },
+        "unit": {
+          "name": "Einheit",
+          "description": "Wiederholungseinheit."
+        },
+        "every": {
+          "name": "Alle",
+          "description": "Alle N Einheiten."
+        },
+        "end_mode": {
+          "name": "Ende",
+          "description": "Nie, an einem Datum oder nach einer Anzahl von Ausführungen."
+        },
+        "end_date": {
+          "name": "Enddatum",
+          "description": "Letztes mögliches Datum einer Ausführung."
+        },
+        "count": {
+          "name": "Anzahl der Ausführungen",
+          "description": "Anzahl der Ausführungen, wenn das Ende eine Anzahl ist."
+        },
+        "amount": {
+          "name": "Grundbetrag",
+          "description": "Vorzeichenbehafteter Betrag jeder Ausführung (negativ = Belastung)."
+        },
+        "payee_id": {
+          "name": "Empfänger",
+          "description": "Empfänger-ID."
+        },
+        "payee_name": {
+          "name": "Empfängername",
+          "description": "Empfänger nach Name, wird angelegt, falls er nicht existiert."
+        },
+        "payment_method_id": {
+          "name": "Zahlungsart",
+          "description": "ID der Zahlungsart."
+        },
+        "category_id": {
+          "name": "Kategorie",
+          "description": "Kategorie-ID."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID."
+        },
+        "transfer_account_id": {
+          "name": "Umbuchungskonto",
+          "description": "Bei einer Umbuchung: das andere Konto (negativer Betrag = auf dieses Konto)."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "auto": {
+          "name": "Automatisch",
+          "description": "Buchung bei Fälligkeit automatisch erfassen."
+        },
+        "lead_days": {
+          "name": "Tage im Voraus",
+          "description": "Buchung so viele Tage vor ihrem Datum erfassen."
+        },
+        "generate_from": {
+          "name": "Buchen ab",
+          "description": "Vor diesem Datum nichts automatisch buchen (Standard: heute)."
+        },
+        "active": {
+          "name": "Aktiv",
+          "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        }
+      }
+    },
+    "delete_schedule": {
+      "name": "Dauerauftrag löschen",
+      "description": "Löscht einen Dauerauftrag; bereits erzeugte Buchungen bleiben erhalten.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        }
+      }
+    },
+    "set_schedule_occurrences": {
+      "name": "Ratenplan speichern",
+      "description": "Speichert den Betrag (und optional das Datum) jeder Rate eines Ratenplans.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        },
+        "items": {
+          "name": "Tabelle",
+          "description": "Liste [{rank, amount, date}]; Datum optional, sonst das der Regel."
+        }
+      }
+    },
+    "skip_occurrence": {
+      "name": "Ausführung überspringen",
+      "description": "Überspringt eine Ausführung: Sie wird nicht gebucht.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        },
+        "rank": {
+          "name": "Ausführungsnummer",
+          "description": "Nummer der Ausführung (1 = erste)."
+        }
+      }
+    },
+    "restore_occurrence": {
+      "name": "Ausführung wiederherstellen",
+      "description": "Stellt eine übersprungene Ausführung wieder her.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        },
+        "rank": {
+          "name": "Ausführungsnummer",
+          "description": "Nummer der Ausführung (1 = erste)."
+        }
+      }
+    },
+    "generate_occurrence": {
+      "name": "Ausführung jetzt buchen",
+      "description": "Bucht eine Ausführung sofort, ohne ihr Datum abzuwarten.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        },
+        "rank": {
+          "name": "Ausführungsnummer",
+          "description": "Nummer der Ausführung (1 = erste)."
+        }
+      }
+    },
+    "generate_due_occurrences": {
+      "name": "Fällige Ausführungen buchen",
+      "description": "Bucht alle fälligen Ausführungen (geschieht auch jede Nacht)."
+    },
+    "create_budget": {
+      "name": "Budget anlegen",
+      "description": "Legt ein Budget für ein Konto über einen Monatsbereich an.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "start_month": {
+          "name": "Erster Monat",
+          "description": "Erster Monat (JJJJ-MM)."
+        },
+        "months": {
+          "name": "Anzahl Monate",
+          "description": "Anzahl der Monate (1 bis 36)."
+        },
+        "archived": {
+          "name": "Archiviert",
+          "description": "Archiviertes Budget."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        }
+      }
+    },
+    "update_budget": {
+      "name": "Budget ändern",
+      "description": "Ändert ein Budget; nur die angegebenen Felder werden geändert.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget-ID."
+        },
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "start_month": {
+          "name": "Erster Monat",
+          "description": "Erster Monat (JJJJ-MM)."
+        },
+        "months": {
+          "name": "Anzahl Monate",
+          "description": "Anzahl der Monate (1 bis 36)."
+        },
+        "archived": {
+          "name": "Archiviert",
+          "description": "Archiviertes Budget."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        }
+      }
+    },
+    "delete_budget": {
+      "name": "Budget löschen",
+      "description": "Löscht ein Budget mit allen Beträgen.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget-ID."
+        }
+      }
+    },
+    "set_budget_lines": {
+      "name": "Budgettabelle speichern",
+      "description": "Speichert die Tabelle Kategorien × Monate eines Budgets (positive Beträge in Richtung der Kategorie).",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget-ID."
+        },
+        "lines": {
+          "name": "Zellen",
+          "description": "Liste [{category_id, month, amount}]."
+        }
+      }
+    },
+    "copy_budget": {
+      "name": "Budget kopieren",
+      "description": "Kopiert ein Budget mit denselben Beträgen in einen neuen Zeitraum.",
+      "fields": {
+        "budget_id": {
+          "name": "Zu kopierendes Budget",
+          "description": "ID des zu kopierenden Budgets."
+        },
+        "name": {
+          "name": "Neuer Name",
+          "description": "Name des neuen Budgets."
+        },
+        "start_month": {
+          "name": "Erster Monat",
+          "description": "Erster Monat (JJJJ-MM); Standard: im Anschluss an das kopierte Budget."
+        },
+        "months": {
+          "name": "Anzahl Monate",
+          "description": "Anzahl der Monate; Standard: wie das kopierte Budget."
+        },
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID; Standard: dasselbe Konto."
+        }
+      }
+    },
+    "list_schedules": {
+      "name": "Daueraufträge auflisten",
+      "description": "Gibt die Daueraufträge zurück.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "active": {
+          "name": "Nur aktive",
+          "description": "Nur aktive Daueraufträge."
+        }
+      }
+    },
+    "list_upcoming_occurrences": {
+      "name": "Anstehende Ausführungen auflisten",
+      "description": "Gibt die in den nächsten Tagen fälligen und die überfälligen Ausführungen zurück.",
+      "fields": {
+        "days": {
+          "name": "Horizont (Tage)",
+          "description": "Anzahl der kommenden Tage."
+        },
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        }
+      }
+    },
+    "list_schedule_occurrences": {
+      "name": "Ausführungen eines Dauerauftrags auflisten",
+      "description": "Gibt alle Ausführungen eines Dauerauftrags mit ihrem Status zurück.",
+      "fields": {
+        "schedule_id": {
+          "name": "Dauerauftrag",
+          "description": "ID des Dauerauftrags."
+        },
+        "upcoming": {
+          "name": "Anstehende Ausführungen",
+          "description": "Bei einem Dauerauftrag ohne Ende: Anzahl der zurückzugebenden Ausführungen."
+        }
+      }
+    },
+    "list_budgets": {
+      "name": "Budgets auflisten",
+      "description": "Gibt die Budgets zurück.",
+      "fields": {
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        },
+        "include_archived": {
+          "name": "Archivierte einschließen",
+          "description": "Auch archivierte Budgets zurückgeben."
+        }
+      }
+    },
+    "get_budget_lines": {
+      "name": "Budgettabelle lesen",
+      "description": "Gibt die geplanten Beträge eines Budgets je Kategorie und Monat zurück.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget-ID."
+        }
+      }
+    },
+    "get_budget_report": {
+      "name": "Budgetbericht",
+      "description": "Gibt Plan, Ist und Abweichung eines Budgets je Kategorie und Monat zurück.",
+      "fields": {
+        "budget_id": {
+          "name": "Budget",
+          "description": "Budget-ID."
+        }
+      }
+    },
+    "create_shared_account": {
+      "name": "Geteiltes Konto anlegen",
+      "description": "Legt ein geteiltes Konto an, um die gemeinsamen Ausgaben einer Gruppe auszugleichen.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "participants": {
+          "name": "Teilnehmer",
+          "description": "Namen der Teilnehmer (mindestens zwei, du eingeschlossen)."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        }
+      }
+    },
+    "update_shared_account": {
+      "name": "Geteiltes Konto ändern",
+      "description": "Benennt ein geteiltes Konto um, schließt es ab oder öffnet es wieder.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name."
+        },
+        "notes": {
+          "name": "Notizen",
+          "description": "Freie Notizen."
+        },
+        "closed": {
+          "name": "Abgeschlossen",
+          "description": "Wahr: abschließen (friert die Ausgaben ein); falsch: wieder öffnen."
+        }
+      }
+    },
+    "delete_shared_account": {
+      "name": "Geteiltes Konto löschen",
+      "description": "Löscht ein geteiltes Konto mit Teilnehmern und Ausgaben.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        }
+      }
+    },
+    "add_shared_participant": {
+      "name": "Teilnehmer hinzufügen",
+      "description": "Fügt einem geteilten Konto einen Teilnehmer hinzu.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name des Teilnehmers."
+        }
+      }
+    },
+    "rename_shared_participant": {
+      "name": "Teilnehmer umbenennen",
+      "description": "Benennt einen Teilnehmer eines geteilten Kontos um.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "participant_id": {
+          "name": "Teilnehmer",
+          "description": "Teilnehmer-ID."
+        },
+        "name": {
+          "name": "Neuer Name",
+          "description": "Neuer Name des Teilnehmers."
+        }
+      }
+    },
+    "remove_shared_participant": {
+      "name": "Teilnehmer entfernen",
+      "description": "Entfernt einen Teilnehmer ohne Ausgaben (mindestens zwei bleiben).",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "participant_id": {
+          "name": "Teilnehmer",
+          "description": "Teilnehmer-ID."
+        }
+      }
+    },
+    "add_shared_expense": {
+      "name": "Geteilte Ausgabe hinzufügen",
+      "description": "Erfasst eine von einem Teilnehmer bezahlte Ausgabe eines geteilten Kontos.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "participant_id": {
+          "name": "Bezahlt von",
+          "description": "ID des Teilnehmers, der bezahlt hat."
+        },
+        "amount": {
+          "name": "Betrag",
+          "description": "Bezahlter Betrag, positiv."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum (JJJJ-MM-TT); Standard: heute."
+        },
+        "label": {
+          "name": "Text",
+          "description": "Wofür die Ausgabe war."
+        }
+      }
+    },
+    "update_shared_expense": {
+      "name": "Geteilte Ausgabe ändern",
+      "description": "Ändert eine Ausgabe eines geteilten Kontos.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "expense_id": {
+          "name": "Ausgabe",
+          "description": "Ausgaben-ID."
+        },
+        "participant_id": {
+          "name": "Bezahlt von",
+          "description": "ID des Teilnehmers, der bezahlt hat."
+        },
+        "amount": {
+          "name": "Betrag",
+          "description": "Bezahlter Betrag, positiv."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum (JJJJ-MM-TT)."
+        },
+        "label": {
+          "name": "Text",
+          "description": "Wofür die Ausgabe war."
+        }
+      }
+    },
+    "delete_shared_expense": {
+      "name": "Geteilte Ausgabe löschen",
+      "description": "Löscht eine Ausgabe eines geteilten Kontos.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        },
+        "expense_id": {
+          "name": "Ausgabe",
+          "description": "Ausgaben-ID."
+        }
+      }
+    },
+    "list_shared_accounts": {
+      "name": "Geteilte Konten auflisten",
+      "description": "Gibt die geteilten Konten mit Summen, nächstem Zahler und Rückzahlungen zurück."
+    },
+    "get_shared_account": {
+      "name": "Geteiltes Konto lesen",
+      "description": "Gibt ein geteiltes Konto mit Ausgaben, Anteilen und Rückzahlungen zurück.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Geteiltes Konto",
+          "description": "ID des geteilten Kontos."
+        }
+      }
+    },
+    "move_account": {
+      "name": "Kontobuchungen verschieben",
+      "description": "Verschiebt alle Buchungen und Daueraufträge eines Kontos auf ein anderes.",
+      "fields": {
+        "account_id": {
+          "name": "Quellkonto",
+          "description": "ID des Kontos, dessen Buchungen verschoben werden."
+        },
+        "target_id": {
+          "name": "Ziel",
+          "description": "ID des Elements, das die Buchungen erhält."
+        },
+        "include_reconciled": {
+          "name": "Abgestimmte einschließen",
+          "description": "Auch abgestimmte Buchungen verschieben (beide abgestimmten Salden ändern sich)."
+        }
+      }
+    },
+    "move_category": {
+      "name": "Kategoriebuchungen verschieben",
+      "description": "Verschiebt alle Buchungen und Daueraufträge einer Kategorie in eine andere.",
+      "fields": {
+        "category_id": {
+          "name": "Quellkategorie",
+          "description": "ID der Kategorie, deren Buchungen verschoben werden."
+        },
+        "target_id": {
+          "name": "Ziel",
+          "description": "ID des Elements, das die Buchungen erhält."
+        }
+      }
+    },
+    "move_class": {
+      "name": "Klassenbuchungen verschieben",
+      "description": "Verschiebt alle Buchungen und Daueraufträge einer Klasse in eine andere.",
+      "fields": {
+        "class_id": {
+          "name": "Quellklasse",
+          "description": "ID der Klasse, deren Buchungen verschoben werden."
+        },
+        "target_id": {
+          "name": "Ziel",
+          "description": "ID des Elements, das die Buchungen erhält."
+        }
+      }
+    },
+    "move_payee": {
+      "name": "Empfängerbuchungen verschieben",
+      "description": "Verschiebt alle Buchungen und Daueraufträge eines Empfängers auf einen anderen (Zusammenführen).",
+      "fields": {
+        "payee_id": {
+          "name": "Quellempfänger",
+          "description": "ID des Empfängers, dessen Buchungen verschoben werden."
+        },
+        "target_id": {
+          "name": "Ziel",
+          "description": "ID des Elements, das die Buchungen erhält."
+        }
+      }
+    }
+  },
+  "selector": {
+    "account_kind": {
+      "options": {
+        "checking": "Girokonto",
+        "savings": "Sparkonto",
+        "card": "Karte",
+        "cash": "Bargeld",
+        "other": "Sonstiges"
+      }
+    },
+    "category_kind": {
+      "options": {
+        "income": "Einnahme",
+        "expense": "Ausgabe",
+        "savings": "Sparen"
+      }
+    },
+    "transaction_state": {
+      "options": {
+        "0": "Nicht abgeglichen",
+        "1": "Abgeglichen",
+        "2": "Abgestimmt"
+      }
+    },
+    "order": {
+      "options": {
+        "asc": "Älteste zuerst",
+        "desc": "Neueste zuerst"
+      }
+    },
+    "schedule_mode": {
+      "options": {
+        "periodic": "Periodisch (fester Betrag)",
+        "installments": "Ratenplan"
+      }
+    },
+    "unit": {
+      "options": {
+        "day": "Tage",
+        "week": "Wochen",
+        "month": "Monate",
+        "quarter": "Quartale",
+        "year": "Jahre"
+      }
+    },
+    "end_mode": {
+      "options": {
+        "never": "Nie",
+        "date": "An einem Datum",
+        "count": "Nach N Ausführungen"
+      }
+    }
+  }
+}
