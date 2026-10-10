@@ -18,20 +18,29 @@ My Bank se compose de deux parties :
 
 | Partie | Ce que c'est | Installation |
 |---|---|---|
-| **My Bank API** | Le serveur : stocke vos données dans une base SQLite locale, calcule les soldes et les budgets, génère les opérations planifiées, se sauvegarde chaque nuit | **Module complémentaire** (add-on) Home Assistant (Home Assistant OS / Supervised), ou conteneur **Docker** |
+| **My Bank API** | Le serveur : stocke vos données dans une base SQLite locale, calcule les soldes et les budgets, génère les opérations planifiées, se sauvegarde chaque nuit | **Application** Home Assistant (anciennement *add-on* ou module complémentaire ; Home Assistant OS / Supervised), ou conteneur **Docker** |
 | **My Bank** (ce dépôt) | L'intégration et ses cartes Lovelace : capteurs, services et interface utilisateur | **HACS** |
 
 L'intégration est un client léger : toutes les règles (soldes, verrouillage des opérations rapprochées, calculs de budget…) sont dans le serveur. Vos données ne quittent jamais votre réseau.
+
+## Prérequis
+
+- Home Assistant **2026.2 ou plus récent**, et [HACS](https://hacs.xyz/) pour installer l'intégration. Testé sur 2026.2.3 et 2026.10.0.
+- Pour le serveur, au choix :
+  - **Home Assistant OS** ou une installation **Supervised**, sur un système 64 bits (amd64 ou aarch64, par ex. Raspberry Pi 4/5 avec l'image 64 bits), pour utiliser l'application — testé sur Home Assistant OS 18.3 ;
+  - ou **Docker** sur n'importe quelle machine 64 bits de votre réseau (amd64 ou arm64), pour les installations Home Assistant Container / Core.
 
 ## Installation
 
 ### 1. Le serveur
 
-**Home Assistant OS / Supervised — module complémentaire (recommandé)**
+**Home Assistant OS / Supervised — application (recommandé)**
 
-[![Ajouter le dépôt de modules complémentaires à votre Home Assistant.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPatafoin%2Fha-addons)
+[![Ajouter le dépôt d'applications à votre Home Assistant.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPatafoin%2Fha-addons)
 
-Ajoutez le dépôt `https://github.com/Patafoin/ha-addons`, installez **My Bank API** et démarrez-le. C'est tout : le module crée un jeton d'accès pour Home Assistant et s'annonce de lui-même.
+Ou à la main : Paramètres → **Applications** → **Installer une application** → ⋮ → **Dépôts**, ajoutez `https://github.com/Patafoin/ha-addons`. Installez ensuite **My Bank API** et démarrez-la. C'est tout : l'application crée un jeton d'accès pour Home Assistant et s'annonce d'elle-même.
+
+> Les versions de Home Assistant antérieures au changement de nom appellent les applications **modules complémentaires** (add-ons) : Paramètres → Modules complémentaires → Boutique.
 
 **Home Assistant Container / Core — Docker**
 
@@ -66,7 +75,7 @@ Dans HACS : ⋮ → **Dépôts personnalisés** → `https://github.com/Patafoin
 
 ### 3. Les relier
 
-- **Avec le module complémentaire** : Paramètres → Appareils et services affiche **My Bank** comme découvert. Cliquez sur **Configurer** → **Valider**.
+- **Avec l'application** : Paramètres → Appareils et services affiche **My Bank** comme découvert. Cliquez sur **Configurer** → **Valider**.
 - **Avec Docker** : Paramètres → Appareils et services → **Ajouter une intégration** → **My Bank**, puis saisissez l'URL du serveur (par ex. `http://192.168.1.10:9931`) et le jeton (`MYBANK_API_TOKEN`).
 
 ![Configuration](docs/images/config-flow.png)
@@ -125,7 +134,7 @@ Toutes les cartes disposent d'un éditeur visuel.
 ## Entités
 
 - **Un capteur par compte** : état = solde total (y compris les opérations à date future) ; attributs `solde_pointe` (pointé), `solde_rapproche` (rapproché), `account_id`, `kind`, `iban`, `closed`. Rafraîchi toutes les 5 minutes et après chaque modification.
-- **`sensor.planifications_arrivant_a_terme`** : nombre d'opérations planifiées dont la dernière échéance tombe dans les 30 jours, avec la liste en attributs — pratique pour une automatisation de notification.
+- **Planifications arrivant à terme** (`sensor.planifications_arrivant_a_terme` sur une installation en français ; l'identifiant suit la langue de Home Assistant au moment de l'ajout de l'intégration) : nombre d'opérations planifiées dont la dernière échéance tombe dans les 30 jours, avec la liste en attributs — pratique pour une automatisation de notification.
 
 ## Services
 
@@ -147,7 +156,7 @@ Les cartes, les fenêtres de configuration, les services et les messages d'erreu
 
 ## Mise à jour
 
-Mettez à jour l'intégration avec HACS et le serveur depuis la boutique des modules complémentaires (ou `docker compose pull`). Si le serveur est trop ancien pour l'intégration, Home Assistant le signale par une notification de réparation.
+Mettez à jour l'intégration avec HACS et le serveur depuis Paramètres → Applications (ou `docker compose pull`). Si le serveur est trop ancien pour l'intégration, Home Assistant le signale par une notification de réparation.
 
 ## Import depuis MS Comptes Bancaires
 

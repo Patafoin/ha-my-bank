@@ -18,20 +18,29 @@ My Bank comes in two parts:
 
 | Part | What it is | How to install |
 |---|---|---|
-| **My Bank API** | The server: stores your data in a local SQLite database, computes balances and budgets, generates scheduled transactions, backs itself up every night | Home Assistant **add-on** (Home Assistant OS / Supervised), or a **Docker** container |
+| **My Bank API** | The server: stores your data in a local SQLite database, computes balances and budgets, generates scheduled transactions, backs itself up every night | Home Assistant **app** (formerly *add-on*; Home Assistant OS / Supervised), or a **Docker** container |
 | **My Bank** (this repository) | The integration and its Lovelace cards: sensors, services, and the user interface | **HACS** |
 
 The integration is a thin client: every rule (balances, locking of reconciled transactions, budget computations…) lives in the server. Your data never leaves your network.
+
+## Requirements
+
+- Home Assistant **2026.2 or later**, and [HACS](https://hacs.xyz/) to install the integration. Tested on 2026.2.3 and 2026.10.0.
+- For the server, either:
+  - **Home Assistant OS** or a **Supervised** installation, on a 64-bit system (amd64 or aarch64, e.g. Raspberry Pi 4/5 with the 64-bit image), to use the app — tested on Home Assistant OS 18.3;
+  - or **Docker** on any 64-bit machine of your network (amd64 or arm64), for Home Assistant Container / Core installations.
 
 ## Installation
 
 ### 1. The server
 
-**Home Assistant OS / Supervised — add-on (recommended)**
+**Home Assistant OS / Supervised — app (recommended)**
 
-[![Add the add-on repository to your Home Assistant.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPatafoin%2Fha-addons)
+[![Add the app repository to your Home Assistant.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FPatafoin%2Fha-addons)
 
-Add the repository `https://github.com/Patafoin/ha-addons`, install **My Bank API** and start it. That's all: the add-on creates an access token for Home Assistant and announces itself.
+Or by hand: Settings → **Apps** → **Install app** → ⋮ → **Repositories**, add `https://github.com/Patafoin/ha-addons`. Then install **My Bank API** and start it. That's all: the app creates an access token for Home Assistant and announces itself.
+
+> Home Assistant versions before the renaming call apps **add-ons** (Settings → Add-ons → Add-on store).
 
 **Home Assistant Container / Core — Docker**
 
@@ -66,7 +75,7 @@ In HACS: ⋮ → **Custom repositories** → `https://github.com/Patafoin/ha-my-
 
 ### 3. Connect them
 
-- **With the add-on**: Settings → Devices & services shows **My Bank** as discovered. Click **Configure** → **Submit**.
+- **With the app**: Settings → Devices & services shows **My Bank** as discovered. Click **Configure** → **Submit**.
 - **With Docker**: Settings → Devices & services → **Add integration** → **My Bank**, then enter the server URL (e.g. `http://192.168.1.10:9931`) and the token (`MYBANK_API_TOKEN`).
 
 ![Setup](docs/images/config-flow.png)
@@ -125,7 +134,7 @@ All cards have a visual editor.
 ## Entities
 
 - **One sensor per account**: state = total balance (including future-dated transactions); attributes `solde_pointe` (cleared), `solde_rapproche` (reconciled), `account_id`, `kind`, `iban`, `closed`. Refreshed every 5 minutes and after every change.
-- **`sensor.planifications_arrivant_a_terme`**: number of scheduled transactions whose last occurrence falls within 30 days, with the list in attributes — handy for a notification automation.
+- **Scheduled transactions ending** (`sensor.scheduled_transactions_ending` on an English installation; the entity ID follows the language of Home Assistant when the integration is added): number of scheduled transactions whose last occurrence falls within 30 days, with the list in attributes — handy for a notification automation.
 
 ## Services
 
@@ -147,7 +156,7 @@ The cards, the setup dialogs, the services and the error messages of the server 
 
 ## Updating
 
-Update the integration with HACS and the server with the add-on store (or `docker compose pull`). If the server is older than the integration needs, Home Assistant raises a repair issue telling you so.
+Update the integration with HACS and the server from Settings → Apps (or `docker compose pull`). If the server is older than the integration needs, Home Assistant raises a repair issue telling you so.
 
 ## Importing from MS Comptes Bancaires
 

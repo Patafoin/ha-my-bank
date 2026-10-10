@@ -3,13 +3,13 @@
     "step": {
       "user": {
         "title": "Connexion à My Bank API",
-        "description": "My Bank a besoin d'un serveur My Bank API en service (add-on Home Assistant ou conteneur Docker).",
+        "description": "My Bank a besoin d'un serveur My Bank API en service (application Home Assistant — anciennement add-on — ou conteneur Docker).",
         "data": {
           "url": "URL de My Bank API",
           "token": "Jeton d'accès"
         },
         "data_description": {
-          "url": "Adresse du serveur My Bank API, par exemple http://192.168.1.10:9931. Inutile avec l'add-on, découvert automatiquement.",
+          "url": "Adresse du serveur My Bank API, par exemple http://192.168.1.10:9931. Inutile avec l'application My Bank API, découverte automatiquement.",
           "token": "Créé sur le serveur par : docker exec my-bank-api my-bank token create home-assistant (ou variable MYBANK_API_TOKEN)."
         }
       },
@@ -21,13 +21,13 @@
           "token": "Jeton d'accès"
         },
         "data_description": {
-          "url": "Adresse du serveur My Bank API, par exemple http://192.168.1.10:9931. Inutile avec l'add-on, découvert automatiquement.",
+          "url": "Adresse du serveur My Bank API, par exemple http://192.168.1.10:9931. Inutile avec l'application My Bank API, découverte automatiquement.",
           "token": "Créé sur le serveur par : docker exec my-bank-api my-bank token create home-assistant (ou variable MYBANK_API_TOKEN)."
         }
       },
       "hassio_confirm": {
-        "title": "Add-on My Bank API détecté",
-        "description": "Connecter Home Assistant à l'add-on {addon} ?"
+        "title": "Application My Bank API détectée",
+        "description": "Connecter Home Assistant à l'application {addon} ?"
       }
     },
     "error": {
@@ -42,7 +42,7 @@
   "issues": {
     "api_too_old": {
       "title": "My Bank API doit être mis à jour",
-      "description": "My Bank API {version} est plus ancien que la version minimale attendue par l'intégration ({minimum}). Mettre à jour l'add-on ou l'image Docker My Bank API, sinon certaines fonctions de la carte échoueront."
+      "description": "My Bank API {version} est plus ancien que la version minimale attendue par l'intégration ({minimum}). Mettre à jour l'application ou l'image Docker My Bank API, sinon certaines fonctions de la carte échoueront."
     }
   },
   "entity": {
