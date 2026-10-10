@@ -813,7 +813,8 @@ list_account_transactions:
       selector:
         date: {}
     state:
-      required: '[0, 1]'
+      required: false
+      example: '[0, 1]'
       selector:
         object: {}
     order:

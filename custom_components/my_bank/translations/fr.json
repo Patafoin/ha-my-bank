@@ -667,7 +667,7 @@
         },
         "splits": {
           "name": "Ventilation",
-          "description": "Liste de lignes {amount, category_id, class_id, label} ; leur somme doit égaler le montant."
+          "description": "Liste de lignes (amount, category_id, class_id, label) ; leur somme doit égaler le montant."
         }
       }
     },
@@ -729,7 +729,7 @@
         },
         "splits": {
           "name": "Ventilation",
-          "description": "Liste de lignes {amount, category_id, class_id, label} ; leur somme doit égaler le montant."
+          "description": "Liste de lignes (amount, category_id, class_id, label) ; leur somme doit égaler le montant."
         }
       }
     },
@@ -1145,7 +1145,7 @@
         },
         "items": {
           "name": "Grille",
-          "description": "Liste [{rank, amount, date}] ; date facultative, sinon celle de la règle."
+          "description": "Liste [(rank, amount, date)] ; date facultative, sinon celle de la règle."
         }
       }
     },
@@ -1279,7 +1279,7 @@
         },
         "lines": {
           "name": "Cellules",
-          "description": "Liste [{category_id, month, amount}]."
+          "description": "Liste [(category_id, month, amount)]."
         }
       }
     },

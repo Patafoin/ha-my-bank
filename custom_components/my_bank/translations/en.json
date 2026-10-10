@@ -667,7 +667,7 @@
         },
         "splits": {
           "name": "Split",
-          "description": "List of lines {amount, category_id, class_id, label}; their sum must equal the amount."
+          "description": "List of lines (amount, category_id, class_id, label); their sum must equal the amount."
         }
       }
     },
@@ -729,7 +729,7 @@
         },
         "splits": {
           "name": "Split",
-          "description": "List of lines {amount, category_id, class_id, label}; their sum must equal the amount."
+          "description": "List of lines (amount, category_id, class_id, label); their sum must equal the amount."
         }
       }
     },
@@ -1145,7 +1145,7 @@
         },
         "items": {
           "name": "Grid",
-          "description": "List [{rank, amount, date}]; date optional, otherwise the rule's date."
+          "description": "List [(rank, amount, date)]; date optional, otherwise the rule's date."
         }
       }
     },
@@ -1279,7 +1279,7 @@
         },
         "lines": {
           "name": "Cells",
-          "description": "List [{category_id, month, amount}]."
+          "description": "List [(category_id, month, amount)]."
         }
       }
     },

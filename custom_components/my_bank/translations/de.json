@@ -667,7 +667,7 @@
         },
         "splits": {
           "name": "Aufteilung",
-          "description": "Liste von Zeilen {amount, category_id, class_id, label}; ihre Summe muss dem Betrag entsprechen."
+          "description": "Liste von Zeilen (amount, category_id, class_id, label); ihre Summe muss dem Betrag entsprechen."
         }
       }
     },
@@ -729,7 +729,7 @@
         },
         "splits": {
           "name": "Aufteilung",
-          "description": "Liste von Zeilen {amount, category_id, class_id, label}; ihre Summe muss dem Betrag entsprechen."
+          "description": "Liste von Zeilen (amount, category_id, class_id, label); ihre Summe muss dem Betrag entsprechen."
         }
       }
     },
@@ -1145,7 +1145,7 @@
         },
         "items": {
           "name": "Tabelle",
-          "description": "Liste [{rank, amount, date}]; Datum optional, sonst das der Regel."
+          "description": "Liste [(rank, amount, date)]; Datum optional, sonst das der Regel."
         }
       }
     },
@@ -1279,7 +1279,7 @@
         },
         "lines": {
           "name": "Zellen",
-          "description": "Liste [{category_id, month, amount}]."
+          "description": "Liste [(category_id, month, amount)]."
         }
       }
     },
