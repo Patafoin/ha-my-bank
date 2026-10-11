@@ -3,18 +3,37 @@ name: Tests
 on:
   push:
   pull_request:
+  schedule:
+    # Weekly, to catch a new Home Assistant release breaking the integration.
+    - cron: "0 4 * * 1"
 
 jobs:
   pytest:
+    name: pytest (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Lower bound: the hacs.json minimum (HA 2026.2), pinned in requirements_test.txt.
+          - name: HA 2026.2
+            python: "3.13"
+            install: pip install -r requirements_test.txt
+          # Latest Home Assistant release.
+          - name: HA latest
+            python: "3.14"
+            install: pip install pytest-homeassistant-custom-component pytest-mock
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: ${{ matrix.install }}
+      - run: python -m pytest -q
+
+  card:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: requirements_test.txt
-      - run: pip install -r requirements_test.txt
-      - run: python -m pytest -q
+      - uses: actions/checkout@v7
       - name: Card syntax
         run: node --check custom_components/my_bank/www/my-bank-card.js
