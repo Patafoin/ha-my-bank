@@ -1175,8 +1175,8 @@ class MyBankCard extends HTMLElement {
 
   // onClose : fermeture du formulaire affiché à la place de la ligne (Annuler).
   // opts (carte de saisie rapide) : chooseAccount (compte modifiable), hidden (Set de clés ENTRY_FIELDS masquées :
-  // les champs restent dans le formulaire, pré-remplis depuis le tiers et envoyés), cancelLabel, autofocus (défaut : oui),
-  // onSaved({ service, payload, accountId }) à la place du rafraîchissement du volet Opérations.
+  // les champs restent dans le formulaire, pré-remplis depuis le tiers et envoyés), showHidden + onToggleHidden(on) (bouton
+  // qui affiche / masque les champs masqués), cancelLabel, autofocus (défaut : oui), onSaved({ service, payload, accountId }) à la place du rafraîchissement du volet Opérations.
   _showTransactionForm(container, tx, onClose, opts = {}) {
     const L = this._lookups;
     let accountId = this._txAccountId;
@@ -1223,13 +1223,26 @@ class MyBankCard extends HTMLElement {
         <div class="form-actions">
           <button type="submit">${tx ? t("Enregistrer") : t("Créer")}</button>
           <button type="button" class="secondary toggle-split" data-f="split">${t("Ventiler")}</button>
+          ${hidden.size ? `<button type="button" class="secondary toggle-hidden"></button>` : ""}
           <button type="button" class="cancel">${esc(opts.cancelLabel || t("Annuler"))}</button>
         </div>
       </form>
     `;
     const form = container.querySelector("form");
     const $ = (sel) => form.querySelector(sel);
-    form.querySelectorAll("[data-f]").forEach((el) => el.classList.toggle("f-off", hidden.has(el.dataset.f)));
+    let showHidden = !!opts.showHidden;
+    const applyHidden = () => {
+      form.querySelectorAll("[data-f]").forEach((el) => el.classList.toggle("f-off", !showHidden && hidden.has(el.dataset.f)));
+      if (hidden.size) $(".toggle-hidden").textContent = showHidden ? t("Moins de champs") : t("Tous les champs");
+    };
+    applyHidden();
+    if (hidden.size) {
+      $(".toggle-hidden").addEventListener("click", () => {
+        showHidden = !showHidden;
+        applyHidden();
+        if (opts.onToggleHidden) opts.onToggleHidden(showHidden);
+      });
+    }
     const splitsBox = $(".splits");
     const lines = $(".split-lines");
     let splitMode = false;
@@ -1323,7 +1336,7 @@ class MyBankCard extends HTMLElement {
       }
     };
     this._payeeAutocomplete(payeeInput, $(".tiers-suggestions"), autofill, $('[name="amount"]'));
-    if (!tx && opts.autofocus !== false) (hidden.has("payee") ? $('[name="amount"]') : payeeInput).focus();
+    if (!tx && opts.autofocus !== false) (hidden.has("payee") && !showHidden ? $('[name="amount"]') : payeeInput).focus();
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -3313,6 +3326,8 @@ class MyBankEntryCard extends MyBankSimpleCard {
     const show = (autofocus) => this._showTransactionForm(container, null, () => show(true), {
       chooseAccount: true,
       hidden,
+      showHidden: this._showHidden, // choix gardé d'une opération à l'autre
+      onToggleHidden: (on) => (this._showHidden = on),
       cancelLabel: t("Effacer"),
       autofocus, // pas au chargement du tableau de bord (clavier du téléphone)
       onSaved: async ({ service, payload, accountId }) => {
@@ -3746,6 +3761,7 @@ const I18N = {
     "Mode de règlement": "Payment method",
     "Modifier": "Edit",
     "Mois en cours": "Current month",
+    "Moins de champs": "Fewer fields",
     "Montant": "Amount",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Invalid amount (enter a positive amount; the type gives the direction).",
     "Montant invalide (saisir un montant positif).": "Invalid amount (enter a positive amount).",
@@ -3885,6 +3901,7 @@ const I18N = {
     "Tous": "All",
     "Tous les": "Every",
     "Tous les ans": "Every year",
+    "Tous les champs": "All fields",
     "Tous les jours": "Every day",
     "Tous les mois": "Every month",
     "Tous les trimestres": "Every quarter",
@@ -4118,6 +4135,7 @@ const I18N = {
     "Mode de règlement": "Zahlungsart",
     "Modifier": "Bearbeiten",
     "Mois en cours": "Aktueller Monat",
+    "Moins de champs": "Weniger Felder",
     "Montant": "Betrag",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Ungültiger Betrag (positiven Betrag eingeben; die Art bestimmt die Richtung).",
     "Montant invalide (saisir un montant positif).": "Ungültiger Betrag (positiven Betrag eingeben).",
@@ -4257,6 +4275,7 @@ const I18N = {
     "Tous": "Alle",
     "Tous les": "Alle",
     "Tous les ans": "Jährlich",
+    "Tous les champs": "Alle Felder",
     "Tous les jours": "Täglich",
     "Tous les mois": "Monatlich",
     "Tous les trimestres": "Vierteljährlich",

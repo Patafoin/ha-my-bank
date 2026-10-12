@@ -123,7 +123,7 @@ Give each card instance its own `sections` to build an operations-only view, a s
 | Card | Options |
 |---|---|
 | `custom:my-bank-balance-card` | `account_id` — the three balances of one account |
-| `custom:my-bank-entry-card` | `account_id`, `fields` — quick entry, pre-filled from the payee |
+| `custom:my-bank-entry-card` | `account_id`, `fields` — quick entry, pre-filled from the payee; an "All fields" button shows the hidden fields |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
 | `custom:my-bank-share-card` | — shared expenses |
 

@@ -123,7 +123,7 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 | Carte | Options |
 |---|---|
 | `custom:my-bank-balance-card` | `account_id` — les trois soldes d'un compte |
-| `custom:my-bank-entry-card` | `account_id`, `fields` — saisie rapide, pré-remplie à partir du tiers |
+| `custom:my-bank-entry-card` | `account_id`, `fields` — saisie rapide, pré-remplie à partir du tiers ; bouton « Tous les champs » pour afficher les champs masqués |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
 | `custom:my-bank-share-card` | — dépenses partagées |
 
