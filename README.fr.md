@@ -44,6 +44,15 @@ Ou à la main : Paramètres → **Applications** → **Installer une application
 
 **Home Assistant Container / Core — Docker**
 
+Générez d'abord le jeton d'accès, une longue chaîne aléatoire que Home Assistant utilisera pour parler au serveur :
+
+```bash
+openssl rand -hex 32
+# ou : python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Mettez-le dans `MYBANK_API_TOKEN` ci-dessous, et gardez-le : vous le saisirez dans Home Assistant à l'étape 3.
+
 ```yaml
 # compose.yaml
 services:
@@ -58,12 +67,15 @@ services:
       - ./backups:/backups
     environment:
       TZ: Europe/Paris
-      MYBANK_API_TOKEN: "remplacez-moi-par-une-longue-chaine-aleatoire"
+      MYBANK_API_TOKEN: "collez-ici-le-jeton-genere"
 ```
 
 ```bash
 docker compose up -d
+curl http://localhost:9931/api/v1/health   # le serveur répond
 ```
+
+Le jeton est stocké haché dans la base. Modifiez la variable et redémarrez pour le remplacer ; retirez-la pour le révoquer. Si vous préférez ne pas garder le jeton dans `compose.yaml`, laissez `MYBANK_API_TOKEN` de côté et créez-en un dans le conteneur : `docker exec my-bank-api my-bank token create ha` (affiché une seule fois).
 
 Tous les réglages sont décrits dans le [README de My Bank API](https://github.com/Patafoin/my-bank-api/blob/main/README.fr.md).
 
@@ -76,7 +88,7 @@ Dans HACS : ⋮ → **Dépôts personnalisés** → `https://github.com/Patafoin
 ### 3. Les relier
 
 - **Avec l'application** : Paramètres → Appareils et services affiche **My Bank** comme découvert. Cliquez sur **Configurer** → **Valider**.
-- **Avec Docker** : Paramètres → Appareils et services → **Ajouter une intégration** → **My Bank**, puis saisissez l'URL du serveur (par ex. `http://192.168.1.10:9931`) et le jeton (`MYBANK_API_TOKEN`).
+- **Avec Docker** : Paramètres → Appareils et services → **Ajouter une intégration** → **My Bank**, puis saisissez l'URL du serveur (par ex. `http://192.168.1.10:9931`) et le jeton généré à l'étape 1.
 
 ![Configuration](docs/images/config-flow.png)
 

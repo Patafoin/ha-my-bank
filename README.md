@@ -44,6 +44,15 @@ Or by hand: Settings → **Apps** → **Install app** → ⋮ → **Repositories
 
 **Home Assistant Container / Core — Docker**
 
+First generate the access token, a long random string Home Assistant will use to talk to the server:
+
+```bash
+openssl rand -hex 32
+# or: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Put it in `MYBANK_API_TOKEN` below, and keep it: you will enter it in Home Assistant at step 3.
+
 ```yaml
 # compose.yaml
 services:
@@ -58,12 +67,15 @@ services:
       - ./backups:/backups
     environment:
       TZ: Europe/Paris
-      MYBANK_API_TOKEN: "change-me-to-a-long-random-string"
+      MYBANK_API_TOKEN: "paste-the-generated-token-here"
 ```
 
 ```bash
 docker compose up -d
+curl http://localhost:9931/api/v1/health   # the server answers
 ```
+
+The token is stored hashed in the database. Change the variable and restart to replace it; remove it to revoke it. If you prefer not to keep the token in `compose.yaml`, leave `MYBANK_API_TOKEN` out and create one in the container instead: `docker exec my-bank-api my-bank token create ha` (shown only once).
 
 See the [My Bank API README](https://github.com/Patafoin/my-bank-api) for all settings.
 
@@ -76,7 +88,7 @@ In HACS: ⋮ → **Custom repositories** → `https://github.com/Patafoin/ha-my-
 ### 3. Connect them
 
 - **With the app**: Settings → Devices & services shows **My Bank** as discovered. Click **Configure** → **Submit**.
-- **With Docker**: Settings → Devices & services → **Add integration** → **My Bank**, then enter the server URL (e.g. `http://192.168.1.10:9931`) and the token (`MYBANK_API_TOKEN`).
+- **With Docker**: Settings → Devices & services → **Add integration** → **My Bank**, then enter the server URL (e.g. `http://192.168.1.10:9931`) and the token generated in step 1.
 
 ![Setup](docs/images/config-flow.png)
 
