@@ -96,6 +96,8 @@ Dans HACS : ⋮ → **Dépôts personnalisés** → `https://github.com/Patafoin
 
 La carte est enregistrée automatiquement (aucune ressource à ajouter). Modifiez un tableau de bord → **Ajouter une carte** → **My Bank**.
 
+Si les cartes n'apparaissent pas dans le sélecteur après une installation ou une mise à jour, rechargez la page sans cache (Ctrl+F5) ou videz le cache de l'application Companion. Les cartes personnalisées sont en bas du sélecteur, ou cherchez « bank ».
+
 ## Les cartes
 
 ### `custom:my-bank-card` — tout, un onglet par sujet

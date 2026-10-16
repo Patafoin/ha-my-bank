@@ -77,6 +77,6 @@ class MyBankCoordinator(DataUpdateCoordinator[MyBankData]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except MyBankApiError as err:
             # best-effort: the balances stay up to date, the list of ending schedules is kept as is
-            _LOGGER.warning("My Bank : planifications non lues (%s)", err)
+            _LOGGER.warning("My Bank: could not read the scheduled transactions (%s)", err)
             ending = previous
         return MyBankData(accounts={a["id"]: a for a in accounts}, ending=ending)

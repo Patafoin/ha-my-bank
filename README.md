@@ -96,6 +96,8 @@ In HACS: ⋮ → **Custom repositories** → `https://github.com/Patafoin/ha-my-
 
 The card is registered automatically (no resource to add). Edit a dashboard → **Add card** → **My Bank**.
 
+If the cards don't show up in the picker after installing or updating, force-reload the page (Ctrl+F5) or clear the cache of the Companion app. The custom cards are at the bottom of the picker, or search for "bank".
+
 ## The cards
 
 ### `custom:my-bank-card` — everything, one tab per subject

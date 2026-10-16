@@ -48,7 +48,7 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     resources = lovelace_data.resources
     if not isinstance(resources, ResourceStorageCollection):
         _LOGGER.warning(
-            "Lovelace est en mode YAML : ajoutez %s?v=%s manuellement aux ressources",
+            "Lovelace is in YAML mode: add %s?v=%s (type: module) to your resources manually",
             CARD_URL_PATH,
             CARD_VERSION,
         )
