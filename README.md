@@ -10,6 +10,8 @@ Personal bookkeeping in Home Assistant, the way desktop money managers do it: ac
 
 ![Dashboard](docs/images/card-dashboard.png)
 
+💬 Questions, feedback, ideas: [discussion on the Home Assistant Community forum](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114).
+
 > Available in **English, French and German** (cards, services, setup, server messages), following the Home Assistant language.
 
 ## How it works
@@ -147,6 +149,10 @@ Give each card instance its own `sections` to build an operations-only view, a s
 All cards have a visual editor.
 
 <br clear="right">
+
+**Chart cards** — balance history, upcoming occurrences, expenses by category:
+
+![Chart cards](docs/images/chart-cards.png)
 
 ## Entities
 

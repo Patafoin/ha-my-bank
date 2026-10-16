@@ -10,6 +10,8 @@ La gestion de vos comptes personnels dans Home Assistant, à la manière des log
 
 ![Tableau de bord](docs/images/card-dashboard.png)
 
+💬 Questions, retours, idées : [discussion sur le forum Home Assistant Community](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114) (en anglais).
+
 > Disponible en **anglais, français et allemand** (cartes, services, configuration, messages du serveur), selon la langue de Home Assistant.
 
 ## Fonctionnement
@@ -147,6 +149,10 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 Toutes les cartes disposent d'un éditeur visuel.
 
 <br clear="right">
+
+**Cartes graphiques** — évolution du solde, échéances à venir, dépenses par rubrique :
+
+![Cartes graphiques](docs/images/chart-cards.png)
 
 ## Entités
 
