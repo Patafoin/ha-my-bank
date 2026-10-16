@@ -1,6 +1,6 @@
 # My Bank for Home Assistant
 
-🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md)
+🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md) · 🇩🇪 [Auf Deutsch lesen](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
@@ -109,7 +109,7 @@ If the cards don't show up in the picker after installing or updating, force-rel
 | `dashboard` | Balances of every account, budget of the current month |
 | `transactions` | Transactions of an account with running balance; filters; add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click |
 | `accounts` | Accounts (checking, savings, card, cash…), opening balance, closing |
-| `categories` / `tags` | Category tree (income / expense / savings) and a second, free classification axis |
+| `categories` / `tags` | Category tree (income / expense / savings) and classes, a second axis for analysis — see [Categories and classes](#categories-and-classes) |
 | `payees` | Payees with default category |
 | `budgets` | Monthly budget per account: planned vs actual, variance, copy from a previous budget |
 | `recurrences` | Scheduled transactions (periodic or instalment plans), upcoming occurrences, automatic generation |
@@ -153,6 +153,35 @@ All cards have a visual editor.
 **Chart cards** — balance history, upcoming occurrences, expenses by category:
 
 ![Chart cards](docs/images/chart-cards.png)
+
+## Categories and classes
+
+My Bank offers two ways to classify a transaction: the **category** and the **class**. They do not play the same role.
+
+**The category: what the money was for — use it first.** It answers "what was this spent on (or received for)?": Groceries, Housing, Fuel… Everything is built around it:
+- **budgets** (planned vs actual per category),
+- the **spending by category** card,
+- the income / expense / savings tree, with its subcategories,
+- the **default category** of payees, which pre-fills the entry form.
+
+A transaction without a category shows up in none of these.
+
+**The class: an optional extra axis, for analysis.** It answers another question: "for whom, or for what?". It is there for analytics: grouping transactions from different categories, or splitting one category. Classes have no budget; you mostly use them by filtering the transaction list, which then shows the total.
+
+**Example: two cars**
+
+| Transaction | Category | Class |
+|---|---|---|
+| Fill-up, 60 € | Fuel | Vehicle A |
+| Fill-up, 45 € | Fuel | Vehicle B |
+| Service, 180 € | Vehicle maintenance | Vehicle A |
+
+- The **Fuel** category puts the 105 € of fuel in the budget and in the spending card, whichever the car.
+- The **Vehicle A** class tells you what that car costs (240 €, fuel and maintenance included): filter the transaction list on this class. With Category = Fuel and Class = Vehicle A, you get the fuel of that car only.
+
+Avoid setting only the class, without a category: the per-car analysis would still work, but these expenses would vanish from the budget and from the spending by category card. Avoid also creating "Fuel vehicle A" and "Fuel vehicle B" categories: that multiplies budget lines for information the class already gives.
+
+**In short**: always set the category. Add a class when you want to follow an object, a project or a person across several categories. In a split transaction, each line has its own category and its own class.
 
 ## Entities
 

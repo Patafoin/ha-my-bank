@@ -1,6 +1,6 @@
 # My Bank pour Home Assistant
 
-🇬🇧 [Read in English](https://github.com/Patafoin/ha-my-bank/blob/main/README.md)
+🇬🇧 [Read in English](https://github.com/Patafoin/ha-my-bank/blob/main/README.md) · 🇩🇪 [Auf Deutsch lesen](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
@@ -109,7 +109,7 @@ Si les cartes n'apparaissent pas dans le sélecteur après une installation ou u
 | `dashboard` | Soldes de tous les comptes, budget du mois en cours |
 | `transactions` | Opérations d'un compte avec solde progressif ; filtres ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic |
 | `accounts` | Comptes (courant, épargne, carte, espèces…), solde initial, clôture |
-| `categories` / `tags` | Arborescence des catégories (recettes / dépenses / épargne) et un second axe de classement libre |
+| `categories` / `tags` | Arborescence des rubriques (recettes / dépenses / épargne) et classes, un second axe d'analyse — voir [Rubriques et classes](#rubriques-et-classes) |
 | `payees` | Tiers avec catégorie par défaut |
 | `budgets` | Budget mensuel par compte : prévu / réalisé, écart, copie d'un budget précédent |
 | `recurrences` | Opérations planifiées (périodiques ou échéanciers), prochaines échéances, génération automatique |
@@ -153,6 +153,35 @@ Toutes les cartes disposent d'un éditeur visuel.
 **Cartes graphiques** — évolution du solde, échéances à venir, dépenses par rubrique :
 
 ![Cartes graphiques](docs/images/chart-cards.png)
+
+## Rubriques et classes
+
+My Bank propose deux façons de classer une opération : la **rubrique** et la **classe**. Elles n'ont pas le même rôle.
+
+**La rubrique : la nature de la dépense ou de la recette, à utiliser en priorité.** Elle répond à la question « à quoi a servi cet argent ? » : Alimentation, Logement, Essence… C'est autour d'elle que tout est construit :
+- les **budgets** (prévu / réalisé par rubrique),
+- la carte **dépenses par rubrique**,
+- l'arborescence recettes / dépenses / épargne, avec ses sous-rubriques,
+- la **rubrique par défaut** des tiers, qui pré-remplit la saisie.
+
+Une opération sans rubrique n'apparaît dans aucun de ces suivis.
+
+**La classe : un axe d'analyse en plus, facultatif.** Elle répond à une autre question : « pour qui ou pour quoi ? ». Elle sert à l'analytique : regrouper des opérations de rubriques différentes ou découper une même rubrique. Les classes n'ont pas de budget ; on s'en sert surtout pour filtrer la liste des opérations, qui affiche alors le total.
+
+**Exemple : deux véhicules**
+
+| Opération | Rubrique | Classe |
+|---|---|---|
+| Plein, 60 € | Essence | Véhicule A |
+| Plein, 45 € | Essence | Véhicule B |
+| Révision, 180 € | Entretien véhicule | Véhicule A |
+
+- La rubrique **Essence** fait apparaître les 105 € de carburant dans le budget et la carte des dépenses, quel que soit le véhicule.
+- La classe **Véhicule A** permet de voir ce que coûte ce véhicule-là (240 €, essence et entretien compris) : filtrez la liste des opérations sur cette classe. Avec le filtre Rubrique = Essence et Classe = Véhicule A, on obtient l'essence de ce véhicule seulement.
+
+À éviter : ne mettre que la classe, sans rubrique. L'analyse par véhicule fonctionnerait toujours, mais ces dépenses disparaîtraient du budget et de la carte des dépenses par rubrique. À éviter aussi : créer des rubriques « Essence véhicule A » et « Essence véhicule B ». Ça multiplie les lignes de budget pour une information que la classe donne déjà.
+
+**En résumé** : renseignez toujours la rubrique. Ajoutez une classe quand vous voulez suivre un objet, un projet ou une personne à travers plusieurs rubriques. Dans une opération ventilée, chaque ligne a sa propre rubrique et sa propre classe.
 
 ## Entités
 

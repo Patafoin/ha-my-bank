@@ -17,7 +17,7 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-CARD_VERSION = "0.13.1"
+CARD_VERSION = "0.13.2"
 CARD_URL_PATH = "/my_bank/my-bank-card.js"
 _REGISTERED = f"{DOMAIN}_frontend_registered"
 

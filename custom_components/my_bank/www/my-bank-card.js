@@ -236,6 +236,7 @@ const STYLE = `
   .tx-amounts { text-align: right; flex-shrink: 0; }
   .tx-amount { font-size: 14px; font-weight: 600; }
   .tx-amount.credit { color: var(--success-color, #43a047); }
+  .tx-amount.debit { color: var(--error-color, #db4437); }
   .tx-balance { font-size: 11px; color: var(--secondary-text-color); }
   .tx-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .tx-actions button.tx-state { border: 1px solid var(--divider-color); border-radius: 4px; line-height: 1; opacity: 0.45; }
@@ -847,7 +848,7 @@ class MyBankCard extends HTMLElement {
         </div>
         <div class="tx-right">
           <div class="tx-amounts">
-            <div class="tx-amount ${credit ? "credit" : ""}">${credit ? "+" : ""}${fmtAmount(tx.amount)} €</div>
+            <div class="tx-amount ${credit ? "credit" : Number(tx.amount) < 0 ? "debit" : ""}">${credit ? "+" : ""}${fmtAmount(tx.amount)} €</div>
             <div class="tx-balance">${t("Solde :")} ${fmtAmount(tx.balance_after)}</div>
           </div>
           <div class="tx-actions">
@@ -1457,7 +1458,7 @@ class MyBankCard extends HTMLElement {
               ].filter(Boolean).join(" · "))}</div>
             </div>
             <div class="tx-right">
-              <div class="tx-amounts"><div class="tx-amount ${Number(o.amount) > 0 ? "credit" : ""}">${Number(o.amount) > 0 ? "+" : ""}${fmtAmount(o.amount)} €</div></div>
+              <div class="tx-amounts"><div class="tx-amount ${Number(o.amount) > 0 ? "credit" : Number(o.amount) < 0 ? "debit" : ""}">${Number(o.amount) > 0 ? "+" : ""}${fmtAmount(o.amount)} €</div></div>
               <div class="tx-actions">
                 <button class="occ-generate" title="${t("Saisir l'opération maintenant")}">✓</button>
                 <button class="occ-skip" title="${t("Sauter cette échéance")}">⏭</button>
@@ -1485,7 +1486,7 @@ class MyBankCard extends HTMLElement {
               <div class="tx-sub">${esc(sub.join(" · "))}</div>
             </div>
             <div class="tx-right">
-              <div class="tx-amounts"><div class="tx-amount ${Number(amount) > 0 ? "credit" : ""}">${Number(amount) > 0 ? "+" : ""}${fmtAmount(amount)} €</div></div>
+              <div class="tx-amounts"><div class="tx-amount ${Number(amount) > 0 ? "credit" : Number(amount) < 0 ? "debit" : ""}">${Number(amount) > 0 ? "+" : ""}${fmtAmount(amount)} €</div></div>
               <div class="tx-actions">
                 <button class="grid" title="${t("Échéances")}">📅</button>
                 <button class="edit" title="${t("Modifier")}">✎</button>
