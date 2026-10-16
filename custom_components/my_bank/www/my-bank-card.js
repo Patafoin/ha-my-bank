@@ -3259,9 +3259,14 @@ function selectedAccountIds(config, accounts) {
   return raw && raw.length ? accounts.filter((a) => raw.includes(a.id)).map((a) => a.id) : accounts.map((a) => a.id);
 }
 
-function dayMonth(iso) {
-  const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
+// Date courte pour un axe de graphique : jour + mois abrégé (dans la langue), année en plus si demandée.
+// Jamais tout en chiffres (jj/mm vs mm/jj) : l'ordre numérique dépend de la locale (ex. « en » générique
+// rend les dates en m/j/a) alors que le mois en lettres lève l'ambiguïté quelle que soit la langue.
+function axisDate(iso, withYear) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const opts = { day: "numeric", month: "short" };
+  if (withYear) opts.year = "numeric";
+  return new Date(y, m - 1, d).toLocaleDateString(LOCALE, opts);
 }
 
 const SIMPLE_STYLE = `
@@ -3572,7 +3577,7 @@ class MyBankBalanceHistoryCard extends MyBankSimpleCard {
     });
     [start, end].forEach((d, i) => {
       const lbl = svgEl("text", { x: i === 0 ? pad.l : W - pad.r, y: H - 6, class: "chart-tick", "text-anchor": i === 0 ? "start" : "end" });
-      lbl.textContent = frDate(d);
+      lbl.textContent = axisDate(d, true);
       svg.appendChild(lbl);
     });
     // Étiquettes de fin de ligne écartées verticalement si deux dernières valeurs sont proches, pour ne pas
@@ -3671,7 +3676,7 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
       for (let i = 0; i < Math.ceil(days / 7); i++) {
         const from = new Date(today); from.setDate(from.getDate() + i * 7);
         const to = new Date(today); to.setDate(to.getDate() + i * 7 + 6);
-        buckets.push({ label: dayMonth(isoDate(from)), from: isoDate(from), to: isoDate(to), total: 0 });
+        buckets.push({ label: axisDate(isoDate(from)), from: isoDate(from), to: isoDate(to), total: 0 });
       }
     } else {
       for (let i = 0; i < Math.ceil(days / 30.4); i++) {
@@ -3688,7 +3693,7 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
   }
 
   _paintBarChart(host, buckets) {
-    const W = 560, H = 190, pad = { l: 8, r: 8, t: 10, b: 24 };
+    const W = 560, H = 190, pad = { l: 8, r: 8, t: 22, b: 24 };
     const max = Math.max(...buckets.map((b) => b.total), 1) * 1.15;
     const bw = ((W - pad.l - pad.r) / buckets.length) * 0.6;
     const x = (i) => pad.l + (i + 0.5) * ((W - pad.l - pad.r) / buckets.length);
@@ -3696,16 +3701,19 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
     svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: H - pad.b, y2: H - pad.b, class: "chart-grid" }));
     buckets.forEach((b, i) => {
-      const r = svgEl("rect", { x: x(i) - bw / 2, y: y(b.total), width: bw, height: Math.max(0, H - pad.b - y(b.total)), rx: 2, fill: "var(--primary-color)", opacity: "0.65" });
-      if (b.total) {
-        const title = svgEl("title", {});
-        title.textContent = `${b.label} : ${fmtAmount(b.total)} €`;
-        r.appendChild(title);
-      }
+      const top = y(b.total);
+      const r = svgEl("rect", { x: x(i) - bw / 2, y: top, width: bw, height: Math.max(0, H - pad.b - top), rx: 2, fill: "var(--primary-color)", opacity: "0.65" });
       svg.appendChild(r);
       const lbl = svgEl("text", { x: x(i), y: H - 8, class: "chart-tick", "text-anchor": "middle" });
       lbl.textContent = b.label;
       svg.appendChild(lbl);
+      if (b.total) {
+        // Étiquette toujours visible (pas seulement au survol) : la carte vise d'abord un tableau de bord
+        // tactile, sans pointeur pour déclencher une infobulle.
+        const amt = svgEl("text", { x: x(i), y: Math.max(top - 4, pad.t - 6), class: "chart-label", "text-anchor": "middle" });
+        amt.textContent = `${fmtAmount(b.total)} €`;
+        svg.appendChild(amt);
+      }
     });
     host.innerHTML = "";
     host.appendChild(svg);
