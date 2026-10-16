@@ -139,6 +139,9 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 | `custom:my-bank-balance-card` | `account_id` — les trois soldes d'un compte |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — saisie rapide, pré-remplie à partir du tiers ; bouton « Tous les champs » pour afficher les champs masqués |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
+| `custom:my-bank-balance-history-card` | `account_ids`, `period` — évolution du solde (courbe) d'un ou plusieurs comptes ; une carte = un graphique, composer plusieurs cartes pour séparer des comptes d'échelles différentes |
+| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — montant des échéances à venir, par semaine ou par mois selon l'horizon |
+| `custom:my-bank-category-spending-card` | `account_ids`, `period` — dépenses par rubrique (barres), le montant le plus élevé fait 100 % |
 | `custom:my-bank-share-card` | — dépenses partagées |
 
 Toutes les cartes disposent d'un éditeur visuel.

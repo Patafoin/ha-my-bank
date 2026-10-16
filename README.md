@@ -139,6 +139,9 @@ Give each card instance its own `sections` to build an operations-only view, a s
 | `custom:my-bank-balance-card` | `account_id` — the three balances of one account |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — quick entry, pre-filled from the payee; an "All fields" button shows the hidden fields |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
+| `custom:my-bank-balance-history-card` | `account_ids`, `period` — balance history (line chart) of one or more accounts; one card = one chart, compose several cards to separate accounts of different scale |
+| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — amount of upcoming occurrences, by week or by month depending on the horizon |
+| `custom:my-bank-category-spending-card` | `account_ids`, `period` — spending by category (bars), the highest amount is 100 % |
 | `custom:my-bank-share-card` | — shared expenses |
 
 All cards have a visual editor.

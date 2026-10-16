@@ -804,6 +804,7 @@ class MyBankCard extends HTMLElement {
     const now = new Date();
     if (range === "year") return `${now.getFullYear()}-01-01`;
     if (range === "3months") return isoDate(new Date(now.getFullYear(), now.getMonth() - 2, 1));
+    if (range === "6months") return isoDate(new Date(now.getFullYear(), now.getMonth() - 5, 1));
     if (range === "12months") return isoDate(new Date(now.getFullYear(), now.getMonth() - 11, 1));
     return isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
   }
@@ -3231,6 +3232,38 @@ const ENTRY_FIELDS = [
 const BUDGET_PERIODS = translated({ month: "Mois en cours", cumul: "Du début du budget au mois en cours", all: "Toute la période" });
 const SIMPLE_REFRESH_MS = 5 * 60 * 1000;
 
+// Cartes graphiques : période passée (solde, dépenses par rubrique) et horizon à venir (échéances).
+const TREND_PERIODS = translated({ month: "Mois en cours", "3months": "3 derniers mois", "6months": "6 derniers mois", "12months": "12 derniers mois", year: "Année en cours" });
+const UPCOMING_HORIZONS = translated({ "2weeks": "2 prochaines semaines", "4weeks": "4 prochaines semaines", "8weeks": "8 prochaines semaines", "3months": "3 prochains mois", "6months": "6 prochains mois", "12months": "12 prochains mois" });
+const HORIZON_DAYS = { "2weeks": 14, "4weeks": 28, "8weeks": 56, "3months": 92, "6months": 183, "12months": 366 };
+const HORIZON_BUCKET = { "2weeks": "week", "4weeks": "week", "8weeks": "week", "3months": "month", "6months": "month", "12months": "month" };
+// Palette catégorielle fixe (une couleur par compte, jamais recalculée au gré des filtres) ; variante sombre
+// choisie sur le mode sombre de hass, pas sur prefers-color-scheme (HA peut différer de l'OS).
+const SERIES_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+const SERIES_DARK = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+
+function seriesColors(hass) {
+  return hass && hass.themes && hass.themes.darkMode ? SERIES_DARK : SERIES_LIGHT;
+}
+
+function svgEl(tag, attrs) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+// Comptes à retenir pour une carte graphique : ceux cochés dans account_ids (stockés en chaînes par l'éditeur
+// générique), ou tous les comptes ouverts si le réglage est absent (cases toutes cochées = valeur par défaut).
+function selectedAccountIds(config, accounts) {
+  const raw = Array.isArray(config.account_ids) ? config.account_ids.map(Number) : null;
+  return raw && raw.length ? accounts.filter((a) => raw.includes(a.id)).map((a) => a.id) : accounts.map((a) => a.id);
+}
+
+function dayMonth(iso) {
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
+
 const SIMPLE_STYLE = `
   .card-title { font-size: 18px; font-weight: 500; margin: 0 0 8px; }
   .entry-msg { margin-bottom: 8px; padding: 10px 12px; border-radius: 4px; font-size: 14px;
@@ -3245,6 +3278,12 @@ const SIMPLE_STYLE = `
   .bl.branch .bl-name { font-weight: 600; }
   .bl.kind .bl-name { font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.04em; color: var(--primary-color); }
   .bl .pbar { width: 100%; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart-grid { stroke: var(--divider-color); stroke-width: 1; }
+  .chart-tick { fill: var(--secondary-text-color); font-size: 10px; }
+  .chart-label { fill: var(--primary-text-color); font-size: 11px; font-weight: 600; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; }
+  .chart-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 `;
 
 class MyBankSimpleCard extends MyBankCard {
@@ -3463,6 +3502,303 @@ class MyBankBudgetCard extends MyBankSimpleCard {
   }
 }
 
+// Évolution du solde d'un ou plusieurs comptes (ligne), sur une période réglable. Une carte = un graphique :
+// pour comparer des comptes d'échelles très différentes (courant vs épargne), composer plusieurs cartes plutôt
+// que de les forcer sur un même axe ici.
+class MyBankBalanceHistoryCard extends MyBankSimpleCard {
+  static getStubConfig() {
+    return { period: "12months" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("my-bank-balance-history-card-editor");
+  }
+
+  getCardSize() {
+    return 4;
+  }
+
+  set hass(hass) {
+    super.hass = hass;
+    if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
+  }
+
+  async _renderCard() {
+    await this._ensureLookups();
+    const accounts = this._lookups.accounts.filter((a) => !a.closed);
+    if (!accounts.length) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte.")}</div>`;
+      return;
+    }
+    const ids = selectedAccountIds(this._config, accounts);
+    const chosen = accounts.filter((a) => ids.includes(a.id));
+    if (!chosen.length) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte sélectionné.")}</div>`;
+      return;
+    }
+    const period = TREND_PERIODS[this._config.period] ? this._config.period : "12months";
+    const start = this._rangeStart(period);
+    const today = isoDate(new Date());
+    const series = await Promise.all(chosen.map(async (a) => {
+      const items = await this._items("list_account_transactions", { account_id: a.id, start, order: "asc" });
+      const points = items.map((tx) => ({ date: tx.date, value: Number(tx.balance_after) }));
+      if (points.length) {
+        if (points[0].date > start) points.unshift({ date: start, value: Number(items[0].balance_after) - Number(items[0].amount) });
+        if (points[points.length - 1].date < today) points.push({ date: today, value: points[points.length - 1].value });
+      } else {
+        points.push({ date: start, value: Number(a.balances.total) }, { date: today, value: Number(a.balances.total) });
+      }
+      return { name: a.name, points };
+    }));
+    const heading = this._config.title ? "" : `<div class="bal-name">${t("Évolution du solde")} — ${esc(TREND_PERIODS[period])}</div>`;
+    this._bodyEl.innerHTML = `${heading}<div class="chart-wrap"></div>`;
+    this._paintLineChart(this._bodyEl.querySelector(".chart-wrap"), series, start, today);
+  }
+
+  _paintLineChart(host, series, start, end) {
+    const colors = seriesColors(this._hass);
+    const W = 560, H = 190, pad = { l: 8, r: 54, t: 10, b: 20 };
+    const t0 = new Date(start).getTime(), t1 = Math.max(new Date(end).getTime(), t0 + 1);
+    const all = series.flatMap((s) => s.points.map((p) => p.value));
+    const yMin = Math.min(...all), yMax = Math.max(...all);
+    const padY = (yMax - yMin) * 0.08 || Math.max(1, Math.abs(yMax) * 0.05);
+    const lo = yMin - padY, hi = yMax + padY;
+    const x = (d) => pad.l + ((new Date(d).getTime() - t0) / (t1 - t0)) * (W - pad.l - pad.r);
+    const y = (v) => H - pad.b - ((v - lo) / (hi - lo)) * (H - pad.t - pad.b);
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
+    [0, 0.5, 1].forEach((f) => {
+      const gy = pad.t + f * (H - pad.t - pad.b);
+      svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: gy, y2: gy, class: "chart-grid" }));
+    });
+    [start, end].forEach((d, i) => {
+      const lbl = svgEl("text", { x: i === 0 ? pad.l : W - pad.r, y: H - 6, class: "chart-tick", "text-anchor": i === 0 ? "start" : "end" });
+      lbl.textContent = frDate(d);
+      svg.appendChild(lbl);
+    });
+    // Étiquettes de fin de ligne écartées verticalement si deux dernières valeurs sont proches, pour ne pas
+    // se chevaucher (plusieurs comptes qui terminent à des soldes voisins).
+    const labelY = new Map(series.map((s) => [s, y(s.points[s.points.length - 1].value)]));
+    const minGap = 13;
+    [...series].sort((a, b) => labelY.get(a) - labelY.get(b)).reduce((prevY, s) => {
+      const wanted = Math.max(labelY.get(s), prevY);
+      labelY.set(s, wanted);
+      return wanted + minGap;
+    }, -Infinity);
+    series.forEach((s, i) => {
+      const color = colors[i % colors.length];
+      const d = s.points.map((p, j) => (j === 0 ? "M" : "L") + x(p.date) + "," + y(p.value)).join(" ");
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2 }));
+      s.points.forEach((p) => {
+        const dot = svgEl("circle", { cx: x(p.date), cy: y(p.value), r: 2.5, fill: color });
+        const title = svgEl("title", {});
+        title.textContent = `${s.name} — ${frDate(p.date)} : ${fmtAmount(p.value)} €`;
+        dot.appendChild(title);
+        svg.appendChild(dot);
+      });
+      const last = s.points[s.points.length - 1];
+      const lbl = svgEl("text", { x: x(last.date) + 6, y: labelY.get(s) + 3, class: "chart-label" });
+      lbl.textContent = `${fmtAmount(last.value)} €`;
+      svg.appendChild(lbl);
+    });
+    host.innerHTML = "";
+    host.appendChild(svg);
+    if (series.length > 1) {
+      const legend = document.createElement("div");
+      legend.className = "chart-legend";
+      legend.innerHTML = series.map((s, i) => `<span><span class="dot" style="background:${colors[i % colors.length]}"></span>${esc(s.name)}</span>`).join("");
+      host.appendChild(legend);
+    }
+  }
+}
+
+// Charge des échéances à venir (barres), par semaine ou par mois selon l'horizon choisi. Comptes et horizon
+// réglables ; un virement entre deux comptes tous deux sélectionnés n'est compté qu'une fois.
+class MyBankUpcomingChargeCard extends MyBankSimpleCard {
+  static getStubConfig() {
+    return { horizon: "8weeks" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("my-bank-upcoming-charge-card-editor");
+  }
+
+  getCardSize() {
+    return 4;
+  }
+
+  set hass(hass) {
+    super.hass = hass;
+    if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
+  }
+
+  async _renderCard() {
+    await this._ensureLookups();
+    const accounts = this._lookups.accounts.filter((a) => !a.closed);
+    if (!accounts.length) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte.")}</div>`;
+      return;
+    }
+    const ids = selectedAccountIds(this._config, accounts);
+    if (!ids.length) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte sélectionné.")}</div>`;
+      return;
+    }
+    const horizon = HORIZON_DAYS[this._config.horizon] ? this._config.horizon : "8weeks";
+    const days = HORIZON_DAYS[horizon];
+    const all = ids.length === accounts.length;
+    const lists = await Promise.all((all ? [null] : ids).map((id) =>
+      this._items("list_upcoming_occurrences", id ? { days, account_id: id } : { days })
+    ));
+    const seen = new Set();
+    const occurrences = [];
+    for (const list of lists) for (const o of list) {
+      const key = `${o.schedule_id}:${o.rank}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      occurrences.push(o);
+    }
+    const buckets = this._buildBuckets(HORIZON_BUCKET[horizon], days, occurrences);
+    const heading = this._config.title ? "" : `<div class="bal-name">${t("Échéances à venir")} — ${esc(UPCOMING_HORIZONS[horizon])}</div>`;
+    this._bodyEl.innerHTML = `${heading}<div class="chart-wrap"></div>`;
+    this._paintBarChart(this._bodyEl.querySelector(".chart-wrap"), buckets);
+  }
+
+  _buildBuckets(unit, days, occurrences) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const buckets = [];
+    if (unit === "week") {
+      for (let i = 0; i < Math.ceil(days / 7); i++) {
+        const from = new Date(today); from.setDate(from.getDate() + i * 7);
+        const to = new Date(today); to.setDate(to.getDate() + i * 7 + 6);
+        buckets.push({ label: dayMonth(isoDate(from)), from: isoDate(from), to: isoDate(to), total: 0 });
+      }
+    } else {
+      for (let i = 0; i < Math.ceil(days / 30.4); i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        const ym = isoDate(d).slice(0, 7);
+        buckets.push({ label: monthLabel(ym, "short"), from: `${ym}-01`, to: isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)), total: 0 });
+      }
+    }
+    occurrences.forEach((o) => {
+      const b = buckets.find((x) => o.date >= x.from && o.date <= x.to);
+      if (b) b.total += Math.abs(Number(o.amount));
+    });
+    return buckets;
+  }
+
+  _paintBarChart(host, buckets) {
+    const W = 560, H = 190, pad = { l: 8, r: 8, t: 10, b: 24 };
+    const max = Math.max(...buckets.map((b) => b.total), 1) * 1.15;
+    const bw = ((W - pad.l - pad.r) / buckets.length) * 0.6;
+    const x = (i) => pad.l + (i + 0.5) * ((W - pad.l - pad.r) / buckets.length);
+    const y = (v) => H - pad.b - (v / max) * (H - pad.t - pad.b);
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
+    svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: H - pad.b, y2: H - pad.b, class: "chart-grid" }));
+    buckets.forEach((b, i) => {
+      const r = svgEl("rect", { x: x(i) - bw / 2, y: y(b.total), width: bw, height: Math.max(0, H - pad.b - y(b.total)), rx: 2, fill: "var(--primary-color)", opacity: "0.65" });
+      if (b.total) {
+        const title = svgEl("title", {});
+        title.textContent = `${b.label} : ${fmtAmount(b.total)} €`;
+        r.appendChild(title);
+      }
+      svg.appendChild(r);
+      const lbl = svgEl("text", { x: x(i), y: H - 8, class: "chart-tick", "text-anchor": "middle" });
+      lbl.textContent = b.label;
+      svg.appendChild(lbl);
+    });
+    host.innerHTML = "";
+    host.appendChild(svg);
+  }
+}
+
+// Dépenses par rubrique (barres proportionnelles, le montant maximum = 100 %) : reprend l'arbre des rubriques
+// de dépenses ; une rubrique mère sans opération qui lui soit directement rattachée n'affiche pas de montant
+// (seules ses sous-rubriques comptent), mais reste listée si l'une d'elles a un montant.
+class MyBankCategorySpendingCard extends MyBankSimpleCard {
+  static getStubConfig() {
+    return { period: "month" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("my-bank-category-spending-card-editor");
+  }
+
+  getCardSize() {
+    return 6;
+  }
+
+  set hass(hass) {
+    super.hass = hass;
+    if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
+  }
+
+  async _renderCard() {
+    await this._ensureLookups();
+    const accounts = this._lookups.accounts.filter((a) => !a.closed);
+    if (!accounts.length) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte.")}</div>`;
+      return;
+    }
+    const ids = selectedAccountIds(this._config, accounts);
+    if (!ids.length) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte sélectionné.")}</div>`;
+      return;
+    }
+    const period = TREND_PERIODS[this._config.period] ? this._config.period : "month";
+    const start = this._rangeStart(period);
+    const all = ids.length === accounts.length;
+    const sums = await this._categorySums(all ? [null] : ids, start);
+    const categories = this._lookups.categories.filter((c) => c.kind === "expense");
+    const byId = this._lookups.category;
+    const hasChildren = new Set(categories.map((c) => c.parent_id).filter((id) => id != null));
+    const keep = new Set();
+    categories.forEach((c) => {
+      if ((sums.get(c.id) || 0) > 0) {
+        let cur = c;
+        while (cur) { keep.add(cur.id); cur = cur.parent_id != null ? byId.get(cur.parent_id) : null; }
+      }
+    });
+    const rows = categories.filter((c) => keep.has(c.id));
+    const max = Math.max(1, ...rows.map((c) => sums.get(c.id) || 0));
+    const heading = this._config.title ? "" : `<div class="bal-name">${t("Dépenses par rubrique")} — ${esc(TREND_PERIODS[period])}</div>`;
+    const lines = rows.map((c) => {
+      const amount = sums.get(c.id) || 0;
+      const pct = Math.round((amount / max) * 100);
+      return `<div class="bl ${hasChildren.has(c.id) ? "branch" : ""}" style="padding-left: ${c.depth * 14}px">
+        <div class="bl-head"><span class="bl-name">${esc(c.name)}</span>${amount > 0 ? `<span class="bl-amt">${fmtAmount(amount)} €</span>` : ""}</div>
+        ${amount > 0 ? `<div class="pbar"><div style="width: ${pct}%"></div></div>` : ""}
+      </div>`;
+    }).join("");
+    this._bodyEl.innerHTML = `${heading}${lines || `<div class="empty">${t("Aucune dépense sur cette période.")}</div>`}`;
+  }
+
+  // Somme des opérations rattachées directement à chaque rubrique (pas celles des sous-rubriques), sur la
+  // période et les comptes choisis. Un appel par compte sélectionné (ou un seul, sans filtre, si tous choisis).
+  async _categorySums(accountIds, start) {
+    const sums = new Map();
+    for (const accountId of accountIds) {
+      let offset = 0;
+      for (;;) {
+        const query = { start, order: "asc", limit: 1000, offset };
+        if (accountId) query.account_id = accountId;
+        const res = await this._call("search_transactions", query, true);
+        const items = (res && res.items) || [];
+        for (const tx of items) {
+          for (const s of tx.splits) {
+            if (s.category_id == null) continue;
+            const amount = -Number(s.amount); // dépense = montant négatif ; on affiche un montant positif
+            sums.set(s.category_id, (sums.get(s.category_id) || 0) + amount);
+          }
+        }
+        offset += items.length;
+        if (items.length < 1000 || offset >= ((res && res.total) || 0)) break;
+      }
+    }
+    return sums;
+  }
+}
+
 // Comptes partagés seuls (tableau de bord smartphone) : la carte principale réduite au volet « Partages »,
 // avec le bouton Retour entre la liste et un compte ; sans le bandeau des planifications.
 class MyBankShareCard extends MyBankCard {
@@ -3621,6 +3957,66 @@ class MyBankBudgetCardEditor extends MyBankSimpleEditor {
   }
 }
 
+// Comptes à cocher, partagé par les trois éditeurs de cartes graphiques ci-dessous.
+async function loadAccountChecks(editor) {
+  const accounts = (await editor._items("list_accounts")).filter((a) => !a.closed);
+  return { account_ids: accounts.map((a) => ({ key: String(a.id), label: a.name })) };
+}
+
+class MyBankBalanceHistoryCardEditor extends MyBankSimpleEditor {
+  async _loadOptions() {
+    return loadAccountChecks(this);
+  }
+
+  _fields() {
+    return [
+      { key: "title", label: t("Titre (facultatif)") },
+      {
+        key: "account_ids", label: t("Comptes affichés"), type: "checks",
+        options: this._options ? this._options.account_ids : [],
+        help: t("Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes)."),
+      },
+      { key: "period", label: t("Période"), type: "select", options: Object.entries(TREND_PERIODS).map(([id, name]) => ({ id, name })) },
+    ];
+  }
+}
+
+class MyBankUpcomingChargeCardEditor extends MyBankSimpleEditor {
+  async _loadOptions() {
+    return loadAccountChecks(this);
+  }
+
+  _fields() {
+    return [
+      { key: "title", label: t("Titre (facultatif)") },
+      {
+        key: "account_ids", label: t("Comptes pris en compte"), type: "checks",
+        options: this._options ? this._options.account_ids : [],
+        help: t("Tous cochés par défaut."),
+      },
+      { key: "horizon", label: t("Horizon"), type: "select", options: Object.entries(UPCOMING_HORIZONS).map(([id, name]) => ({ id, name })) },
+    ];
+  }
+}
+
+class MyBankCategorySpendingCardEditor extends MyBankSimpleEditor {
+  async _loadOptions() {
+    return loadAccountChecks(this);
+  }
+
+  _fields() {
+    return [
+      { key: "title", label: t("Titre (facultatif)") },
+      {
+        key: "account_ids", label: t("Comptes pris en compte"), type: "checks",
+        options: this._options ? this._options.account_ids : [],
+        help: t("Tous cochés par défaut."),
+      },
+      { key: "period", label: t("Période"), type: "select", options: Object.entries(TREND_PERIODS).map(([id, name]) => ({ id, name })) },
+    ];
+  }
+}
+
 // @@I18N-BEGIN@@ — généré par i18n/gen.py depuis i18n/dict.json (clé : texte français de la carte)
 const I18N = {
   en: {
@@ -3638,9 +4034,16 @@ const I18N = {
     "(à un centime près)": "(to the nearest cent)",
     ", {n} échéances": ", {n} occurrences",
     "12 derniers mois": "Last 12 months",
+    "12 prochains mois": "Next 12 months",
     "1re échéance ({date}) inscrite dès l'enregistrement": "1st occurrence ({date}) entered on save",
     "1re échéance ({date}) inscrite le {entry}": "1st occurrence ({date}) entered on {entry}",
+    "2 prochaines semaines": "Next 2 weeks",
     "3 derniers mois": "Last 3 months",
+    "3 prochains mois": "Next 3 months",
+    "4 prochaines semaines": "Next 4 weeks",
+    "6 derniers mois": "Last 6 months",
+    "6 prochains mois": "Next 6 months",
+    "8 prochaines semaines": "Next 8 weeks",
     "A payé des dépenses : ne peut pas être retiré": "Has paid expenses: cannot be removed",
     "Abandonner la saisie en cours ?": "Discard the current entry?",
     "Abandonner les montants saisis non enregistrés ?": "Discard the unsaved amounts?",
@@ -3663,6 +4066,7 @@ const I18N = {
     "Aucun budget ne couvre le mois en cours.": "No budget covers the current month.",
     "Aucun budget. Un budget suit un compte : montants prévus par rubrique et par mois, puis réalisé et écarts.": "No budget. A budget follows one account: planned amounts per category and month, then actuals and variances.",
     "Aucun compte partagé en cours. Un compte partagé réunit les dépenses communes d'un groupe (vacances…) pour les équilibrer.": "No open shared account. A shared account gathers a group's common expenses (holidays…) to settle them.",
+    "Aucun compte sélectionné.": "No account selected.",
     "Aucun compte.": "No account.",
     "Aucun compte. Crée d'abord un compte dans l'onglet « Comptes ».": "No account. First create an account in the “Accounts” tab.",
     "Aucun mois du budget dans cette période.": "No month of the budget in this period.",
@@ -3670,6 +4074,7 @@ const I18N = {
     "Aucun réglage : la carte affiche tous les comptes partagés.": "No settings: the card shows all shared accounts.",
     "Aucun élément.": "No item.",
     "Aucune dépense pour l'instant.": "No expense yet.",
+    "Aucune dépense sur cette période.": "No expense in this period.",
     "Aucune opération ne correspond aux critères.": "No transaction matches the filters.",
     "Aucune opération planifiée.": "No scheduled transaction.",
     "Aucune opération sur cette période.": "No transaction in this period.",
@@ -3677,6 +4082,7 @@ const I18N = {
     "Aucune échéance à inscrire": "No occurrence to enter",
     "Autre": "Other",
     "Autre compte": "Other account",
+    "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie.": "Bars proportional to the amount spent, category by category, over the chosen period.",
     "Budget": "Budget",
     "Budget introuvable.": "Budget not found.",
     "Budget « {name} »": "Budget “{name}”",
@@ -3703,7 +4109,9 @@ const I18N = {
     "Compte par défaut": "Default account",
     "Compte partagé": "Shared account",
     "Comptes": "Accounts",
+    "Comptes affichés": "Accounts shown",
     "Comptes partagés": "Shared accounts",
+    "Comptes pris en compte": "Accounts included",
     "Comptes, opérations (pointage, ventilation, virements), échéancier, budgets, rubriques, classes et tiers — via My Bank API.": "Accounts, transactions (clearing, splits, transfers), scheduled transactions, budgets, categories, classes and payees — through My Bank API.",
     "Copier": "Copy",
     "Courant": "Checking",
@@ -3726,6 +4134,7 @@ const I18N = {
     "Dépenses": "Expenses",
     "Dépenses ({n})": "Expenses ({n})",
     "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture.": "A group's shared expenses: who pays next, who owes how much to whom when closing.",
+    "Dépenses par rubrique": "Expenses by category",
     "Déplacer": "Move",
     "Déplacer les {count} opération(s) de « {name} » vers « {target} » ?": "Move the {count} transaction(s) of “{name}” to “{target}”?",
     "Déplacer les {count} opération(s) de « {name} »{hint}, et ses planifications, vers :": "Move the {count} transaction(s) of “{name}”{hint}, and its scheduled transactions, to:",
@@ -3739,6 +4148,8 @@ const I18N = {
     "Espèces": "Cash",
     "Fermer": "Close",
     "Fin": "End",
+    "Historique du solde d'un ou plusieurs comptes (ligne), période réglable.": "History of one or more accounts' balance (line chart), adjustable period.",
+    "Horizon": "Horizon",
     "Il faut au moins deux participants.": "At least two participants are needed.",
     "Inactive : rien ne sera inscrit": "Inactive: nothing will be entered",
     "Inclure les opérations rapprochées (les soldes rapprochés des deux comptes changent)": "Include reconciled transactions (the reconciled balances of both accounts change)",
@@ -3760,9 +4171,10 @@ const I18N = {
     "Mode": "Mode",
     "Mode de règlement": "Payment method",
     "Modifier": "Edit",
-    "Mois en cours": "Current month",
     "Moins de champs": "Fewer fields",
+    "Mois en cours": "Current month",
     "Montant": "Amount",
+    "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables.": "Amount of upcoming occurrences per week or month, adjustable accounts and horizon.",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Invalid amount (enter a positive amount; the type gives the direction).",
     "Montant invalide (saisir un montant positif).": "Invalid amount (enter a positive amount).",
     "Montant invalide : « {value} »": "Invalid amount: “{value}”",
@@ -3774,8 +4186,11 @@ const I18N = {
     "My Bank": "My Bank",
     "My Bank — budget": "My Bank — budget",
     "My Bank — comptes partagés": "My Bank — shared accounts",
+    "My Bank — dépenses par rubrique": "My Bank — expenses by category",
     "My Bank — saisie rapide": "My Bank — quick entry",
     "My Bank — soldes d'un compte": "My Bank — account balances",
+    "My Bank — échéances à venir": "My Bank — upcoming occurrences",
+    "My Bank — évolution du solde": "My Bank — balance history",
     "Ne rien saisir d'office avant le": "Do not enter anything automatically before",
     "Niveaux de rubriques affichés (1 = rubriques racines)": "Category levels shown (1 = top-level categories)",
     "Nom": "Name",
@@ -3899,6 +4314,8 @@ const I18N = {
     "Total {name}": "Total {name}",
     "Total {total} € · part de chacun {share} €": "Total {total} € · each person's share {share} €",
     "Tous": "All",
+    "Tous cochés par défaut.": "All checked by default.",
+    "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes).": "All checked by default. To compare accounts of very different scale, prefer one card per account (or group of accounts).",
     "Tous les": "Every",
     "Tous les ans": "Every year",
     "Tous les champs": "All fields",
@@ -3988,10 +4405,12 @@ const I18N = {
     "Échéance {n} : sa date ({date}) précède celle de l'échéance {prev}.": "Occurrence {n}: its date ({date}) is before that of occurrence {prev}.",
     "Échéances": "Occurrences",
     "Échéances des 7 prochains jours": "Due in the next 7 days",
+    "Échéances à venir": "Upcoming occurrences",
     "Échéancier": "Schedule",
     "Échéancier (montant par échéance)": "Instalment plan (amount per occurrence)",
     "Épargne": "Savings",
     "État": "Status",
+    "Évolution du solde": "Balance history",
     "à": "to",
     "échéancier": "instalment plan",
     "— (racine)": "— (top level)",
@@ -4012,9 +4431,16 @@ const I18N = {
     "(à un centime près)": "(auf den Cent genau)",
     ", {n} échéances": ", {n} Ausführungen",
     "12 derniers mois": "Letzte 12 Monate",
+    "12 prochains mois": "Nächste 12 Monate",
     "1re échéance ({date}) inscrite dès l'enregistrement": "1. Ausführung ({date}) wird beim Speichern gebucht",
     "1re échéance ({date}) inscrite le {entry}": "1. Ausführung ({date}) wird am {entry} gebucht",
+    "2 prochaines semaines": "Nächste 2 Wochen",
     "3 derniers mois": "Letzte 3 Monate",
+    "3 prochains mois": "Nächste 3 Monate",
+    "4 prochaines semaines": "Nächste 4 Wochen",
+    "6 derniers mois": "Letzte 6 Monate",
+    "6 prochains mois": "Nächste 6 Monate",
+    "8 prochaines semaines": "Nächste 8 Wochen",
     "A payé des dépenses : ne peut pas être retiré": "Hat Ausgaben bezahlt: kann nicht entfernt werden",
     "Abandonner la saisie en cours ?": "Aktuelle Eingabe verwerfen?",
     "Abandonner les montants saisis non enregistrés ?": "Nicht gespeicherte Beträge verwerfen?",
@@ -4037,6 +4463,7 @@ const I18N = {
     "Aucun budget ne couvre le mois en cours.": "Kein Budget deckt den aktuellen Monat ab.",
     "Aucun budget. Un budget suit un compte : montants prévus par rubrique et par mois, puis réalisé et écarts.": "Kein Budget. Ein Budget gehört zu einem Konto: geplante Beträge je Kategorie und Monat, dann Ist-Werte und Abweichungen.",
     "Aucun compte partagé en cours. Un compte partagé réunit les dépenses communes d'un groupe (vacances…) pour les équilibrer.": "Kein offenes geteiltes Konto. Ein geteiltes Konto sammelt die gemeinsamen Ausgaben einer Gruppe (Urlaub…), um sie auszugleichen.",
+    "Aucun compte sélectionné.": "Kein Konto ausgewählt.",
     "Aucun compte.": "Kein Konto.",
     "Aucun compte. Crée d'abord un compte dans l'onglet « Comptes ».": "Kein Konto. Lege zuerst ein Konto im Reiter „Konten“ an.",
     "Aucun mois du budget dans cette période.": "Kein Budgetmonat in diesem Zeitraum.",
@@ -4044,6 +4471,7 @@ const I18N = {
     "Aucun réglage : la carte affiche tous les comptes partagés.": "Keine Einstellungen: Die Karte zeigt alle geteilten Konten.",
     "Aucun élément.": "Keine Einträge.",
     "Aucune dépense pour l'instant.": "Noch keine Ausgaben.",
+    "Aucune dépense sur cette période.": "Keine Ausgabe in diesem Zeitraum.",
     "Aucune opération ne correspond aux critères.": "Keine Buchung entspricht den Filtern.",
     "Aucune opération planifiée.": "Kein Dauerauftrag.",
     "Aucune opération sur cette période.": "Keine Buchungen in diesem Zeitraum.",
@@ -4051,6 +4479,7 @@ const I18N = {
     "Aucune échéance à inscrire": "Keine Ausführung zu buchen",
     "Autre": "Sonstiges",
     "Autre compte": "Anderes Konto",
+    "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie.": "Balken proportional zum ausgegebenen Betrag, Kategorie für Kategorie, über den gewählten Zeitraum.",
     "Budget": "Budget",
     "Budget introuvable.": "Budget nicht gefunden.",
     "Budget « {name} »": "Budget „{name}“",
@@ -4077,7 +4506,9 @@ const I18N = {
     "Compte par défaut": "Standardkonto",
     "Compte partagé": "Geteiltes Konto",
     "Comptes": "Konten",
+    "Comptes affichés": "Angezeigte Konten",
     "Comptes partagés": "Geteilte Konten",
+    "Comptes pris en compte": "Berücksichtigte Konten",
     "Comptes, opérations (pointage, ventilation, virements), échéancier, budgets, rubriques, classes et tiers — via My Bank API.": "Konten, Buchungen (Abgleich, Aufteilung, Umbuchungen), Daueraufträge, Budgets, Kategorien, Klassen und Empfänger — über My Bank API.",
     "Copier": "Kopieren",
     "Courant": "Girokonto",
@@ -4100,6 +4531,7 @@ const I18N = {
     "Dépenses": "Ausgaben",
     "Dépenses ({n})": "Ausgaben ({n})",
     "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture.": "Gemeinsame Ausgaben einer Gruppe: wer als Nächstes zahlt, wer wem beim Abschluss wie viel schuldet.",
+    "Dépenses par rubrique": "Ausgaben nach Kategorie",
     "Déplacer": "Verschieben",
     "Déplacer les {count} opération(s) de « {name} » vers « {target} » ?": "Die {count} Buchung(en) von „{name}“ nach „{target}“ verschieben?",
     "Déplacer les {count} opération(s) de « {name} »{hint}, et ses planifications, vers :": "Die {count} Buchung(en) von „{name}“{hint} und die zugehörigen Daueraufträge verschieben nach:",
@@ -4113,6 +4545,8 @@ const I18N = {
     "Espèces": "Bargeld",
     "Fermer": "Schließen",
     "Fin": "Ende",
+    "Historique du solde d'un ou plusieurs comptes (ligne), période réglable.": "Verlauf des Kontostands eines oder mehrerer Konten (Liniendiagramm), einstellbarer Zeitraum.",
+    "Horizon": "Zeithorizont",
     "Il faut au moins deux participants.": "Es braucht mindestens zwei Teilnehmer.",
     "Inactive : rien ne sera inscrit": "Inaktiv: es wird nichts gebucht",
     "Inclure les opérations rapprochées (les soldes rapprochés des deux comptes changent)": "Abgestimmte Buchungen einschließen (die abgestimmten Salden beider Konten ändern sich)",
@@ -4134,9 +4568,10 @@ const I18N = {
     "Mode": "Modus",
     "Mode de règlement": "Zahlungsart",
     "Modifier": "Bearbeiten",
-    "Mois en cours": "Aktueller Monat",
     "Moins de champs": "Weniger Felder",
+    "Mois en cours": "Aktueller Monat",
     "Montant": "Betrag",
+    "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables.": "Betrag der anstehenden Ausführungen pro Woche oder Monat, einstellbare Konten und Zeithorizont.",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Ungültiger Betrag (positiven Betrag eingeben; die Art bestimmt die Richtung).",
     "Montant invalide (saisir un montant positif).": "Ungültiger Betrag (positiven Betrag eingeben).",
     "Montant invalide : « {value} »": "Ungültiger Betrag: „{value}“",
@@ -4148,8 +4583,11 @@ const I18N = {
     "My Bank": "My Bank",
     "My Bank — budget": "My Bank — Budget",
     "My Bank — comptes partagés": "My Bank — geteilte Konten",
+    "My Bank — dépenses par rubrique": "My Bank — Ausgaben nach Kategorie",
     "My Bank — saisie rapide": "My Bank — Schnellerfassung",
     "My Bank — soldes d'un compte": "My Bank — Kontosalden",
+    "My Bank — échéances à venir": "My Bank — anstehende Ausführungen",
+    "My Bank — évolution du solde": "My Bank — Kontostandsverlauf",
     "Ne rien saisir d'office avant le": "Vor diesem Datum nichts automatisch buchen",
     "Niveaux de rubriques affichés (1 = rubriques racines)": "Angezeigte Kategorieebenen (1 = oberste Kategorien)",
     "Nom": "Name",
@@ -4273,6 +4711,8 @@ const I18N = {
     "Total {name}": "Summe {name}",
     "Total {total} € · part de chacun {share} €": "Summe {total} € · Anteil pro Person {share} €",
     "Tous": "Alle",
+    "Tous cochés par défaut.": "Standardmäßig alle ausgewählt.",
+    "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes).": "Standardmäßig alle ausgewählt. Um Konten sehr unterschiedlicher Größenordnung zu vergleichen, lieber eine Karte pro Konto (oder Kontogruppe) verwenden.",
     "Tous les": "Alle",
     "Tous les ans": "Jährlich",
     "Tous les champs": "Alle Felder",
@@ -4362,10 +4802,12 @@ const I18N = {
     "Échéance {n} : sa date ({date}) précède celle de l'échéance {prev}.": "Ausführung {n}: ihr Datum ({date}) liegt vor dem von Ausführung {prev}.",
     "Échéances": "Ausführungen",
     "Échéances des 7 prochains jours": "Fällig in den nächsten 7 Tagen",
+    "Échéances à venir": "Anstehende Ausführungen",
     "Échéancier": "Daueraufträge",
     "Échéancier (montant par échéance)": "Ratenplan (Betrag je Rate)",
     "Épargne": "Sparen",
     "État": "Status",
+    "Évolution du solde": "Kontostandsverlauf",
     "à": "bis",
     "échéancier": "Ratenplan",
     "— (racine)": "— (oberste Ebene)",
@@ -4383,6 +4825,12 @@ customElements.define("my-bank-balance-card", MyBankBalanceCard);
 customElements.define("my-bank-balance-card-editor", MyBankBalanceCardEditor);
 customElements.define("my-bank-budget-card", MyBankBudgetCard);
 customElements.define("my-bank-budget-card-editor", MyBankBudgetCardEditor);
+customElements.define("my-bank-balance-history-card", MyBankBalanceHistoryCard);
+customElements.define("my-bank-balance-history-card-editor", MyBankBalanceHistoryCardEditor);
+customElements.define("my-bank-upcoming-charge-card", MyBankUpcomingChargeCard);
+customElements.define("my-bank-upcoming-charge-card-editor", MyBankUpcomingChargeCardEditor);
+customElements.define("my-bank-category-spending-card", MyBankCategorySpendingCard);
+customElements.define("my-bank-category-spending-card-editor", MyBankCategorySpendingCardEditor);
 
 window.customCards = window.customCards || [];
 // Sélecteur de cartes : textes traduits à l'affichage du sélecteur (getters).
@@ -4393,4 +4841,7 @@ window.customCards.push(
   pickerCard("my-bank-balance-card", "My Bank — soldes d'un compte", "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte."),
   pickerCard("my-bank-share-card", "My Bank — comptes partagés", "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture."),
   pickerCard("my-bank-budget-card", "My Bank — budget", "Réalisé / prévu et barres de réalisation par rubrique, niveaux réglables."),
+  pickerCard("my-bank-balance-history-card", "My Bank — évolution du solde", "Historique du solde d'un ou plusieurs comptes (ligne), période réglable."),
+  pickerCard("my-bank-upcoming-charge-card", "My Bank — échéances à venir", "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables."),
+  pickerCard("my-bank-category-spending-card", "My Bank — dépenses par rubrique", "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie."),
 );
