@@ -107,13 +107,14 @@ If the cards don't show up in the picker after installing or updating, force-rel
 | Tab (`sections` key) | Content |
 |---|---|
 | `dashboard` | Balances of every account, budget of the current month |
-| `transactions` | Transactions of an account with running balance; filters; add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click |
+| `transactions` | Transactions of an account with running balance; filters (savable as default); add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click; a reconciliation helper highlights the transaction that explains a balance gap |
 | `accounts` | Accounts (checking, savings, card, cash…), opening balance, closing |
 | `categories` / `tags` | Category tree (income / expense / savings) and classes, a second axis for analysis — see [Categories and classes](#categories-and-classes) |
 | `payees` | Payees with default category |
 | `budgets` | Monthly budget per account: planned vs actual, variance, copy from a previous budget |
 | `recurrences` | Scheduled transactions (periodic or instalment plans), upcoming occurrences, automatic generation |
 | `shares` | Shared expenses of a group (holidays…): who pays next, who owes whom at the end |
+| `help` | In-app help: getting started, clearing vs reconciling (with a worked example), concepts, categories vs classes, schedules, budgets, shared expenses |
 
 ```yaml
 type: custom:my-bank-card

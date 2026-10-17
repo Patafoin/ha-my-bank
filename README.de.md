@@ -107,13 +107,14 @@ Wenn die Karten nach einer Installation oder einem Update nicht in der Auswahl e
 | Reiter (Schlüssel `sections`) | Inhalt |
 |---|---|
 | `dashboard` | Kontostände aller Konten, Budget des laufenden Monats |
-| `transactions` | Buchungen eines Kontos mit laufendem Kontostand; Filter; Hinzufügen, Bearbeiten, Aufteilen, Umbuchen; Abgleichen (☐/☑) und Abstimmen (🔓/🔒) mit einem Klick |
+| `transactions` | Buchungen eines Kontos mit laufendem Kontostand; Filter (als Standard speicherbar); Hinzufügen, Bearbeiten, Aufteilen, Umbuchen; Abgleichen (☐/☑) und Abstimmen (🔓/🔒) mit einem Klick; eine Abstimmungshilfe hebt die Buchung hervor, die eine Saldodifferenz erklärt |
 | `accounts` | Konten (Girokonto, Sparkonto, Karte, Bargeld…), Anfangssaldo, Schließung |
 | `categories` / `tags` | Kategorienbaum (Einnahmen / Ausgaben / Sparen) und Klassen, eine zweite Achse für Auswertungen — siehe [Kategorien und Klassen](#kategorien-und-klassen) |
 | `payees` | Empfänger mit Standardkategorie |
 | `budgets` | Monatsbudget pro Konto: geplant / tatsächlich, Abweichung, Kopie eines früheren Budgets |
 | `recurrences` | Daueraufträge (periodisch oder Ratenpläne), anstehende Ausführungen, automatische Erzeugung |
 | `shares` | Geteilte Ausgaben einer Gruppe (Urlaub…): wer als Nächstes zahlt, wer wem am Ende wie viel schuldet |
+| `help` | Integrierte Hilfe: erste Schritte, Abgleich vs. Abstimmung (mit Praxisbeispiel), Konzepte, Kategorien vs. Klassen, Daueraufträge, Budgets, geteilte Ausgaben |
 
 ```yaml
 type: custom:my-bank-card

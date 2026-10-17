@@ -45,6 +45,7 @@ const SECTION_DEFS = [
   { key: "budgets", get label() { return t("Budgets"); } },
   { key: "recurrences", get label() { return t("Échéancier"); } },
   { key: "shares", get label() { return t("Partages"); } }, // comptes partagés, indépendants des comptes bancaires
+  { key: "help", get label() { return t("Aide"); } },
 ];
 
 const ACCOUNT_KINDS = translated({ checking: "Courant", savings: "Épargne", card: "Carte", cash: "Espèces", other: "Autre" });
@@ -131,6 +132,7 @@ const TX_FILTERS = {
   type: "", min: "", max: "", payee: "", category: "", sub: true, class: "", method: "",
   pointed: "", reconciled: "", number: "", text: "",
 };
+const TX_FILTERS_DEFAULT_KEY = "my-bank-tx-filters-default"; // critères enregistrés comme vue par défaut des opérations
 
 const STYLE = `
   :host { display: block; width: 100%; box-sizing: border-box; }
@@ -221,6 +223,12 @@ const STYLE = `
     margin-bottom: 8px; padding: 8px 12px; background: var(--secondary-background-color); border-radius: 8px;
   }
   .tx-summary strong { color: var(--primary-text-color); }
+  .tx-summary .tx-refresh {
+    margin-left: auto; background: none; border: 1px solid var(--divider-color); border-radius: 50%;
+    cursor: pointer; width: 39px; height: 39px; padding: 0; font-size: 21px; line-height: 36px;
+    color: var(--primary-color); vertical-align: middle;
+  }
+  .tx-summary .tx-refresh:hover { border-color: var(--primary-color); background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12); }
   .month-sep {
     font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--primary-color); background: var(--secondary-background-color);
@@ -246,6 +254,68 @@ const STYLE = `
   .tx-filters { margin-bottom: 8px; }
   .tx-filters form.entity-form { margin-top: 0; }
   .tx-count { font-size: 13px; color: var(--secondary-text-color); margin-bottom: 8px; }
+  .tx-recon-btn.active { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .tx-recon {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; padding: 8px 12px;
+    background: var(--secondary-background-color); border-radius: 8px;
+  }
+  .tx-recon[hidden] { display: none; }
+  .tx-recon label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--secondary-text-color); }
+  .tx-recon input { width: 110px; }
+  .tx-recon .recon-diff { font-size: 14px; font-weight: 600; }
+  .tx-recon .recon-ok { color: var(--success-color, #43a047); }
+  .tx-row.recon-match { border-left: 4px solid var(--warning-color, #ffa600); background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12); }
+  .help-layout { display: flex; gap: 20px; align-items: flex-start; }
+  .help-menu { display: flex; flex-direction: column; gap: 2px; flex: 0 0 180px; }
+  .help-menu button {
+    text-align: left; background: none; border: none; cursor: pointer; padding: 10px 12px;
+    border-radius: 6px; font-size: 14px; color: var(--primary-text-color);
+  }
+  .help-menu button.active { background: var(--secondary-background-color); color: var(--primary-color); font-weight: 500; }
+  .help-content { flex: 1 1 320px; min-width: 0; font-size: 14px; line-height: 1.6; }
+  .help-content h3 { margin: 0 0 8px; font-size: 16px; color: var(--primary-color); }
+  .help-content h3:not(:first-child) { margin-top: 20px; }
+  .help-content p, .help-content ul, .help-content ol { margin: 0 0 10px; }
+  .help-content ul, .help-content ol { padding-left: 22px; }
+  .help-content li { margin-bottom: 6px; }
+  @media (max-width: 560px) {
+    .help-layout { flex-direction: column; }
+    .help-menu { flex-direction: row; flex-wrap: wrap; flex: 0 0 auto; }
+  }
+  .help-mock { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 0; }
+  .help-mock-col { flex: 1 1 260px; min-width: 240px; border: 1px solid var(--divider-color); border-radius: 8px; overflow: hidden; }
+  .help-mock-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--secondary-text-color); background: var(--secondary-background-color); padding: 8px 12px;
+  }
+  .help-mock-row {
+    box-sizing: border-box; min-height: 44px; display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-bottom: 1px solid var(--divider-color); font-size: 13px;
+  }
+  .help-mock-row:last-child { border-bottom: none; }
+  .help-mock-row.ghost {
+    justify-content: center; color: var(--secondary-text-color); font-style: italic; font-size: 12px;
+    background: repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(128,128,128,0.08) 6px, rgba(128,128,128,0.08) 12px);
+  }
+  .help-mock-icon {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 600; color: #fff;
+  }
+  .help-mock-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .help-mock-label { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .help-mock-sub { font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .help-mock-amount { font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .help-mock-state { font-size: 13px; flex-shrink: 0; white-space: nowrap; }
+  .help-mock-point, .help-mock-reco { opacity: .45; }
+  .help-mock-point.on, .help-mock-reco.on { opacity: 1; color: var(--primary-color); }
+  .help-mock-check, .help-mock-tick, .help-mock-state-empty {
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 10px;
+  }
+  .help-mock-check { background: #2d3a4a; color: #fff; }
+  .help-mock-tick { border: 1px solid var(--divider-color); }
+  .help-mock-state-empty { color: var(--secondary-text-color); opacity: .5; }
+  @media (max-width: 560px) { .help-mock { flex-direction: column; } }
   .tiers-suggestions div.active { background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.2); }
   .tiers-field { position: relative; }
   .tiers-suggestions {
@@ -396,12 +466,31 @@ class MyBankCard extends HTMLElement {
       ? SECTION_DEFS.filter((s) => requested.includes(s.key))
       : SECTION_DEFS.slice();
     if (!this._sections.length) this._sections = SECTION_DEFS.slice();
+    // Cartes déjà configurées avec une liste de sections explicite, figée avant l'ajout de l'aide :
+    // le nouvel onglet doit quand même apparaître après une mise à jour, sans retouche de leur config.
+    // Condition sur length > 1 : ne touche pas aux cartes à volet unique volontairement sans onglets
+    // (dont MyBankShareCard, qui force sections: ["shares"]).
+    if (requested && this._sections.length > 1 && !this._sections.some((s) => s.key === "help")) {
+      this._sections.push(SECTION_DEFS.find((s) => s.key === "help"));
+    }
     this._config = config;
-    this._active = this._sections[0].key;
     this._lookups = null;
     // une clé par configuration : deux cartes d'une même vue gardent chacune leur historique
     this._navKey = this._sections.map((s) => s.key).join(",");
+    // F5 recrée la carte (nouveau setConfig) sur la même entrée d'historique : s'il s'y trouve un écran
+    // noté par _navCommit, on y retourne plutôt que de rouvrir le premier onglet.
+    if (!this._navRestoreInitial()) this._active = this._sections[0].key;
     this._render();
+  }
+
+  // Écran à restaurer au tout premier rendu (F5), si l'entrée d'historique courante en contient un pour cette carte.
+  _navRestoreInitial() {
+    const st = history.state;
+    if (this.preview || (st && ("dialog" in st || "dialogData" in st || "opensDialog" in st))) return false;
+    const view = st && st[NAV_KEY] && st[NAV_KEY][this._navKey];
+    if (!view || !this._sections.some((s) => s.key === view.active)) return false;
+    this._applyNavView(view);
+    return true;
   }
 
   connectedCallback() {
@@ -553,6 +642,7 @@ class MyBankCard extends HTMLElement {
         case "budgets": return await this._renderBudgets();
         case "recurrences": return await this._renderSchedules();
         case "shares": return await this._renderShares();
+        case "help": return await this._renderHelp();
         default:
           this._bodyEl.innerHTML = `<div class="empty">${t("Section inconnue.")}</div>`;
       }
@@ -643,9 +733,12 @@ class MyBankCard extends HTMLElement {
       txEnd: this._txEnd || "",
       txFilters: this._txFilters ? { ...this._txFilters } : null,
       txFiltersOpen: !!this._txFiltersOpen,
+      txRecon: !!this._txRecon,
+      txReconBalance: this._txReconBalance || "",
       budgetId: this._budgetId ?? null,
       budgetView: this._budgetView || null,
       shareId: this._shareId || null,
+      helpTopic: this._helpTopic || null,
     };
   }
 
@@ -669,6 +762,24 @@ class MyBankCard extends HTMLElement {
     else history.pushState({ [NAV_KEY]: views }, "");
   }
 
+  // Reporte les champs d'un écran noté (history.state) sur l'instance, pour _navPop et _navRestoreInitial.
+  _applyNavView(view) {
+    this._active = view.active;
+    this._returnTo = view.returnTo;
+    this._txAccountId = view.txAccountId ?? undefined;
+    this._txRange = view.txRange || undefined;
+    this._txStart = view.txStart;
+    this._txEnd = view.txEnd;
+    this._txFilters = view.txFilters ? { ...view.txFilters } : undefined;
+    this._txFiltersOpen = view.txFiltersOpen;
+    this._txRecon = !!view.txRecon;
+    this._txReconBalance = view.txReconBalance || "";
+    this._budgetId = view.budgetId ?? undefined;
+    this._budgetView = view.budgetView || undefined;
+    this._shareId = view.shareId || null;
+    this._helpTopic = view.helpTopic || undefined;
+  }
+
   async _navPop(ev) {
     const view = ev.state && ev.state[NAV_KEY] && ev.state[NAV_KEY][this._navKey];
     if (!view || !this._hass || !this._sections || !this._sections.some((s) => s.key === view.active)) return;
@@ -679,17 +790,7 @@ class MyBankCard extends HTMLElement {
       history.pushState({ [NAV_KEY]: { ...ev.state[NAV_KEY], [this._navKey]: this._navView() } }, "");
       return;
     }
-    this._active = view.active;
-    this._returnTo = view.returnTo;
-    this._txAccountId = view.txAccountId ?? undefined;
-    this._txRange = view.txRange || undefined;
-    this._txStart = view.txStart;
-    this._txEnd = view.txEnd;
-    this._txFilters = view.txFilters ? { ...view.txFilters } : undefined;
-    this._txFiltersOpen = view.txFiltersOpen;
-    this._budgetId = view.budgetId ?? undefined;
-    this._budgetView = view.budgetView || undefined;
-    this._shareId = view.shareId || null;
+    this._applyNavView(view);
     this._renderTabs();
     this._navRestoring = true;
     try {
@@ -870,7 +971,7 @@ class MyBankCard extends HTMLElement {
     }
     if (!accounts.some((a) => a.id === this._txAccountId)) this._txAccountId = accounts[0].id;
     this._txRange = this._txRange || "month";
-    this._txFilters = this._txFilters || { ...TX_FILTERS };
+    this._txFilters = this._txFilters || this._loadDefaultTxFilters();
     const query = { account_id: this._txAccountId, order: "desc" };
     if (this._txRange === "custom") {
       if (this._txStart) query.start = this._txStart;
@@ -888,9 +989,14 @@ class MyBankCard extends HTMLElement {
         <select class="tx-account">${accounts.map((a) => `<option value="${a.id}" ${a.id === this._txAccountId ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select>
         <select class="tx-range">${RANGES.map((r) => `<option value="${r.key}" ${r.key === this._txRange ? "selected" : ""}>${esc(r.label)}</option>`).join("")}</select>
         <button class="secondary tx-filter-btn"></button>
+        <button class="secondary tx-recon-btn ${this._txRecon ? "active" : ""}">${t("Rapprochement")}</button>
         <button class="add">+ ${t("Ajouter")}</button>
       </div>
       <div class="tx-filters" ${this._txFiltersOpen ? "" : "hidden"}>${this._txFiltersHtml(query)}</div>
+      <div class="tx-recon" ${this._txRecon ? "" : "hidden"}>
+        <label>${t("Solde du site bancaire")}<input type="text" inputmode="decimal" name="reconBalance" value="${esc(this._txReconBalance || "")}"></label>
+        <span class="recon-diff"></span>
+      </div>
       <div class="tx-summary"></div>
       <div class="form-container"></div>
       <div class="tx-count"></div>
@@ -903,6 +1009,11 @@ class MyBankCard extends HTMLElement {
     const formContainer = this._bodyEl.querySelector(".form-container");
     const list = this._bodyEl.querySelector(".tx-list");
     const filtersBox = this._bodyEl.querySelector(".tx-filters");
+    // Rafraîchissement manuel (bouton ↻ du bandeau des soldes) : ni les soldes ni la liste ne bougent
+    // tout seuls quand on modifie une opération par ailleurs, il faut donc pouvoir les relire à la demande.
+    this._bodyEl.querySelector(".tx-summary").addEventListener("click", (ev) => {
+      if (ev.target.closest(".tx-refresh")) this._renderActive(true);
+    });
     // Un seul formulaire ouvert à la fois : en haut (ajout) ou à la place de la ligne (modification).
     const closeForms = () => {
       formContainer.innerHTML = "";
@@ -934,6 +1045,19 @@ class MyBankCard extends HTMLElement {
       filtersBox.hidden = !this._txFiltersOpen;
       this._navCommit(true);
     });
+    // Rapprochement : filtre sur les opérations non rapprochées, et compare le solde saisi (site bancaire)
+    // au solde rapproché de l'intégration pour repérer l'opération en trop ou manquante.
+    this._bodyEl.querySelector(".tx-recon-btn").addEventListener("click", () => {
+      this._txRecon = !this._txRecon;
+      this._txFilters.reconciled = this._txRecon ? "no" : "";
+      this._renderActive(true);
+    });
+    const reconBox = this._bodyEl.querySelector(".tx-recon");
+    reconBox.querySelector('[name="reconBalance"]').addEventListener("input", (ev) => {
+      this._txReconBalance = ev.target.value;
+      this._paintRecon();
+      this._navCommit(true);
+    });
     const filterForm = filtersBox.querySelector("form");
     const readFilters = () => {
       const f = this._txFilters;
@@ -956,6 +1080,15 @@ class MyBankCard extends HTMLElement {
     filterForm.addEventListener("submit", (ev) => ev.preventDefault());
     filterForm.querySelector(".f-reset").addEventListener("click", () => {
       this._txFilters = { ...TX_FILTERS };
+      this._renderActive(true);
+    });
+    filterForm.querySelector(".f-save-default").addEventListener("click", () => {
+      this._saveDefaultTxFilters();
+      this._renderActive(true); // fait apparaître le bouton « Réinitialiser vue par défaut »
+    });
+    const clearDefaultBtn = filterForm.querySelector(".f-clear-default");
+    if (clearDefaultBtn) clearDefaultBtn.addEventListener("click", () => {
+      this._clearDefaultTxFilters();
       this._renderActive(true);
     });
     this._bodyEl.querySelector(".add").addEventListener("click", () => {
@@ -1006,13 +1139,39 @@ class MyBankCard extends HTMLElement {
       <label>${t("Rapprochée")}${sel("reconciled", yesNo)}</label>
       <label>${t("N° de chèque")}<input type="text" name="number" value="${esc(f.number)}"></label>
       <label>${t("Libellé / notes")}<input type="text" name="text" value="${esc(f.text)}"></label>
-      <div class="form-actions"><button type="button" class="cancel f-reset">${t("Réinitialiser les critères")}</button></div>
+      <div class="form-actions">
+        <button type="button" class="cancel f-reset">${t("Réinitialiser les critères")}</button>
+        <button type="button" class="secondary f-save-default">${t("Enregistrer par défaut")}</button>
+        ${this._hasDefaultTxFilters() ? `<button type="button" class="secondary f-clear-default">${t("Réinitialiser vue par défaut")}</button>` : ""}
+      </div>
     </form>`;
   }
 
   _txFilterCount() {
     const f = this._txFilters;
     return Object.keys(TX_FILTERS).filter((k) => k !== "sub" && f[k] !== "").length;
+  }
+
+  // Critères enregistrés comme vue par défaut des opérations (bouton « Enregistrer par défaut » du bandeau).
+  _loadDefaultTxFilters() {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(TX_FILTERS_DEFAULT_KEY) || "null");
+      return saved ? { ...TX_FILTERS, ...saved } : { ...TX_FILTERS };
+    } catch (e) {
+      return { ...TX_FILTERS }; // stockage indisponible : vue par défaut d'origine
+    }
+  }
+
+  _hasDefaultTxFilters() {
+    try { return window.localStorage.getItem(TX_FILTERS_DEFAULT_KEY) !== null; } catch (e) { return false; }
+  }
+
+  _saveDefaultTxFilters() {
+    try { window.localStorage.setItem(TX_FILTERS_DEFAULT_KEY, JSON.stringify(this._txFilters)); } catch (e) { /* stockage indisponible */ }
+  }
+
+  _clearDefaultTxFilters() {
+    try { window.localStorage.removeItem(TX_FILTERS_DEFAULT_KEY); } catch (e) { /* idem */ }
   }
 
   _txMatches(tx, f) {
@@ -1076,6 +1235,35 @@ class MyBankCard extends HTMLElement {
       ? t("{n} opération(s) sur {all} · total {total} €", { n: items.length, all: this._txAll.length, total: NUMBER.format(total) })
         + (catIds ? ` ${t("(part de la rubrique)")}` : "")
       : "";
+    if (this._txRecon) this._paintRecon(); // la liste vient d'être redessinée : la mise en évidence doit l'être aussi
+  }
+
+  // Rapprochement : écart entre le solde saisi (site bancaire) et le solde banque (pointé) de l'intégration ;
+  // l'opération visible dont le montant (en valeur absolue) comble cet écart est mise en évidence.
+  _paintRecon() {
+    const box = this._bodyEl.querySelector(".tx-recon");
+    if (!box) return;
+    const list = this._bodyEl.querySelector(".tx-list");
+    list.querySelectorAll(".tx-row.recon-match").forEach((el) => el.classList.remove("recon-match"));
+    const diffEl = box.querySelector(".recon-diff");
+    const account = this._lookups.account.get(this._txAccountId);
+    const raw = box.querySelector('[name="reconBalance"]').value;
+    const entered = toNumber(raw);
+    if (!account || raw.trim() === "" || !Number.isFinite(entered)) {
+      diffEl.textContent = "";
+      return;
+    }
+    const diffCents = Math.round(entered * 100) - Math.round(Number(account.balances.pointed) * 100);
+    if (diffCents === 0) {
+      diffEl.innerHTML = `<span class="recon-ok">${t("Écart nul : tout est rapproché.")}</span>`;
+      return;
+    }
+    const diff = diffCents / 100;
+    diffEl.textContent = t("Écart : {diff} €", { diff: (diff > 0 ? "+" : "") + NUMBER.format(diff) });
+    list.querySelectorAll(".tx-row").forEach((row) => {
+      const tx = this._txItems.get(Number(row.dataset.id));
+      if (tx && Math.abs(Math.round(Number(tx.amount) * 100)) === Math.abs(diffCents)) row.classList.add("recon-match");
+    });
   }
 
   _paintSummary(account) {
@@ -1084,7 +1272,8 @@ class MyBankCard extends HTMLElement {
     const b = account.balances;
     el.innerHTML = `<span>${t("Solde prévisionnel :")} <strong>${fmtAmount(b.total)} €</strong></span>
       <span>${t("Solde banque :")} <strong>${fmtAmount(b.pointed)} €</strong></span>
-      <span>${t("Rapproché :")} <strong>${fmtAmount(b.reconciled)} €</strong></span>`;
+      <span>${t("Rapproché :")} <strong>${fmtAmount(b.reconciled)} €</strong></span>
+      <button type="button" class="tx-refresh" title="${t("Rafraîchir la liste selon les critères sélectionnés")}">↻</button>`;
   }
 
   // Re-reads only the three balances above the list (after a state change or a delete).
@@ -1093,6 +1282,7 @@ class MyBankCard extends HTMLElement {
     this._lookups.accounts = accounts;
     this._lookups.account = new Map(accounts.map((a) => [a.id, a]));
     this._paintSummary(this._lookups.account.get(this._txAccountId));
+    if (this._txRecon) this._paintRecon(); // le solde banque (pointé) vient de changer (pointage, rapprochement, suppression)
   }
 
   // Pointage et rapprochement : deux boutons distincts (une rapprochée est forcément pointée).
@@ -2805,6 +2995,198 @@ class MyBankCard extends HTMLElement {
     };
   }
 
+  // --- Aide : sous-menu de fiches courtes, indépendantes des données (pas d'appel API) ------------
+
+  _helpTopics() {
+    return [
+      { key: "start", label: t("Pour commencer"), html: this._helpStartHtml() },
+      { key: "recon", label: t("Pointage & rapprochement"), html: this._helpReconHtml() },
+      { key: "concepts", label: t("Concepts"), html: this._helpConceptsHtml() },
+      { key: "catclass", label: t("Rubriques vs Classes"), html: this._helpCatClassHtml() },
+      { key: "schedules", label: t("Échéancier"), html: this._helpSchedulesHtml() },
+      { key: "budgets", label: t("Budgets"), html: this._helpBudgetsHtml() },
+      { key: "shares", label: t("Partages"), html: this._helpSharesHtml() },
+    ];
+  }
+
+  async _renderHelp() {
+    const topics = this._helpTopics();
+    if (!topics.some((x) => x.key === this._helpTopic)) this._helpTopic = topics[0].key;
+    this._bodyEl.innerHTML = `
+      <div class="help-layout">
+        <div class="help-menu">
+          ${topics.map((x) => `<button type="button" data-topic="${x.key}" class="${x.key === this._helpTopic ? "active" : ""}">${esc(x.label)}</button>`).join("")}
+        </div>
+        <div class="help-content">${topics.find((x) => x.key === this._helpTopic).html}</div>
+      </div>
+    `;
+    this._bodyEl.querySelector(".help-menu").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("button");
+      if (!btn) return;
+      this._helpTopic = btn.dataset.topic;
+      this._renderActive(true);
+    });
+  }
+
+  _helpStartHtml() {
+    return `
+      <h3>${t("Pour commencer")}</h3>
+      <p>${t("Trois étapes avant ta première saisie, pas plus.")}</p>
+      <ol>
+        <li>${t("Crée tes comptes (onglet Comptes) : compte courant, livret, carte…")}</li>
+        <li>${t("Crée quelques rubriques (onglet Rubriques) : Alimentation, Logement, Salaire… Pas besoin d'être exhaustif, tu complèteras plus tard.")}</li>
+        <li>${t("Saisis tes opérations (onglet Opérations) : choisis le compte, puis « + Ajouter ». Pense à sélectionner la rubrique correspondant à l'opération.")}</li>
+      </ol>
+      <p>${t("Une rubrique mal choisie ne bloque rien : elle se change à tout moment, même après coup.")}</p>
+    `;
+  }
+
+  // ☑/☐ (pointée) et 🔒/🔓 (rapprochée) : mêmes glyphes et même grisé/coloré qu'en vrai dans la liste des opérations.
+  _helpMockState(pointed, reconciled) {
+    return `<span class="help-mock-point ${pointed ? "on" : ""}">${pointed ? "☑" : "☐"}</span>`
+      + `<span class="help-mock-reco ${reconciled ? "on" : ""}">${reconciled ? "🔒" : "🔓"}</span>`;
+  }
+
+  _helpReconHtml() {
+    return `
+      <h3>${t("Pointage & rapprochement")}</h3>
+      <p>${t("Deux niveaux de vérification, à ne pas confondre.")}</p>
+      <ul>
+        <li>${t("Pointée : tu as vérifié que l'opération existe bien sur le site de ta banque. C'est ton suivi personnel, au jour le jour.")}</li>
+        <li>${t("Rapprochée : l'opération correspond définitivement au relevé bancaire officiel. Une fois rapprochée, elle ne doit plus bouger.")}</li>
+      </ul>
+      <p>${t("En pratique : pointe au fil de l'eau, rapproche à la réception de chaque relevé.")}</p>
+      <h3>${t("Le module d'aide au rapprochement")}</h3>
+      <p>${t("Un écart entre ton solde et celui de la banque ? Le bouton « Rapprochement » (onglet Opérations) t'aide à le retrouver :")}</p>
+      <ol>
+        <li>${t("Il filtre la liste sur les opérations pas encore rapprochées.")}</li>
+        <li>${t("Tu saisis le solde affiché sur le site de ta banque.")}</li>
+        <li>${t("L'écart avec ton solde pointé (banque) s'affiche aussitôt.")}</li>
+        <li>${t("S'il correspond exactement au montant d'une opération visible, elle est surlignée : doublon ou oubli probable.")}</li>
+      </ol>
+      <p>${t("Pointe ou rapproche les opérations une à une : l'écart se recalcule automatiquement à chaque fois.")}</p>
+      <h3>${t("Cas pratique")}</h3>
+      <p>${t("Rapprochée veut dire confirmée des deux côtés : rapprochée dans My Bank, et cochée sur le site de ta banque (beaucoup de banques affichent une icône ✓ sur chaque opération confirmée, comme dans l'exemple ci-dessous).")}</p>
+      <div class="help-mock">
+        <div class="help-mock-col">
+          <div class="help-mock-title">${t("Dans My Bank")}</div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#c9a24a">BL</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("Boulangerie")}</span><span class="help-mock-sub">${t("Alimentation")}</span></span>
+            <span class="help-mock-amount">− 4,50 €</span>
+            <span class="help-mock-state">${this._helpMockState(false, false)}</span>
+          </div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#9aa5b1">CC</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("Café du Coin")}</span><span class="help-mock-sub">${t("Restaurants")}</span></span>
+            <span class="help-mock-amount">− 3,80 €</span>
+            <span class="help-mock-state">${this._helpMockState(false, false)}</span>
+          </div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#4caf7d">PL</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("Pharmacie Lenoir")}</span><span class="help-mock-sub">${t("Santé")}</span></span>
+            <span class="help-mock-amount">− 9,40 €</span>
+            <span class="help-mock-state">${this._helpMockState(true, false)}</span>
+          </div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#3b82c4">SA</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("Salaire")}</span><span class="help-mock-sub">${t("Salaire")}</span></span>
+            <span class="help-mock-amount">+ 1 780,00 €</span>
+            <span class="help-mock-state">${this._helpMockState(true, true)}</span>
+          </div>
+        </div>
+        <div class="help-mock-col">
+          <div class="help-mock-title">${t("Sur le site de ta banque (exemple)")}</div>
+          <div class="help-mock-row ghost">${t("Pas encore sur le relevé")}</div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#9aa5b1">CC</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("CAFE DU COIN FR")}</span><span class="help-mock-sub">${t("Restaurants")}</span></span>
+            <span class="help-mock-amount">− 3,80 €</span>
+            <span class="help-mock-tick"></span>
+          </div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#4caf7d">PL</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("PHARMACIE LENOIR")}</span><span class="help-mock-sub">${t("Santé")}</span></span>
+            <span class="help-mock-amount">− 9,40 €</span>
+            <span class="help-mock-state-empty">—</span>
+          </div>
+          <div class="help-mock-row">
+            <span class="help-mock-icon" style="background:#3b82c4">SA</span>
+            <span class="help-mock-info"><span class="help-mock-label">${t("VIREMENT SALAIRE")}</span><span class="help-mock-sub">${t("Virements reçus")}</span></span>
+            <span class="help-mock-amount">+ 1 780,00 €</span>
+            <span class="help-mock-check">✓</span>
+          </div>
+        </div>
+      </div>
+      <ul>
+        <li>${t("L'opération Salaire est pointée car elle apparaît sur le site de la banque et compte dans le solde ; elle est rapprochée parce qu'elle y a été cochée comme telle.")}</li>
+        <li>${t("L'opération Pharmacie Lenoir est seulement pointée : elle apparaît sur le site de la banque, mais la coche de rapprochement n'y est pas encore disponible.")}</li>
+        <li>${t("L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.")}</li>
+        <li>${t("L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.")}</li>
+      </ul>
+    `;
+  }
+
+  _helpConceptsHtml() {
+    return `
+      <h3>${t("Concepts")}</h3>
+      <ul>
+        <li><strong>${t("Compte")}</strong> — ${t("où vit l'argent : banque, livret, carte…")}</li>
+        <li><strong>${t("Opération")}</strong> — ${t("un mouvement d'argent : dépense, recette ou virement.")}</li>
+        <li><strong>${t("Rubrique")}</strong> — ${t("à quoi sert l'argent : Alimentation, Loisirs… Utilisée par le budget et les graphiques. Son type (dépense ou recette) n'est qu'indicatif : rien n'empêche d'y rattacher une opération dans l'autre sens si besoin (un remboursement sur une rubrique de dépense, par exemple).")}</li>
+        <li><strong>${t("Classe")}</strong> — ${t("une étiquette facultative, transversale aux rubriques (ex. « Vacances 2026 »).")}</li>
+        <li><strong>${t("Tiers")}</strong> — ${t("qui reçoit ou envoie l'argent : un magasin, une personne…")}</li>
+        <li><strong>${t("Ventilation")}</strong> — ${t("répartir une seule opération entre plusieurs rubriques (un ticket de supermarché, par exemple, pour séparer alimentation et petit électroménager).")}</li>
+        <li><strong>${t("Virement")}</strong> — ${t("de l'argent qui change de compte sans être ni dépense ni recette.")}</li>
+      </ul>
+    `;
+  }
+
+  _helpCatClassHtml() {
+    return `
+      <h3>${t("Rubriques vs Classes")}</h3>
+      <p>${t("La rubrique est obligatoire et structurante : elle alimente le budget, le tableau de bord et les graphiques. Chaque opération doit en avoir une.")}</p>
+      <p>${t("La classe est facultative et purement analytique : une étiquette pour regrouper des opérations qui traversent plusieurs rubriques (un voyage avec transport, hôtel et restos, par exemple). Elle n'a aucun impact sur le budget ni sur les totaux.")}</p>
+      <p>${t("En résumé : la rubrique est indispensable, la classe est un confort pour filtrer et analyser après coup.")}</p>
+    `;
+  }
+
+  _helpSchedulesHtml() {
+    return `
+      <h3>${t("Échéancier")}</h3>
+      <p>${t("Pour les opérations qui reviennent : salaire, loyer, abonnements, crédits…")}</p>
+      <ul>
+        <li>${t("Mode périodique : même montant, à intervalle régulier (ex. un abonnement mensuel).")}</li>
+        <li>${t("Mode échéancier : un nombre fixe d'échéances comptées, comme un crédit (fin automatique à la dernière mensualité). Le montant peut varier d'une échéance à l'autre.")}</li>
+      </ul>
+      <p>${t("Les échéances à venir s'affichent sur le tableau de bord, et peuvent s'inscrire automatiquement ou être saisies à la main le jour venu. Une planification qui arrive à sa fin te prévient par une alerte.")}</p>
+    `;
+  }
+
+  _helpBudgetsHtml() {
+    return `
+      <h3>${t("Budgets")}</h3>
+      <p>${t("Compare ce que tu comptes dépenser ou recevoir par rubrique (le prévu) à ce qui s'est vraiment passé (le réalisé).")}</p>
+      <ul>
+        <li>${t("Se règle mois par mois, rubrique par rubrique.")}</li>
+        <li>${t("Recopie automatique du montant d'un mois sur le suivant si rien ne change.")}</li>
+        <li>${t("Barres de progression et tableau de bord pour repérer les dérives en un coup d'œil.")}</li>
+      </ul>
+    `;
+  }
+
+  _helpSharesHtml() {
+    return `
+      <h3>${t("Partages")}</h3>
+      <p>${t("Pour suivre des dépenses communes, indépendamment des comptes bancaires : colocation, voyage entre amis, dépenses de couple…")}</p>
+      <ul>
+        <li>${t("Chaque participant enregistre ce qu'il a payé.")}</li>
+        <li>${t("L'appli calcule qui doit combien à qui pour équilibrer.")}</li>
+        <li>${t("Totalement indépendant de tes comptes et opérations bancaires : ça ne touche pas tes soldes.")}</li>
+      </ul>
+    `;
+  }
+
   _accountsConfig() {
     return {
       deleteQuestion: t("Supprimer ce compte ?"),
@@ -4154,6 +4536,7 @@ const I18N = {
     "En cours": "Open",
     "Enregistrer": "Save",
     "Enregistrer la grille": "Save the grid",
+    "Enregistrer par défaut": "Save as default",
     "Espèces": "Cash",
     "Fermer": "Close",
     "Fin": "End",
@@ -4246,6 +4629,8 @@ const I18N = {
     "Prévu": "Planned",
     "Période": "Period",
     "Périodique (montant fixe)": "Periodic (fixed amount)",
+    "Rafraîchir la liste selon les critères sélectionnés": "Refresh the list according to the selected filters",
+    "Rapprochement": "Reconciliation",
     "Rapproché": "Reconciled",
     "Rapproché :": "Reconciled:",
     "Rapprochée": "Reconciled",
@@ -4272,6 +4657,7 @@ const I18N = {
     "Réalisé": "Actual",
     "Réalisé / prévu et barres de réalisation par rubrique, niveaux réglables.": "Actual / planned and progress bars per category, adjustable levels.",
     "Réinitialiser les critères": "Reset filters",
+    "Réinitialiser vue par défaut": "Reset default view",
     "Rétablir": "Restore",
     "Saisi dans la grille": "Entered in the grid",
     "Saisie": "Entered",
@@ -4293,6 +4679,7 @@ const I18N = {
     "Solde banque (pointé)": "Bank balance (cleared)",
     "Solde banque :": "Bank balance:",
     "Solde du compte sur la période": "Account balance over the period",
+    "Solde du site bancaire": "Bank website balance",
     "Solde initial": "Opening balance",
     "Solde prévisionnel": "Projected balance",
     "Solde prévisionnel (toutes opérations)": "Projected balance (all transactions)",
@@ -4409,6 +4796,8 @@ const I18N = {
     "À venir": "Upcoming",
     "À venir (30 jours)": "Upcoming (30 days)",
     "Écart": "Variance",
+    "Écart : {diff} €": "Difference: {diff} €",
+    "Écart nul : tout est rapproché.": "No difference: everything is reconciled.",
     "Écart positif = favorable (moins dépensé, plus reçu ou épargné). Montants des rubriques parentes, sous-rubriques comprises. ▾ / ▸ replie ou déplie une rubrique.": "Positive variance = favourable (less spent, more received or saved). Parent category amounts include their subcategories. ▾ / ▸ collapses or expands a category.",
     "Échéance {n} : montant invalide (saisir un montant positif ; le type indique le sens).": "Occurrence {n}: invalid amount (enter a positive amount; the type gives the direction).",
     "Échéance {n} : sa date ({date}) précède celle de l'échéance {prev}.": "Occurrence {n}: its date ({date}) is before that of occurrence {prev}.",
@@ -4424,6 +4813,69 @@ const I18N = {
     "échéancier": "instalment plan",
     "— (racine)": "— (top level)",
     "— choisir —": "— choose —",
+    "Aide": "Help",
+    "Pour commencer": "Getting started",
+    "Trois étapes avant ta première saisie, pas plus.": "Three steps before your first entry, no more.",
+    "Crée tes comptes (onglet Comptes) : compte courant, livret, carte…": "Create your accounts (Accounts tab): checking, savings, card…",
+    "Crée quelques rubriques (onglet Rubriques) : Alimentation, Logement, Salaire… Pas besoin d'être exhaustif, tu complèteras plus tard.": "Create a few categories (Categories tab): Groceries, Housing, Salary… No need to be exhaustive, you can add more later.",
+    "Saisis tes opérations (onglet Opérations) : choisis le compte, puis « + Ajouter ». Pense à sélectionner la rubrique correspondant à l'opération.": "Enter your transactions (Operations tab): pick the account, then “+ Add”. Remember to pick the category that matches the transaction.",
+    "Une rubrique mal choisie ne bloque rien : elle se change à tout moment, même après coup.": "Picking the wrong category is never a dead end: you can change it any time, even afterwards.",
+    "Pointage & rapprochement": "Clearing & reconciliation",
+    "Deux niveaux de vérification, à ne pas confondre.": "Two levels of checking — don't mix them up.",
+    "Pointée : tu as vérifié que l'opération existe bien sur le site de ta banque. C'est ton suivi personnel, au jour le jour.": "Cleared: you've checked the transaction really is on your bank's website. This is your own day-to-day tracking.",
+    "Rapprochée : l'opération correspond définitivement au relevé bancaire officiel. Une fois rapprochée, elle ne doit plus bouger.": "Reconciled: the transaction definitively matches the official bank statement. Once reconciled, it shouldn't change again.",
+    "En pratique : pointe au fil de l'eau, rapproche à la réception de chaque relevé.": "In practice: clear transactions as you go, reconcile when each statement arrives.",
+    "Le module d'aide au rapprochement": "The reconciliation helper",
+    "Un écart entre ton solde et celui de la banque ? Le bouton « Rapprochement » (onglet Opérations) t'aide à le retrouver :": "A gap between your balance and the bank's? The “Reconciliation” button (Operations tab) helps you track it down:",
+    "Il filtre la liste sur les opérations pas encore rapprochées.": "It filters the list to transactions not yet reconciled.",
+    "Tu saisis le solde affiché sur le site de ta banque.": "You enter the balance shown on your bank's website.",
+    "L'écart avec ton solde pointé (banque) s'affiche aussitôt.": "The gap with your cleared (bank) balance shows right away.",
+    "S'il correspond exactement au montant d'une opération visible, elle est surlignée : doublon ou oubli probable.": "If it exactly matches the amount of a visible transaction, that row is highlighted: a likely duplicate or a missing entry.",
+    "Pointe ou rapproche les opérations une à une : l'écart se recalcule automatiquement à chaque fois.": "Clear or reconcile transactions one by one: the gap recalculates automatically each time.",
+    "Concepts": "Concepts",
+    "où vit l'argent : banque, livret, carte…": "where the money lives: checking, savings, card…",
+    "un mouvement d'argent : dépense, recette ou virement.": "a movement of money: an expense, income, or transfer.",
+    "à quoi sert l'argent : Alimentation, Loisirs… Utilisée par le budget et les graphiques. Son type (dépense ou recette) n'est qu'indicatif : rien n'empêche d'y rattacher une opération dans l'autre sens si besoin (un remboursement sur une rubrique de dépense, par exemple).": "what the money is for: Groceries, Leisure… Used by the budget and the charts. Its type (expense or income) is only a hint for the budget: nothing stops you attaching a transaction the other way round if needed (a refund on an expense category, for example).",
+    "une étiquette facultative, transversale aux rubriques (ex. « Vacances 2026 »).": "an optional tag that cuts across categories (e.g. “Holiday 2026”).",
+    "qui reçoit ou envoie l'argent : un magasin, une personne…": "who receives or sends the money: a shop, a person…",
+    "répartir une seule opération entre plusieurs rubriques (un ticket de supermarché, par exemple, pour séparer alimentation et petit électroménager).": "splitting a single transaction across several categories (a supermarket receipt, for example, to separate groceries from small appliances).",
+    "de l'argent qui change de compte sans être ni dépense ni recette.": "money moving between accounts, neither an expense nor income.",
+    "Rubriques vs Classes": "Categories vs Tags",
+    "La rubrique est obligatoire et structurante : elle alimente le budget, le tableau de bord et les graphiques. Chaque opération doit en avoir une.": "A category is mandatory and structural: it feeds the budget, the dashboard and the charts. Every transaction needs one.",
+    "La classe est facultative et purement analytique : une étiquette pour regrouper des opérations qui traversent plusieurs rubriques (un voyage avec transport, hôtel et restos, par exemple). Elle n'a aucun impact sur le budget ni sur les totaux.": "A tag is optional and purely for analysis: a label grouping transactions that span several categories (a trip with transport, hotel and restaurants, for example). It has no impact on the budget or the totals.",
+    "En résumé : la rubrique est indispensable, la classe est un confort pour filtrer et analyser après coup.": "In short: the category is essential, the tag is a convenience for filtering and analysing afterwards.",
+    "Pour les opérations qui reviennent : salaire, loyer, abonnements, crédits…": "For transactions that recur: salary, rent, subscriptions, loans…",
+    "Mode périodique : même montant, à intervalle régulier (ex. un abonnement mensuel).": "Periodic mode: same amount, at a regular interval (e.g. a monthly subscription).",
+    "Mode échéancier : un nombre fixe d'échéances comptées, comme un crédit (fin automatique à la dernière mensualité). Le montant peut varier d'une échéance à l'autre.": "Instalment plan mode: a fixed, counted number of occurrences, like a loan (ends automatically at the last instalment). The amount can vary from one instalment to the next.",
+    "Les échéances à venir s'affichent sur le tableau de bord, et peuvent s'inscrire automatiquement ou être saisies à la main le jour venu. Une planification qui arrive à sa fin te prévient par une alerte.": "Upcoming occurrences show on the dashboard, and can be entered automatically or by hand when due. A schedule nearing its end warns you with an alert.",
+    "Compare ce que tu comptes dépenser ou recevoir par rubrique (le prévu) à ce qui s'est vraiment passé (le réalisé).": "Compares what you plan to spend or receive per category (planned) against what actually happened (actual).",
+    "Se règle mois par mois, rubrique par rubrique.": "Set month by month, category by category.",
+    "Recopie automatique du montant d'un mois sur le suivant si rien ne change.": "Automatically carries an amount over to the next month if nothing changes.",
+    "Barres de progression et tableau de bord pour repérer les dérives en un coup d'œil.": "Progress bars and the dashboard to spot overruns at a glance.",
+    "Pour suivre des dépenses communes, indépendamment des comptes bancaires : colocation, voyage entre amis, dépenses de couple…": "For tracking shared expenses, independent of bank accounts: flatmates, a trip with friends, a couple's expenses…",
+    "Chaque participant enregistre ce qu'il a payé.": "Each participant logs what they paid.",
+    "L'appli calcule qui doit combien à qui pour équilibrer.": "The app works out who owes what to whom to balance things out.",
+    "Totalement indépendant de tes comptes et opérations bancaires : ça ne touche pas tes soldes.": "Completely independent from your bank accounts and transactions: it never touches your balances.",
+    "Rapprochée veut dire confirmée des deux côtés : rapprochée dans My Bank, et cochée sur le site de ta banque (beaucoup de banques affichent une icône ✓ sur chaque opération confirmée, comme dans l'exemple ci-dessous).": "Reconciled means confirmed on both sides: reconciled in My Bank, and ticked on your bank's website (many banks show a ✓ icon on every confirmed transaction, as in the example below).",
+    "Dans My Bank": "In My Bank",
+    "Sur le site de ta banque (exemple)": "On your bank's website (example)",
+    "Café du Coin": "Corner Café",
+    "Restaurants": "Restaurants",
+    "Pharmacie Lenoir": "Lenoir Pharmacy",
+    "Santé": "Health",
+    "Salaire": "Salary",
+    "Boulangerie": "Bakery",
+    "Alimentation": "Groceries",
+    "CAFE DU COIN FR": "CORNER CAFE FR",
+    "PHARMACIE LENOIR": "LENOIR PHARMACY",
+    "VIREMENT SALAIRE": "SALARY TRANSFER",
+    "Virements reçus": "Incoming transfers",
+    "Pas encore sur le relevé": "Not on the statement yet",
+    "Cas pratique": "Worked example",
+    "L'opération Salaire est pointée car elle apparaît sur le site de la banque et compte dans le solde ; elle est rapprochée parce qu'elle y a été cochée comme telle.": "The Salary transaction is cleared because it appears on the bank's website and counts in the balance; it's reconciled because it's been ticked as such there.",
+    "L'opération Pharmacie Lenoir est seulement pointée : elle apparaît sur le site de la banque, mais la coche de rapprochement n'y est pas encore disponible.": "The Lenoir Pharmacy transaction is only cleared: it appears on the bank's website, but the reconciliation tick isn't available there yet.",
+    "L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.": "The Corner Café transaction needs clearing since it appears on the bank's website. It can also be reconciled in My Bank once it's ticked on the website, as the tick is available there.",
+    "L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.": "The Bakery transaction needs neither clearing nor reconciling: it isn't on the bank's website yet, so it's not in the bank balance — but it already counts in the projected balance.",
   },
   de: {
     " · encore {n} échéances": " · noch {n}",
@@ -4551,6 +5003,7 @@ const I18N = {
     "En cours": "Offen",
     "Enregistrer": "Speichern",
     "Enregistrer la grille": "Tabelle speichern",
+    "Enregistrer par défaut": "Als Standard speichern",
     "Espèces": "Bargeld",
     "Fermer": "Schließen",
     "Fin": "Ende",
@@ -4643,6 +5096,8 @@ const I18N = {
     "Prévu": "Geplant",
     "Période": "Zeitraum",
     "Périodique (montant fixe)": "Periodisch (fester Betrag)",
+    "Rafraîchir la liste selon les critères sélectionnés": "Liste gemäß den gewählten Filtern aktualisieren",
+    "Rapprochement": "Abstimmung",
     "Rapproché": "Abgestimmt",
     "Rapproché :": "Abgestimmt:",
     "Rapprochée": "Abgestimmt",
@@ -4669,6 +5124,7 @@ const I18N = {
     "Réalisé": "Ist",
     "Réalisé / prévu et barres de réalisation par rubrique, niveaux réglables.": "Ist / Plan und Fortschrittsbalken je Kategorie, einstellbare Ebenen.",
     "Réinitialiser les critères": "Filter zurücksetzen",
+    "Réinitialiser vue par défaut": "Standardansicht zurücksetzen",
     "Rétablir": "Wiederherstellen",
     "Saisi dans la grille": "In der Tabelle erfasst",
     "Saisie": "Gebucht",
@@ -4690,6 +5146,7 @@ const I18N = {
     "Solde banque (pointé)": "Banksaldo (abgeglichen)",
     "Solde banque :": "Banksaldo:",
     "Solde du compte sur la période": "Kontosaldo im Zeitraum",
+    "Solde du site bancaire": "Saldo der Bank-Website",
     "Solde initial": "Anfangssaldo",
     "Solde prévisionnel": "Voraussichtlicher Saldo",
     "Solde prévisionnel (toutes opérations)": "Voraussichtlicher Saldo (alle Buchungen)",
@@ -4806,6 +5263,8 @@ const I18N = {
     "À venir": "Ausstehend",
     "À venir (30 jours)": "Demnächst (30 Tage)",
     "Écart": "Abweichung",
+    "Écart : {diff} €": "Differenz: {diff} €",
+    "Écart nul : tout est rapproché.": "Keine Differenz: alles ist abgestimmt.",
     "Écart positif = favorable (moins dépensé, plus reçu ou épargné). Montants des rubriques parentes, sous-rubriques comprises. ▾ / ▸ replie ou déplie une rubrique.": "Positive Abweichung = günstig (weniger ausgegeben, mehr erhalten oder gespart). Beträge übergeordneter Kategorien enthalten die Unterkategorien. ▾ / ▸ klappt eine Kategorie zu oder auf.",
     "Échéance {n} : montant invalide (saisir un montant positif ; le type indique le sens).": "Ausführung {n}: ungültiger Betrag (positiven Betrag eingeben; die Art bestimmt die Richtung).",
     "Échéance {n} : sa date ({date}) précède celle de l'échéance {prev}.": "Ausführung {n}: ihr Datum ({date}) liegt vor dem von Ausführung {prev}.",
@@ -4821,6 +5280,69 @@ const I18N = {
     "échéancier": "Ratenplan",
     "— (racine)": "— (oberste Ebene)",
     "— choisir —": "— auswählen —",
+    "Aide": "Hilfe",
+    "Pour commencer": "Erste Schritte",
+    "Trois étapes avant ta première saisie, pas plus.": "Drei Schritte vor deiner ersten Buchung, nicht mehr.",
+    "Crée tes comptes (onglet Comptes) : compte courant, livret, carte…": "Lege deine Konten an (Reiter Konten): Girokonto, Sparkonto, Karte…",
+    "Crée quelques rubriques (onglet Rubriques) : Alimentation, Logement, Salaire… Pas besoin d'être exhaustif, tu complèteras plus tard.": "Lege ein paar Kategorien an (Reiter Kategorien): Lebensmittel, Wohnen, Gehalt… Muss nicht vollständig sein, du ergänzt später.",
+    "Saisis tes opérations (onglet Opérations) : choisis le compte, puis « + Ajouter ». Pense à sélectionner la rubrique correspondant à l'opération.": "Buche deine Vorgänge (Reiter Buchungen): Konto wählen, dann „+ Hinzufügen“. Denk daran, die passende Kategorie für die Buchung auszuwählen.",
+    "Une rubrique mal choisie ne bloque rien : elle se change à tout moment, même après coup.": "Eine falsch gewählte Kategorie ist kein Problem: sie lässt sich jederzeit ändern, auch nachträglich.",
+    "Pointage & rapprochement": "Abgleich & Abstimmung",
+    "Deux niveaux de vérification, à ne pas confondre.": "Zwei Prüfstufen, die man nicht verwechseln sollte.",
+    "Pointée : tu as vérifié que l'opération existe bien sur le site de ta banque. C'est ton suivi personnel, au jour le jour.": "Abgeglichen: du hast geprüft, dass die Buchung tatsächlich auf der Website deiner Bank existiert. Das ist deine eigene, laufende Kontrolle.",
+    "Rapprochée : l'opération correspond définitivement au relevé bancaire officiel. Une fois rapprochée, elle ne doit plus bouger.": "Abgestimmt: die Buchung entspricht endgültig dem offiziellen Kontoauszug. Einmal abgestimmt, sollte sie sich nicht mehr ändern.",
+    "En pratique : pointe au fil de l'eau, rapproche à la réception de chaque relevé.": "In der Praxis: laufend abgleichen, bei jedem Kontoauszug abstimmen.",
+    "Le module d'aide au rapprochement": "Der Abstimmungs-Helfer",
+    "Un écart entre ton solde et celui de la banque ? Le bouton « Rapprochement » (onglet Opérations) t'aide à le retrouver :": "Eine Differenz zwischen deinem Saldo und dem der Bank? Die Schaltfläche „Abstimmung“ (Reiter Buchungen) hilft dir, sie zu finden:",
+    "Il filtre la liste sur les opérations pas encore rapprochées.": "Sie filtert die Liste auf noch nicht abgestimmte Buchungen.",
+    "Tu saisis le solde affiché sur le site de ta banque.": "Du gibst den auf der Bank-Website angezeigten Saldo ein.",
+    "L'écart avec ton solde pointé (banque) s'affiche aussitôt.": "Die Differenz zu deinem abgeglichenen (Bank-)Saldo wird sofort angezeigt.",
+    "S'il correspond exactement au montant d'une opération visible, elle est surlignée : doublon ou oubli probable.": "Entspricht sie genau dem Betrag einer sichtbaren Buchung, wird diese Zeile hervorgehoben: wahrscheinlich doppelt erfasst oder vergessen.",
+    "Pointe ou rapproche les opérations une à une : l'écart se recalcule automatiquement à chaque fois.": "Buchungen einzeln abgleichen oder abstimmen: die Differenz wird jedes Mal automatisch neu berechnet.",
+    "Concepts": "Konzepte",
+    "où vit l'argent : banque, livret, carte…": "wo das Geld liegt: Girokonto, Sparkonto, Karte…",
+    "un mouvement d'argent : dépense, recette ou virement.": "eine Geldbewegung: Ausgabe, Einnahme oder Umbuchung.",
+    "à quoi sert l'argent : Alimentation, Loisirs… Utilisée par le budget et les graphiques. Son type (dépense ou recette) n'est qu'indicatif : rien n'empêche d'y rattacher une opération dans l'autre sens si besoin (un remboursement sur une rubrique de dépense, par exemple).": "wofür das Geld ausgegeben wird: Lebensmittel, Freizeit… Wird vom Budget und den Diagrammen genutzt. Der Typ (Ausgabe oder Einnahme) ist nur ein Hinweis für das Budget: nichts hindert dich daran, bei Bedarf eine Buchung in die andere Richtung zuzuordnen (z. B. eine Rückerstattung auf eine Ausgabenkategorie).",
+    "une étiquette facultative, transversale aux rubriques (ex. « Vacances 2026 »).": "ein optionales Schlagwort quer zu den Kategorien (z. B. „Urlaub 2026“).",
+    "qui reçoit ou envoie l'argent : un magasin, une personne…": "wer das Geld empfängt oder sendet: ein Geschäft, eine Person…",
+    "répartir une seule opération entre plusieurs rubriques (un ticket de supermarché, par exemple, pour séparer alimentation et petit électroménager).": "eine einzige Buchung auf mehrere Kategorien aufteilen (zum Beispiel ein Supermarktbon, um Lebensmittel von Kleingeräten zu trennen).",
+    "de l'argent qui change de compte sans être ni dépense ni recette.": "Geld, das zwischen Konten wechselt, ohne Ausgabe oder Einnahme zu sein.",
+    "Rubriques vs Classes": "Kategorien vs. Klassen",
+    "La rubrique est obligatoire et structurante : elle alimente le budget, le tableau de bord et les graphiques. Chaque opération doit en avoir une.": "Die Kategorie ist verpflichtend und strukturgebend: sie speist das Budget, das Dashboard und die Diagramme. Jede Buchung braucht eine.",
+    "La classe est facultative et purement analytique : une étiquette pour regrouper des opérations qui traversent plusieurs rubriques (un voyage avec transport, hôtel et restos, par exemple). Elle n'a aucun impact sur le budget ni sur les totaux.": "Die Klasse ist optional und rein analytisch: ein Schlagwort, um Buchungen über mehrere Kategorien hinweg zu gruppieren (z. B. eine Reise mit Fahrt, Hotel und Restaurants). Sie hat keinen Einfluss auf Budget oder Summen.",
+    "En résumé : la rubrique est indispensable, la classe est un confort pour filtrer et analyser après coup.": "Kurz gesagt: die Kategorie ist unverzichtbar, die Klasse ist ein Komfort zum nachträglichen Filtern und Auswerten.",
+    "Pour les opérations qui reviennent : salaire, loyer, abonnements, crédits…": "Für wiederkehrende Buchungen: Gehalt, Miete, Abonnements, Kredite…",
+    "Mode périodique : même montant, à intervalle régulier (ex. un abonnement mensuel).": "Periodischer Modus: gleicher Betrag, in regelmäßigem Abstand (z. B. ein monatliches Abo).",
+    "Mode échéancier : un nombre fixe d'échéances comptées, comme un crédit (fin automatique à la dernière mensualité). Le montant peut varier d'une échéance à l'autre.": "Ratenplan-Modus: eine feste, gezählte Anzahl Ausführungen, wie bei einem Kredit (endet automatisch mit der letzten Rate). Der Betrag kann von Rate zu Rate variieren.",
+    "Les échéances à venir s'affichent sur le tableau de bord, et peuvent s'inscrire automatiquement ou être saisies à la main le jour venu. Une planification qui arrive à sa fin te prévient par une alerte.": "Anstehende Ausführungen erscheinen auf dem Dashboard und werden automatisch oder am Fälligkeitstag manuell gebucht. Ein Plan, der zu Ende geht, warnt dich mit einem Hinweis.",
+    "Compare ce que tu comptes dépenser ou recevoir par rubrique (le prévu) à ce qui s'est vraiment passé (le réalisé).": "Vergleicht, was du je Kategorie ausgeben oder einnehmen willst (geplant), mit dem, was tatsächlich passiert ist (Ist).",
+    "Se règle mois par mois, rubrique par rubrique.": "Wird Monat für Monat, Kategorie für Kategorie eingestellt.",
+    "Recopie automatique du montant d'un mois sur le suivant si rien ne change.": "Übernimmt den Betrag automatisch in den nächsten Monat, wenn sich nichts ändert.",
+    "Barres de progression et tableau de bord pour repérer les dérives en un coup d'œil.": "Fortschrittsbalken und Dashboard, um Abweichungen auf einen Blick zu erkennen.",
+    "Pour suivre des dépenses communes, indépendamment des comptes bancaires : colocation, voyage entre amis, dépenses de couple…": "Zum Verfolgen gemeinsamer Ausgaben, unabhängig von den Bankkonten: Wohngemeinschaft, Reise mit Freunden, Ausgaben als Paar…",
+    "Chaque participant enregistre ce qu'il a payé.": "Jeder Teilnehmer erfasst, was er bezahlt hat.",
+    "L'appli calcule qui doit combien à qui pour équilibrer.": "Die App berechnet, wer wem wie viel schuldet, um auszugleichen.",
+    "Totalement indépendant de tes comptes et opérations bancaires : ça ne touche pas tes soldes.": "Vollständig unabhängig von deinen Bankkonten und -buchungen: deine Salden bleiben unberührt.",
+    "Rapprochée veut dire confirmée des deux côtés : rapprochée dans My Bank, et cochée sur le site de ta banque (beaucoup de banques affichent une icône ✓ sur chaque opération confirmée, comme dans l'exemple ci-dessous).": "Abgestimmt bedeutet auf beiden Seiten bestätigt: abgestimmt in My Bank, und auf der Website deiner Bank abgehakt (viele Banken zeigen ein ✓-Symbol bei jeder bestätigten Buchung, wie im Beispiel unten).",
+    "Dans My Bank": "In My Bank",
+    "Sur le site de ta banque (exemple)": "Auf der Website deiner Bank (Beispiel)",
+    "Café du Coin": "Eck-Café",
+    "Restaurants": "Restaurants",
+    "Pharmacie Lenoir": "Apotheke Lenoir",
+    "Santé": "Gesundheit",
+    "Salaire": "Gehalt",
+    "Boulangerie": "Bäckerei",
+    "Alimentation": "Lebensmittel",
+    "CAFE DU COIN FR": "ECK-CAFE FR",
+    "PHARMACIE LENOIR": "APOTHEKE LENOIR",
+    "VIREMENT SALAIRE": "GEHALTSÜBERWEISUNG",
+    "Virements reçus": "Eingehende Überweisungen",
+    "Pas encore sur le relevé": "Noch nicht im Kontoauszug",
+    "Cas pratique": "Praxisbeispiel",
+    "L'opération Salaire est pointée car elle apparaît sur le site de la banque et compte dans le solde ; elle est rapprochée parce qu'elle y a été cochée comme telle.": "Die Buchung Gehalt ist abgeglichen, weil sie auf der Website der Bank erscheint und im Saldo zählt; sie ist abgestimmt, weil sie dort entsprechend abgehakt wurde.",
+    "L'opération Pharmacie Lenoir est seulement pointée : elle apparaît sur le site de la banque, mais la coche de rapprochement n'y est pas encore disponible.": "Die Buchung Apotheke Lenoir ist nur abgeglichen: sie erscheint auf der Website der Bank, aber das Abstimmungshäkchen ist dort noch nicht verfügbar.",
+    "L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.": "Die Buchung Eck-Café muss abgeglichen werden, da sie auf der Website der Bank erscheint. Sie kann in My Bank auch abgestimmt werden, sobald sie auf der Website abgehakt wird, da das Häkchen dort verfügbar ist.",
+    "L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.": "Die Buchung Bäckerei muss weder abgeglichen noch abgestimmt werden: sie steht noch nicht auf der Website der Bank, also nicht im Banksaldo — zählt aber schon im voraussichtlichen Saldo.",
   },
 };
 // @@I18N-END@@

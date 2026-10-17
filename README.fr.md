@@ -107,13 +107,14 @@ Si les cartes n'apparaissent pas dans le sélecteur après une installation ou u
 | Onglet (clé `sections`) | Contenu |
 |---|---|
 | `dashboard` | Soldes de tous les comptes, budget du mois en cours |
-| `transactions` | Opérations d'un compte avec solde progressif ; filtres ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic |
+| `transactions` | Opérations d'un compte avec solde progressif ; filtres (enregistrables par défaut) ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic ; une aide au rapprochement surligne l'opération qui explique un écart de solde |
 | `accounts` | Comptes (courant, épargne, carte, espèces…), solde initial, clôture |
 | `categories` / `tags` | Arborescence des rubriques (recettes / dépenses / épargne) et classes, un second axe d'analyse — voir [Rubriques et classes](#rubriques-et-classes) |
 | `payees` | Tiers avec catégorie par défaut |
 | `budgets` | Budget mensuel par compte : prévu / réalisé, écart, copie d'un budget précédent |
 | `recurrences` | Opérations planifiées (périodiques ou échéanciers), prochaines échéances, génération automatique |
 | `shares` | Dépenses partagées d'un groupe (vacances…) : qui paie la prochaine fois, qui doit combien à qui à la fin |
+| `help` | Aide intégrée : pour commencer, pointage vs rapprochement (avec un cas pratique), concepts, rubriques vs classes, échéancier, budgets, partages |
 
 ```yaml
 type: custom:my-bank-card
