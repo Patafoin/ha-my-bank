@@ -1,6 +1,6 @@
 # My Bank für Home Assistant
 
-🇬🇧 [Read in English](https://github.com/Patafoin/ha-my-bank/blob/main/README.md) · 🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md)
+🇬🇧 [Read in English](https://github.com/Patafoin/ha-my-bank/blob/main/README.md) · 🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md) · 🇪🇸 [Leer en español](https://github.com/Patafoin/ha-my-bank/blob/main/README.es.md)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
@@ -12,7 +12,7 @@ Persönliche Finanzverwaltung in Home Assistant, so wie Haushaltsbuch-Programme 
 
 💬 Fragen, Rückmeldungen, Ideen: [Diskussion im Home Assistant Community-Forum](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114) (auf Englisch).
 
-> Verfügbar auf **Englisch, Französisch und Deutsch** (Karten, Dienste, Einrichtung, Servermeldungen), je nach Sprache von Home Assistant.
+> Die Integration und die Karten sind auf **Englisch, Französisch, Deutsch und Spanisch** verfügbar und richten sich nach der Home-Assistant-Sprache. Meldungen der My-Bank-API werden separat in deren Repository übersetzt; spanische Servermeldungen sind hier nicht enthalten.
 
 ## Funktionsweise
 
@@ -205,7 +205,7 @@ data:
 
 ## Sprachen
 
-Die Karten, die Einrichtungsdialoge, die Dienste und die Fehlermeldungen des Servers folgen der Sprache von Home Assistant: Englisch, Französisch oder Deutsch (Englisch für jede andere Sprache). Bei einer Neuinstallation werden die vom Server standardmäßig angelegten Zahlungsarten in diese Sprache umbenannt.
+Die Integrationsoberfläche (Einrichtung, Dienste und Reparaturen) und die Karten folgen der Home-Assistant-Sprache: Englisch, Französisch, Deutsch oder Spanisch (Englisch für andere Sprachen). Meldungen der My-Bank-API werden separat in deren Repository übersetzt; spanische Servermeldungen sind hier nicht enthalten. Bei einer Neuinstallation werden die vom Server standardmäßig angelegten Zahlungsarten entsprechend den von My Bank API unterstützten Sprachen umbenannt.
 
 ## Aktualisierung
 
@@ -227,7 +227,7 @@ Eine Sprache hinzuzufügen oder zu verbessern ist willkommen:
 - Karten: das Wörterbuch `I18N` am Ende von `custom_components/my_bank/www/my-bank-card.js`, nach dem französischen Text der Karte indiziert.
 - Servermeldungen: `src/my_bank_api/i18n_messages.py` in [my-bank-api](https://github.com/Patafoin/my-bank-api).
 
-Die Tests prüfen, dass jeder Text eine englische und eine deutsche Version mit denselben `{Platzhaltern}` hat.
+Die Tests prüfen alle Home-Assistant-Übersetzungsschlüssel und Platzhalter sowie vollständige englische, deutsche und spanische Kartendictionaries.
 
 ## Lizenz
 

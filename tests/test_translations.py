@@ -1,4 +1,4 @@
-"""Translations stay complete: HA strings (en/fr/de) and the card dictionary (en/de, French is the source)."""
+"""Translations stay complete: HA strings (en/fr/de/es) and the card dictionary (en/de/es, French is the source)."""
 from __future__ import annotations
 
 import json
@@ -26,7 +26,7 @@ def _leaves(data: dict, prefix: str = "") -> dict[str, str]:
 
 def test_translations_match_strings() -> None:
     source = _leaves(json.loads((COMPONENT / "strings.json").read_text()))
-    for lang in ("en", "fr", "de"):
+    for lang in ("en", "fr", "de", "es"):
         other = _leaves(json.loads((COMPONENT / "translations" / f"{lang}.json").read_text()))
         assert set(other) == set(source), f"{lang}: {set(source) ^ set(other)}"
         for key, text in source.items():
@@ -47,12 +47,12 @@ def test_every_service_and_field_is_translated() -> None:
                 assert set(strings["selector"][key]["options"]) == set(field_spec["selector"]["select"]["options"])
 
 
-def test_card_texts_have_english_and_german() -> None:
+def test_card_texts_have_english_german_and_spanish() -> None:
     card = (COMPONENT / "www" / "my-bank-card.js").read_text()
     block = re.search(r"const I18N = (\{.*?\n\});", card, re.S).group(1)
-    dictionaries = json.loads(re.sub(r",(\s*[}\]])", r"\1", re.sub(r"^(\s*)(en|de):", r'\1"\2":', block, flags=re.M)))
+    dictionaries = json.loads(re.sub(r",(\s*[}\]])", r"\1", re.sub(r"^(\s*)(en|de|es):", r'\1"\2":', block, flags=re.M)))
     keys = {json.loads(m) for m in re.findall(r'\bt\(\s*("(?:[^"\\]|\\.)*")', card)}
-    for lang in ("en", "de"):
+    for lang in ("en", "de", "es"):
         missing = sorted(k for k in keys if k not in dictionaries[lang])
         assert not missing, f"{lang}: {missing}"
         for key, text in dictionaries[lang].items():

@@ -1,0 +1,1682 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar con la API de My Bank",
+        "description": "My Bank necesita un servidor de la API de My Bank en funcionamiento (aplicación de Home Assistant —antes complemento— o contenedor Docker).",
+        "data": {
+          "url": "URL de la API de My Bank",
+          "token": "Token de acceso"
+        },
+        "data_description": {
+          "url": "Dirección del servidor de la API de My Bank, p. ej., http://192.168.1.10:9931. No es necesaria si se usa la aplicación de la API de My Bank, que se detecta automáticamente.",
+          "token": "Créalo en el servidor con este comando: docker exec my-bank-api my-bank token create home-assistant (o configura MYBANK_API_TOKEN)."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Se necesita el token de My Bank",
+        "description": "La API de My Bank ha rechazado el token. Introduce la URL y un token válido.",
+        "data": {
+          "url": "URL de la API de My Bank",
+          "token": "Token de acceso"
+        },
+        "data_description": {
+          "url": "Dirección del servidor de la API de My Bank, p. ej., http://192.168.1.10:9931. No es necesaria si se usa la aplicación de la API de My Bank, que se detecta automáticamente.",
+          "token": "Créalo en el servidor con este comando: docker exec my-bank-api my-bank token create home-assistant (o configura MYBANK_API_TOKEN)."
+        }
+      },
+      "hassio_confirm": {
+        "title": "Aplicación de la API de My Bank encontrada",
+        "description": "¿Conectar Home Assistant con la aplicación {addon}?"
+      }
+    },
+    "error": {
+      "cannot_connect": "No se puede acceder a la API de My Bank en esta URL.",
+      "invalid_auth": "La API de My Bank ha rechazado el token."
+    },
+    "abort": {
+      "already_configured": "Esta instancia de la API de My Bank ya está configurada.",
+      "reauth_successful": "Se ha actualizado la conexión con la API de My Bank."
+    }
+  },
+  "issues": {
+    "api_too_old": {
+      "title": "La API de My Bank necesita actualizarse",
+      "description": "La versión {version} de la API de My Bank es anterior a la versión mínima que necesita esta integración ({minimum}). Actualiza la aplicación de la API de My Bank o la imagen de Docker; de lo contrario, algunas funciones de la tarjeta dejarán de funcionar."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ending_schedules": {
+        "name": "Movimientos programados que finalizan",
+        "unit_of_measurement": "movimientos programados",
+        "state_attributes": {
+          "jours": {
+            "name": "Días"
+          },
+          "planifications": {
+            "name": "Movimientos programados"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "My Bank no está conectado (Ajustes → Dispositivos y servicios → My Bank)."
+    }
+  },
+  "services": {
+    "create_account": {
+      "name": "Crear cuenta",
+      "description": "Crea una cuenta bancaria.",
+      "fields": {
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "kind": {
+          "name": "Tipo",
+          "description": "Tipo de cuenta."
+        },
+        "number": {
+          "name": "Número",
+          "description": "Número de cuenta."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Saldo inicial",
+          "description": "Saldo anterior al primer movimiento, p. ej., 1250.00."
+        },
+        "opening_date": {
+          "name": "Fecha del saldo inicial",
+          "description": "Fecha del saldo inicial."
+        },
+        "closed": {
+          "name": "Cerrada",
+          "description": "Cuenta cerrada (se conserva el historial)."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        }
+      }
+    },
+    "update_account": {
+      "name": "Actualizar cuenta",
+      "description": "Modifica una cuenta; solo se cambian los campos indicados.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "kind": {
+          "name": "Tipo",
+          "description": "Tipo de cuenta."
+        },
+        "number": {
+          "name": "Número",
+          "description": "Número de cuenta."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "opening_balance": {
+          "name": "Saldo inicial",
+          "description": "Saldo anterior al primer movimiento, p. ej., 1250.00."
+        },
+        "opening_date": {
+          "name": "Fecha del saldo inicial",
+          "description": "Fecha del saldo inicial."
+        },
+        "closed": {
+          "name": "Cerrada",
+          "description": "Cuenta cerrada (se conserva el historial)."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        }
+      }
+    },
+    "delete_account": {
+      "name": "Eliminar cuenta",
+      "description": "Elimina una cuenta (no se permite si tiene movimientos).",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        }
+      }
+    },
+    "create_category": {
+      "name": "Crear categoría",
+      "description": "Crea una categoría (ingresos, gastos o ahorro), en el nivel superior o dentro de una categoría principal.",
+      "fields": {
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "kind": {
+          "name": "Tipo",
+          "description": "Tipo de categoría (solo para categorías de nivel superior; en los demás casos se hereda)."
+        },
+        "parent_id": {
+          "name": "Elemento principal",
+          "description": "ID del elemento principal; déjalo vacío para el nivel superior."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        }
+      }
+    },
+    "update_category": {
+      "name": "Actualizar categoría",
+      "description": "Modifica una categoría; solo se cambian los campos indicados.",
+      "fields": {
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "kind": {
+          "name": "Tipo",
+          "description": "Tipo de categoría (solo para categorías de nivel superior; en los demás casos se hereda)."
+        },
+        "parent_id": {
+          "name": "Elemento principal",
+          "description": "ID del elemento principal; déjalo vacío para el nivel superior."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        }
+      }
+    },
+    "delete_category": {
+      "name": "Eliminar categoría",
+      "description": "Elimina una categoría (no se permite si todavía está en uso).",
+      "fields": {
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría."
+        }
+      }
+    },
+    "create_class": {
+      "name": "Crear clase",
+      "description": "Crea una clase, un segundo criterio de clasificación independiente de las categorías.",
+      "fields": {
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "parent_id": {
+          "name": "Elemento principal",
+          "description": "ID del elemento principal; déjalo vacío para el nivel superior."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        }
+      }
+    },
+    "update_class": {
+      "name": "Actualizar clase",
+      "description": "Modifica una clase; solo se cambian los campos indicados.",
+      "fields": {
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "parent_id": {
+          "name": "Elemento principal",
+          "description": "ID del elemento principal; déjalo vacío para el nivel superior."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        }
+      }
+    },
+    "delete_class": {
+      "name": "Eliminar clase",
+      "description": "Elimina una clase (no se permite si todavía está en uso).",
+      "fields": {
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase."
+        }
+      }
+    },
+    "create_payee": {
+      "name": "Crear beneficiario",
+      "description": "Crea un beneficiario con sus datos de contacto y bancarios.",
+      "fields": {
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "default_category_id": {
+          "name": "Categoría predeterminada",
+          "description": "Categoría sugerida para los movimientos de este beneficiario."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "short_name": {
+          "name": "Nombre abreviado",
+          "description": "Nombre abreviado."
+        },
+        "address1": {
+          "name": "Dirección (línea 1)",
+          "description": "Dirección (línea 1)."
+        },
+        "address2": {
+          "name": "Dirección (línea 2)",
+          "description": "Dirección (línea 2)."
+        },
+        "address3": {
+          "name": "Dirección (línea 3)",
+          "description": "Dirección (línea 3)."
+        },
+        "postal_code": {
+          "name": "Código postal",
+          "description": "Código postal."
+        },
+        "city": {
+          "name": "Ciudad",
+          "description": "Ciudad."
+        },
+        "region": {
+          "name": "Región",
+          "description": "Región o provincia."
+        },
+        "country": {
+          "name": "País",
+          "description": "País."
+        },
+        "phone": {
+          "name": "Teléfono",
+          "description": "Número de teléfono."
+        },
+        "phone2": {
+          "name": "Teléfono 2",
+          "description": "Segundo número de teléfono."
+        },
+        "mobile": {
+          "name": "Móvil",
+          "description": "Número de móvil."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Número de fax."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Segundo número de fax."
+        },
+        "email": {
+          "name": "Correo electrónico",
+          "description": "Dirección de correo electrónico."
+        },
+        "url": {
+          "name": "Sitio web",
+          "description": "Dirección del sitio web."
+        },
+        "bank_name": {
+          "name": "Nombre del banco",
+          "description": "Nombre del banco del beneficiario."
+        },
+        "bank_code": {
+          "name": "Código bancario",
+          "description": "Código bancario."
+        },
+        "branch_code": {
+          "name": "Código de sucursal",
+          "description": "Código de sucursal."
+        },
+        "account_number": {
+          "name": "Número de cuenta",
+          "description": "Número de cuenta del beneficiario."
+        },
+        "rib_key": {
+          "name": "Clave RIB",
+          "description": "Clave de un identificador de cuenta bancaria francesa (RIB)."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "Código BIC (SWIFT)."
+        },
+        "free1": {
+          "name": "Campo libre 1",
+          "description": "Campo libre."
+        },
+        "free2": {
+          "name": "Campo libre 2",
+          "description": "Campo libre."
+        },
+        "free3": {
+          "name": "Campo libre 3",
+          "description": "Campo libre."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "external_code": {
+          "name": "Código externo",
+          "description": "Código de otra aplicación."
+        },
+        "payee_category": {
+          "name": "Categoría del beneficiario",
+          "description": "Agrupación libre de beneficiarios."
+        }
+      }
+    },
+    "update_payee": {
+      "name": "Actualizar beneficiario",
+      "description": "Modifica un beneficiario; solo se cambian los campos indicados.",
+      "fields": {
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "default_category_id": {
+          "name": "Categoría predeterminada",
+          "description": "Categoría sugerida para los movimientos de este beneficiario."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "short_name": {
+          "name": "Nombre abreviado",
+          "description": "Nombre abreviado."
+        },
+        "address1": {
+          "name": "Dirección (línea 1)",
+          "description": "Dirección (línea 1)."
+        },
+        "address2": {
+          "name": "Dirección (línea 2)",
+          "description": "Dirección (línea 2)."
+        },
+        "address3": {
+          "name": "Dirección (línea 3)",
+          "description": "Dirección (línea 3)."
+        },
+        "postal_code": {
+          "name": "Código postal",
+          "description": "Código postal."
+        },
+        "city": {
+          "name": "Ciudad",
+          "description": "Ciudad."
+        },
+        "region": {
+          "name": "Región",
+          "description": "Región o provincia."
+        },
+        "country": {
+          "name": "País",
+          "description": "País."
+        },
+        "phone": {
+          "name": "Teléfono",
+          "description": "Número de teléfono."
+        },
+        "phone2": {
+          "name": "Teléfono 2",
+          "description": "Segundo número de teléfono."
+        },
+        "mobile": {
+          "name": "Móvil",
+          "description": "Número de móvil."
+        },
+        "fax": {
+          "name": "Fax",
+          "description": "Número de fax."
+        },
+        "fax2": {
+          "name": "Fax 2",
+          "description": "Segundo número de fax."
+        },
+        "email": {
+          "name": "Correo electrónico",
+          "description": "Dirección de correo electrónico."
+        },
+        "url": {
+          "name": "Sitio web",
+          "description": "Dirección del sitio web."
+        },
+        "bank_name": {
+          "name": "Nombre del banco",
+          "description": "Nombre del banco del beneficiario."
+        },
+        "bank_code": {
+          "name": "Código bancario",
+          "description": "Código bancario."
+        },
+        "branch_code": {
+          "name": "Código de sucursal",
+          "description": "Código de sucursal."
+        },
+        "account_number": {
+          "name": "Número de cuenta",
+          "description": "Número de cuenta del beneficiario."
+        },
+        "rib_key": {
+          "name": "Clave RIB",
+          "description": "Clave de un identificador de cuenta bancaria francesa (RIB)."
+        },
+        "iban": {
+          "name": "IBAN",
+          "description": "IBAN."
+        },
+        "swift": {
+          "name": "BIC / SWIFT",
+          "description": "Código BIC (SWIFT)."
+        },
+        "free1": {
+          "name": "Campo libre 1",
+          "description": "Campo libre."
+        },
+        "free2": {
+          "name": "Campo libre 2",
+          "description": "Campo libre."
+        },
+        "free3": {
+          "name": "Campo libre 3",
+          "description": "Campo libre."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "external_code": {
+          "name": "Código externo",
+          "description": "Código de otra aplicación."
+        },
+        "payee_category": {
+          "name": "Categoría del beneficiario",
+          "description": "Agrupación libre de beneficiarios."
+        }
+      }
+    },
+    "delete_payee": {
+      "name": "Eliminar beneficiario",
+      "description": "Elimina un beneficiario (no se permite si todavía está en uso).",
+      "fields": {
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        }
+      }
+    },
+    "create_payment_method": {
+      "name": "Crear método de pago",
+      "description": "Crea un método de pago (tarjeta, cheque, domiciliación bancaria…).",
+      "fields": {
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre del método de pago."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Método de pago activo."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        }
+      }
+    },
+    "update_payment_method": {
+      "name": "Actualizar método de pago",
+      "description": "Modifica un método de pago.",
+      "fields": {
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre del método de pago."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Método de pago activo."
+        },
+        "position": {
+          "name": "Posición",
+          "description": "Orden de clasificación."
+        }
+      }
+    },
+    "delete_payment_method": {
+      "name": "Eliminar método de pago",
+      "description": "Elimina un método de pago (no se permite si todavía está en uso).",
+      "fields": {
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        }
+      }
+    },
+    "create_transaction": {
+      "name": "Crear movimiento",
+      "description": "Registra un movimiento en una cuenta, con una categoría o un desglose.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "date": {
+          "name": "Fecha",
+          "description": "Fecha (YYYY-MM-DD)."
+        },
+        "amount": {
+          "name": "Importe",
+          "description": "Importe con signo: negativo para un cargo y positivo para un abono; p. ej., -14.80."
+        },
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        },
+        "payee_name": {
+          "name": "Nombre del beneficiario",
+          "description": "Beneficiario por nombre; se crea si no existe."
+        },
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        },
+        "number": {
+          "name": "Número de cheque",
+          "description": "Número de cheque."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Descripción del movimiento."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "state": {
+          "name": "Estado",
+          "description": "Sin liquidar, liquidado o conciliado."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría, si no hay desglose."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase, si no hay desglose."
+        },
+        "splits": {
+          "name": "Desglose",
+          "description": "Lista de líneas (amount, category_id, class_id, label); la suma debe coincidir con el importe."
+        }
+      }
+    },
+    "update_transaction": {
+      "name": "Actualizar movimiento",
+      "description": "Modifica un movimiento; solo se cambian los campos indicados. El importe, la fecha, la cuenta y el desglose de un movimiento conciliado están bloqueados.",
+      "fields": {
+        "transaction_id": {
+          "name": "Movimiento",
+          "description": "ID del movimiento."
+        },
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "date": {
+          "name": "Fecha",
+          "description": "Fecha (YYYY-MM-DD)."
+        },
+        "amount": {
+          "name": "Importe",
+          "description": "Importe con signo: negativo para un cargo y positivo para un abono; p. ej., -14.80."
+        },
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        },
+        "payee_name": {
+          "name": "Nombre del beneficiario",
+          "description": "Beneficiario por nombre; se crea si no existe."
+        },
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        },
+        "number": {
+          "name": "Número de cheque",
+          "description": "Número de cheque."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Descripción del movimiento."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "state": {
+          "name": "Estado",
+          "description": "Sin liquidar, liquidado o conciliado."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría, si no hay desglose."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase, si no hay desglose."
+        },
+        "splits": {
+          "name": "Desglose",
+          "description": "Lista de líneas (amount, category_id, class_id, label); la suma debe coincidir con el importe."
+        }
+      }
+    },
+    "delete_transaction": {
+      "name": "Eliminar movimiento",
+      "description": "Elimina un movimiento (las dos partes de una transferencia).",
+      "fields": {
+        "transaction_id": {
+          "name": "Movimiento",
+          "description": "ID del movimiento."
+        }
+      }
+    },
+    "set_transaction_state": {
+      "name": "Establecer el estado del movimiento",
+      "description": "Marca, concilia o desmarca un movimiento como liquidado.",
+      "fields": {
+        "transaction_id": {
+          "name": "Movimiento",
+          "description": "ID del movimiento."
+        },
+        "state": {
+          "name": "Estado",
+          "description": "Sin liquidar, liquidado o conciliado."
+        }
+      }
+    },
+    "set_transactions_state": {
+      "name": "Establecer el estado de varios movimientos",
+      "description": "Establece el mismo estado en varios movimientos a la vez (conciliación de extractos).",
+      "fields": {
+        "ids": {
+          "name": "Movimientos",
+          "description": "Lista de ID de movimientos."
+        },
+        "state": {
+          "name": "Estado",
+          "description": "Estado que se asignará a cada movimiento."
+        }
+      }
+    },
+    "create_transfer": {
+      "name": "Crear transferencia",
+      "description": "Transfiere dinero entre dos cuentas: crea dos movimientos vinculados, cada uno con su propio estado.",
+      "fields": {
+        "from_account_id": {
+          "name": "Cuenta de origen",
+          "description": "ID de la cuenta a la que se carga el importe."
+        },
+        "to_account_id": {
+          "name": "Cuenta de destino",
+          "description": "ID de la cuenta a la que se abona el importe."
+        },
+        "date": {
+          "name": "Fecha",
+          "description": "Fecha (YYYY-MM-DD)."
+        },
+        "amount": {
+          "name": "Importe",
+          "description": "Importe positivo, que se carga en una cuenta y se abona en la otra."
+        },
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Descripción del movimiento."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría, si no hay desglose."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase, si no hay desglose."
+        },
+        "from_state": {
+          "name": "Estado del cargo",
+          "description": "Estado del movimiento en la cuenta a la que se carga el importe."
+        },
+        "to_state": {
+          "name": "Estado del abono",
+          "description": "Estado del movimiento en la cuenta a la que se abona el importe."
+        }
+      }
+    },
+    "list_accounts": {
+      "name": "Listar cuentas",
+      "description": "Devuelve las cuentas con sus tres saldos (total, liquidado y conciliado).",
+      "fields": {
+        "date": {
+          "name": "Fecha",
+          "description": "Saldos a esta fecha (YYYY-MM-DD)."
+        },
+        "include_closed": {
+          "name": "Incluir cuentas cerradas",
+          "description": "También devuelve las cuentas cerradas."
+        }
+      }
+    },
+    "list_categories": {
+      "name": "Listar categorías",
+      "description": "Devuelve el árbol de categorías como una lista plana (con ruta y nivel)."
+    },
+    "list_classes": {
+      "name": "Listar clases",
+      "description": "Devuelve el árbol de clases como una lista plana."
+    },
+    "list_payees": {
+      "name": "Listar beneficiarios",
+      "description": "Devuelve los beneficiarios, con posibilidad de aplicar filtros.",
+      "fields": {
+        "q": {
+          "name": "Texto",
+          "description": "Texto que se buscará."
+        },
+        "active": {
+          "name": "Solo activos",
+          "description": "Solo beneficiarios activos."
+        }
+      }
+    },
+    "list_payment_methods": {
+      "name": "Listar métodos de pago",
+      "description": "Devuelve los métodos de pago."
+    },
+    "list_account_transactions": {
+      "name": "Listar movimientos de la cuenta",
+      "description": "Devuelve los movimientos de una cuenta durante un periodo, con el saldo después de cada línea.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "start": {
+          "name": "Inicio",
+          "description": "Primera fecha (YYYY-MM-DD)."
+        },
+        "end": {
+          "name": "Fin",
+          "description": "Última fecha (YYYY-MM-DD)."
+        },
+        "state": {
+          "name": "Estados",
+          "description": "Solo movimientos con estos estados."
+        },
+        "order": {
+          "name": "Orden",
+          "description": "Orden por fecha."
+        }
+      }
+    },
+    "search_transactions": {
+      "name": "Buscar movimientos",
+      "description": "Busca movimientos de todas las cuentas por fecha, estado, beneficiario, categoría, clase o texto.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "start": {
+          "name": "Inicio",
+          "description": "Primera fecha (YYYY-MM-DD)."
+        },
+        "end": {
+          "name": "Fin",
+          "description": "Última fecha (YYYY-MM-DD)."
+        },
+        "state": {
+          "name": "Estados",
+          "description": "Solo movimientos con estos estados."
+        },
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría."
+        },
+        "include_subcategories": {
+          "name": "Incluir subcategorías",
+          "description": "Incluir también las subcategorías de la categoría."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase."
+        },
+        "q": {
+          "name": "Texto",
+          "description": "Texto que se buscará."
+        },
+        "order": {
+          "name": "Orden",
+          "description": "Orden por fecha."
+        },
+        "limit": {
+          "name": "Límite",
+          "description": "Número máximo de resultados."
+        },
+        "offset": {
+          "name": "Desplazamiento",
+          "description": "Número de resultados que se omitirán (paginación)."
+        }
+      }
+    },
+    "create_schedule": {
+      "name": "Crear movimiento programado",
+      "description": "Crea un movimiento periódico o un plan de pagos, que se genera automáticamente cuando vence.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Descripción del movimiento programado (predeterminada: el beneficiario)."
+        },
+        "mode": {
+          "name": "Modo",
+          "description": "Periódico (importe fijo) o plan de pagos (importe por vencimiento)."
+        },
+        "start_date": {
+          "name": "Primer vencimiento",
+          "description": "Fecha del primer vencimiento."
+        },
+        "unit": {
+          "name": "Unidad",
+          "description": "Unidad de repetición."
+        },
+        "every": {
+          "name": "Cada",
+          "description": "Cada N unidades."
+        },
+        "end_mode": {
+          "name": "Fin",
+          "description": "Nunca, en una fecha o tras un número determinado de vencimientos."
+        },
+        "end_date": {
+          "name": "Fecha de finalización",
+          "description": "Última fecha posible de un vencimiento."
+        },
+        "count": {
+          "name": "Número de vencimientos",
+          "description": "Número de vencimientos si el final se define por cantidad."
+        },
+        "amount": {
+          "name": "Importe base",
+          "description": "Importe con signo de cada vencimiento (negativo = cargo)."
+        },
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        },
+        "payee_name": {
+          "name": "Nombre del beneficiario",
+          "description": "Beneficiario por nombre; se crea si no existe."
+        },
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase."
+        },
+        "transfer_account_id": {
+          "name": "Cuenta de transferencia",
+          "description": "Para una transferencia: la otra cuenta (un importe negativo indica que se transfiere a esa cuenta)."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "auto": {
+          "name": "Automático",
+          "description": "Registrar el movimiento automáticamente cuando venza."
+        },
+        "lead_days": {
+          "name": "Días de antelación",
+          "description": "Registrar el movimiento este número de días antes de su fecha."
+        },
+        "generate_from": {
+          "name": "Generar a partir de",
+          "description": "No registrar nada automáticamente antes de esta fecha (predeterminada: hoy)."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        }
+      }
+    },
+    "update_schedule": {
+      "name": "Actualizar movimiento programado",
+      "description": "Modifica un movimiento programado; los vencimientos que aún no se hayan generado aplicarán los cambios.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        },
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Descripción del movimiento programado (predeterminada: el beneficiario)."
+        },
+        "mode": {
+          "name": "Modo",
+          "description": "Periódico (importe fijo) o plan de pagos (importe por vencimiento)."
+        },
+        "start_date": {
+          "name": "Primer vencimiento",
+          "description": "Fecha del primer vencimiento."
+        },
+        "unit": {
+          "name": "Unidad",
+          "description": "Unidad de repetición."
+        },
+        "every": {
+          "name": "Cada",
+          "description": "Cada N unidades."
+        },
+        "end_mode": {
+          "name": "Fin",
+          "description": "Nunca, en una fecha o tras un número determinado de vencimientos."
+        },
+        "end_date": {
+          "name": "Fecha de finalización",
+          "description": "Última fecha posible de un vencimiento."
+        },
+        "count": {
+          "name": "Número de vencimientos",
+          "description": "Número de vencimientos si el final se define por cantidad."
+        },
+        "amount": {
+          "name": "Importe base",
+          "description": "Importe con signo de cada vencimiento (negativo = cargo)."
+        },
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID del beneficiario."
+        },
+        "payee_name": {
+          "name": "Nombre del beneficiario",
+          "description": "Beneficiario por nombre; se crea si no existe."
+        },
+        "payment_method_id": {
+          "name": "Método de pago",
+          "description": "ID del método de pago."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de la categoría."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de la clase."
+        },
+        "transfer_account_id": {
+          "name": "Cuenta de transferencia",
+          "description": "Para una transferencia: la otra cuenta (un importe negativo indica que se transfiere a esa cuenta)."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "auto": {
+          "name": "Automático",
+          "description": "Registrar el movimiento automáticamente cuando venza."
+        },
+        "lead_days": {
+          "name": "Días de antelación",
+          "description": "Registrar el movimiento este número de días antes de su fecha."
+        },
+        "generate_from": {
+          "name": "Generar a partir de",
+          "description": "No registrar nada automáticamente antes de esta fecha (predeterminada: hoy)."
+        },
+        "active": {
+          "name": "Activo",
+          "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        }
+      }
+    },
+    "delete_schedule": {
+      "name": "Eliminar movimiento programado",
+      "description": "Elimina un movimiento programado; se conservan los movimientos que ya se hayan generado.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        }
+      }
+    },
+    "set_schedule_occurrences": {
+      "name": "Configurar el calendario del plan de pagos",
+      "description": "Guarda el importe (y, opcionalmente, la fecha) de cada vencimiento de un plan de pagos.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        },
+        "items": {
+          "name": "Cuadrícula",
+          "description": "Lista [(rank, amount, date)]; la fecha es opcional; si se omite, se usa la fecha de la regla."
+        }
+      }
+    },
+    "skip_occurrence": {
+      "name": "Omitir vencimiento",
+      "description": "Omite un vencimiento; no se registrará.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        },
+        "rank": {
+          "name": "Número de vencimiento",
+          "description": "Posición del vencimiento (1 = primero)."
+        }
+      }
+    },
+    "restore_occurrence": {
+      "name": "Restaurar vencimiento",
+      "description": "Restaura un vencimiento omitido.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        },
+        "rank": {
+          "name": "Número de vencimiento",
+          "description": "Posición del vencimiento (1 = primero)."
+        }
+      }
+    },
+    "generate_occurrence": {
+      "name": "Registrar vencimiento ahora",
+      "description": "Registra ahora el movimiento de un vencimiento, sin esperar a que llegue su fecha.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        },
+        "rank": {
+          "name": "Número de vencimiento",
+          "description": "Posición del vencimiento (1 = primero)."
+        }
+      }
+    },
+    "generate_due_occurrences": {
+      "name": "Generar vencimientos pendientes",
+      "description": "Registra todos los vencimientos que ya han llegado (también se hace cada noche)."
+    },
+    "create_budget": {
+      "name": "Crear presupuesto",
+      "description": "Crea un presupuesto para una cuenta y un intervalo de meses.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "start_month": {
+          "name": "Primer mes",
+          "description": "Primer mes (YYYY-MM)."
+        },
+        "months": {
+          "name": "Número de meses",
+          "description": "Número de meses (de 1 a 36)."
+        },
+        "archived": {
+          "name": "Archivado",
+          "description": "Presupuesto archivado."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        }
+      }
+    },
+    "update_budget": {
+      "name": "Actualizar presupuesto",
+      "description": "Modifica un presupuesto; solo se cambian los campos indicados.",
+      "fields": {
+        "budget_id": {
+          "name": "Presupuesto",
+          "description": "ID del presupuesto."
+        },
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "start_month": {
+          "name": "Primer mes",
+          "description": "Primer mes (YYYY-MM)."
+        },
+        "months": {
+          "name": "Número de meses",
+          "description": "Número de meses (de 1 a 36)."
+        },
+        "archived": {
+          "name": "Archivado",
+          "description": "Presupuesto archivado."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        }
+      }
+    },
+    "delete_budget": {
+      "name": "Eliminar presupuesto",
+      "description": "Elimina un presupuesto y todos sus importes.",
+      "fields": {
+        "budget_id": {
+          "name": "Presupuesto",
+          "description": "ID del presupuesto."
+        }
+      }
+    },
+    "set_budget_lines": {
+      "name": "Configurar la cuadrícula del presupuesto",
+      "description": "Guarda la cuadrícula de categorías × meses del presupuesto (importes positivos, según el sentido de la categoría).",
+      "fields": {
+        "budget_id": {
+          "name": "Presupuesto",
+          "description": "ID del presupuesto."
+        },
+        "lines": {
+          "name": "Celdas",
+          "description": "Lista [(category_id, month, amount)]."
+        }
+      }
+    },
+    "copy_budget": {
+      "name": "Copiar presupuesto",
+      "description": "Copia un presupuesto a un periodo nuevo con los mismos importes.",
+      "fields": {
+        "budget_id": {
+          "name": "Presupuesto que se va a copiar",
+          "description": "ID del presupuesto que se va a copiar."
+        },
+        "name": {
+          "name": "Nuevo nombre",
+          "description": "Nombre del nuevo presupuesto."
+        },
+        "start_month": {
+          "name": "Primer mes",
+          "description": "Primer mes (YYYY-MM); de forma predeterminada, el mes siguiente al del presupuesto copiado."
+        },
+        "months": {
+          "name": "Número de meses",
+          "description": "Número de meses; de forma predeterminada, el mismo que el del presupuesto copiado."
+        },
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta; de forma predeterminada, la misma cuenta."
+        }
+      }
+    },
+    "list_schedules": {
+      "name": "Listar movimientos programados",
+      "description": "Devuelve los movimientos programados.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "active": {
+          "name": "Solo activos",
+          "description": "Solo movimientos programados activos."
+        }
+      }
+    },
+    "list_upcoming_occurrences": {
+      "name": "Listar próximos vencimientos",
+      "description": "Devuelve los vencimientos previstos dentro de un número de días y los que ya están atrasados.",
+      "fields": {
+        "days": {
+          "name": "Horizonte (días)",
+          "description": "Número de días de antelación."
+        },
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        }
+      }
+    },
+    "list_schedule_occurrences": {
+      "name": "Listar vencimientos de una programación",
+      "description": "Devuelve todos los vencimientos de un movimiento programado y su estado.",
+      "fields": {
+        "schedule_id": {
+          "name": "Movimiento programado",
+          "description": "ID del movimiento programado."
+        },
+        "upcoming": {
+          "name": "Próximos vencimientos",
+          "description": "Para una programación sin fecha de finalización: número de próximos vencimientos que se devolverán."
+        }
+      }
+    },
+    "list_budgets": {
+      "name": "Listar presupuestos",
+      "description": "Devuelve los presupuestos.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        },
+        "include_archived": {
+          "name": "Incluir archivados",
+          "description": "También devuelve los presupuestos archivados."
+        }
+      }
+    },
+    "get_budget_lines": {
+      "name": "Obtener cuadrícula del presupuesto",
+      "description": "Devuelve los importes previstos del presupuesto por categoría y mes.",
+      "fields": {
+        "budget_id": {
+          "name": "Presupuesto",
+          "description": "ID del presupuesto."
+        }
+      }
+    },
+    "get_budget_report": {
+      "name": "Obtener informe del presupuesto",
+      "description": "Devuelve los importes previstos, reales y la desviación del presupuesto por categoría y mes.",
+      "fields": {
+        "budget_id": {
+          "name": "Presupuesto",
+          "description": "ID del presupuesto."
+        }
+      }
+    },
+    "create_shared_account": {
+      "name": "Crear cuenta compartida",
+      "description": "Crea una cuenta compartida para saldar los gastos comunes de un grupo.",
+      "fields": {
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "participants": {
+          "name": "Participantes",
+          "description": "Nombres de los participantes (al menos dos, incluyéndote)."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        }
+      }
+    },
+    "update_shared_account": {
+      "name": "Actualizar cuenta compartida",
+      "description": "Cambia el nombre de una cuenta compartida, la cierra o la vuelve a abrir.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre."
+        },
+        "notes": {
+          "name": "Notas",
+          "description": "Notas libres."
+        },
+        "closed": {
+          "name": "Cerrada",
+          "description": "True: cerrar (se bloquean los gastos); false: volver a abrir."
+        }
+      }
+    },
+    "delete_shared_account": {
+      "name": "Eliminar cuenta compartida",
+      "description": "Elimina una cuenta compartida junto con sus participantes y gastos.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        }
+      }
+    },
+    "add_shared_participant": {
+      "name": "Añadir participante",
+      "description": "Añade un participante a una cuenta compartida.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "name": {
+          "name": "Nombre",
+          "description": "Nombre del participante."
+        }
+      }
+    },
+    "rename_shared_participant": {
+      "name": "Cambiar nombre del participante",
+      "description": "Cambia el nombre de un participante de una cuenta compartida.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "participant_id": {
+          "name": "Participante",
+          "description": "ID del participante."
+        },
+        "name": {
+          "name": "Nuevo nombre",
+          "description": "Nuevo nombre del participante."
+        }
+      }
+    },
+    "remove_shared_participant": {
+      "name": "Eliminar participante",
+      "description": "Elimina a un participante que no haya pagado nada (deben quedar al menos dos).",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "participant_id": {
+          "name": "Participante",
+          "description": "ID del participante."
+        }
+      }
+    },
+    "add_shared_expense": {
+      "name": "Añadir gasto compartido",
+      "description": "Registra un gasto pagado por un participante de una cuenta compartida.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "participant_id": {
+          "name": "Pagado por",
+          "description": "ID del participante que ha pagado."
+        },
+        "amount": {
+          "name": "Importe",
+          "description": "Importe positivo pagado."
+        },
+        "date": {
+          "name": "Fecha",
+          "description": "Fecha (YYYY-MM-DD); de forma predeterminada, hoy."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Concepto del gasto."
+        }
+      }
+    },
+    "update_shared_expense": {
+      "name": "Actualizar gasto compartido",
+      "description": "Modifica un gasto de una cuenta compartida.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "expense_id": {
+          "name": "Gasto",
+          "description": "ID del gasto."
+        },
+        "participant_id": {
+          "name": "Pagado por",
+          "description": "ID del participante que ha pagado."
+        },
+        "amount": {
+          "name": "Importe",
+          "description": "Importe positivo pagado."
+        },
+        "date": {
+          "name": "Fecha",
+          "description": "Fecha (YYYY-MM-DD)."
+        },
+        "label": {
+          "name": "Descripción",
+          "description": "Concepto del gasto."
+        }
+      }
+    },
+    "delete_shared_expense": {
+      "name": "Eliminar gasto compartido",
+      "description": "Elimina un gasto de una cuenta compartida.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        },
+        "expense_id": {
+          "name": "Gasto",
+          "description": "ID del gasto."
+        }
+      }
+    },
+    "list_shared_accounts": {
+      "name": "Listar cuentas compartidas",
+      "description": "Devuelve las cuentas compartidas con los totales, quién paga a continuación y los reembolsos."
+    },
+    "get_shared_account": {
+      "name": "Obtener cuenta compartida",
+      "description": "Devuelve una cuenta compartida con sus gastos, repartos y reembolsos.",
+      "fields": {
+        "shared_account_id": {
+          "name": "Cuenta compartida",
+          "description": "ID de la cuenta compartida."
+        }
+      }
+    },
+    "move_account": {
+      "name": "Mover movimientos de cuenta",
+      "description": "Mueve todos los movimientos y programaciones de una cuenta a otra.",
+      "fields": {
+        "account_id": {
+          "name": "Cuenta de origen",
+          "description": "ID de la cuenta cuyos movimientos se van a mover."
+        },
+        "target_id": {
+          "name": "Destino",
+          "description": "ID del elemento que recibirá los movimientos."
+        },
+        "include_reconciled": {
+          "name": "Incluir conciliados",
+          "description": "Mover también los movimientos conciliados (cambiarán ambos saldos conciliados)."
+        }
+      }
+    },
+    "move_category": {
+      "name": "Mover movimientos de categoría",
+      "description": "Mueve todos los movimientos y programaciones de una categoría a otra categoría.",
+      "fields": {
+        "category_id": {
+          "name": "Categoría de origen",
+          "description": "ID de la categoría cuyos movimientos se van a mover."
+        },
+        "target_id": {
+          "name": "Destino",
+          "description": "ID del elemento que recibirá los movimientos."
+        }
+      }
+    },
+    "move_class": {
+      "name": "Mover movimientos de clase",
+      "description": "Mueve todos los movimientos y programaciones de una clase a otra clase.",
+      "fields": {
+        "class_id": {
+          "name": "Clase de origen",
+          "description": "ID de la clase cuyos movimientos se van a mover."
+        },
+        "target_id": {
+          "name": "Destino",
+          "description": "ID del elemento que recibirá los movimientos."
+        }
+      }
+    },
+    "move_payee": {
+      "name": "Mover movimientos de beneficiario",
+      "description": "Mueve todos los movimientos y programaciones de un beneficiario a otro (combinar).",
+      "fields": {
+        "payee_id": {
+          "name": "Beneficiario de origen",
+          "description": "ID del beneficiario cuyos movimientos se van a mover."
+        },
+        "target_id": {
+          "name": "Destino",
+          "description": "ID del elemento que recibirá los movimientos."
+        }
+      }
+    }
+  },
+  "selector": {
+    "account_kind": {
+      "options": {
+        "checking": "Cuenta corriente",
+        "savings": "Ahorro",
+        "card": "Tarjeta",
+        "cash": "Efectivo",
+        "other": "Otro"
+      }
+    },
+    "category_kind": {
+      "options": {
+        "income": "Ingresos",
+        "expense": "Gasto",
+        "savings": "Ahorro"
+      }
+    },
+    "transaction_state": {
+      "options": {
+        "0": "Sin liquidar",
+        "1": "Liquidado",
+        "2": "Conciliado"
+      }
+    },
+    "order": {
+      "options": {
+        "asc": "Más antiguos primero",
+        "desc": "Más recientes primero"
+      }
+    },
+    "schedule_mode": {
+      "options": {
+        "periodic": "Periódico (importe fijo)",
+        "installments": "Plan de pagos"
+      }
+    },
+    "unit": {
+      "options": {
+        "day": "Días",
+        "week": "Semanas",
+        "month": "Meses",
+        "quarter": "Trimestres",
+        "year": "Años"
+      }
+    },
+    "end_mode": {
+      "options": {
+        "never": "Nunca",
+        "date": "En una fecha",
+        "count": "Tras N vencimientos"
+      }
+    }
+  }
+}
