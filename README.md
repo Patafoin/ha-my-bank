@@ -1,6 +1,6 @@
 # My Bank for Home Assistant
 
-🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md) · 🇩🇪 [Auf Deutsch lesen](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md)
+🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md) · 🇩🇪 [Auf Deutsch lesen](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md) · 🇪🇸 [Leer en español](https://github.com/Patafoin/ha-my-bank/blob/main/README.es.md)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
@@ -12,7 +12,7 @@ Personal bookkeeping in Home Assistant, the way desktop money managers do it: ac
 
 💬 Questions, feedback, ideas: [discussion on the Home Assistant Community forum](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114).
 
-> Available in **English, French and German** (cards, services, setup, server messages), following the Home Assistant language.
+> The integration and card UI are available in **English, French, German and Spanish**, following the Home Assistant language. My Bank API server messages are translated separately in its repository; Spanish server-message translations are not included here.
 
 ## How it works
 
@@ -205,7 +205,7 @@ data:
 
 ## Languages
 
-The cards, the setup dialogs, the services and the error messages of the server follow the language of Home Assistant: English, French or German (English for any other language). On a fresh install, the default payment methods created by the server are renamed in that language.
+The integration UI (setup, services and repairs) and cards follow the Home Assistant language: English, French, German or Spanish (English for any other language). My Bank API server messages are translated separately in the server repository; Spanish server-message translations are not included here. On a fresh install, the server's default payment methods are renamed according to the languages supported by My Bank API.
 
 ## Updating
 
@@ -227,7 +227,7 @@ Adding or fixing a language is welcome:
 - Cards: the `I18N` dictionary at the end of `custom_components/my_bank/www/my-bank-card.js`, keyed by the French text of the card.
 - Server messages: `src/my_bank_api/i18n_messages.py` in [my-bank-api](https://github.com/Patafoin/my-bank-api).
 
-Tests check that every text has an English and a German version, with the same `{placeholders}`.
+Tests check the Home Assistant translations against every source key and placeholder, and verify complete English, German and Spanish card dictionaries.
 
 ## License
 
