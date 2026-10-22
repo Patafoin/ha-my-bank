@@ -8,7 +8,7 @@
 
 Persönliche Finanzverwaltung in Home Assistant, so wie Haushaltsbuch-Programme am Computer: Konten mit drei Kontoständen, abgeglichene und abgestimmte Buchungen, Aufteilungen, Umbuchungen, hierarchische Kategorien, Daueraufträge, Budgets und geteilte Ausgaben unter Freunden — über eine Dashboard-Karte, auf dem Handy, überall.
 
-![Übersicht](docs/images/de/card-dashboard.png)
+![Übersicht](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-dashboard.png)
 
 💬 Fragen, Rückmeldungen, Ideen: [Diskussion im Home Assistant Community-Forum](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114) (auf Englisch).
 
@@ -92,7 +92,7 @@ In HACS: ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/Pat
 - **Mit der App**: Einstellungen → Geräte & Dienste zeigt **My Bank** als entdeckt an. Auf **Konfigurieren** klicken und bestätigen.
 - **Mit Docker**: Einstellungen → Geräte & Dienste → **Integration hinzufügen** → **My Bank**, dann die Server-URL (z. B. `http://192.168.1.10:9931`) und das in Schritt 1 erzeugte Token eingeben.
 
-![Einrichtung](docs/images/de/config-flow.png)
+![Einrichtung](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/config-flow.png)
 
 ### 4. Die Karte hinzufügen
 
@@ -127,15 +127,15 @@ Geben Sie jeder Karteninstanz eigene `sections`, um eine Ansicht nur für die Er
 
 | Buchungen | Budgets |
 |---|---|
-| ![Buchungen](docs/images/de/card-transactions.png) | ![Budgets](docs/images/de/card-budgets.png) |
+| ![Buchungen](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-transactions.png) | ![Budgets](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-budgets.png) |
 
 | Daueraufträge | Geteilte Ausgaben |
 |---|---|
-| ![Daueraufträge](docs/images/de/card-schedules.png) | ![Geteilte Ausgaben](docs/images/de/card-shares.png) |
+| ![Daueraufträge](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-schedules.png) | ![Geteilte Ausgaben](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-shares.png) |
 
 ### Kleine Karten für ein Handy-Dashboard
 
-<img src="docs/images/de/mobile-cards.png" alt="Dashboard auf dem Handy" width="320" align="right">
+<img src="https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/mobile-cards.png" alt="Dashboard auf dem Handy" width="320" align="right">
 
 | Karte | Optionen |
 |---|---|
@@ -153,7 +153,7 @@ Alle Karten haben einen visuellen Editor.
 
 **Diagrammkarten** — Kontostandsverlauf, anstehende Ausführungen, Ausgaben nach Kategorie:
 
-![Diagrammkarten](docs/images/chart-cards.png)
+![Diagrammkarten](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 
 ## Kategorien und Klassen
 

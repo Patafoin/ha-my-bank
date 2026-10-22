@@ -8,7 +8,7 @@
 
 Gestión financiera personal en Home Assistant, como en los programas de finanzas personales para ordenador: cuentas con tres saldos, movimientos liquidados y conciliados, desgloses, transferencias, categorías jerárquicas, movimientos programados, presupuestos y gastos compartidos entre amigos: desde una tarjeta del panel, en el móvil, en cualquier lugar.
 
-![Panel](docs/images/card-dashboard.png)
+![Panel](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-dashboard.png)
 
 💬 Preguntas, comentarios e ideas: [debate en el foro de Home Assistant Community](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114).
 
@@ -92,7 +92,7 @@ En HACS: ⋮ → **Repositorios personalizados** → `https://github.com/Patafoi
 - **Con la aplicación**: en Ajustes → Dispositivos y servicios aparecerá **My Bank** como integración detectada. Pulsa **Configurar** → **Enviar**.
 - **Con Docker**: Ajustes → Dispositivos y servicios → **Añadir integración** → **My Bank**; después, introduce la URL del servidor (por ejemplo, `http://192.168.1.10:9931`) y el token generado en el paso 1.
 
-![Configuración](docs/images/config-flow.png)
+![Configuración](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/config-flow.png)
 
 ### 4. Añade la tarjeta
 
@@ -109,7 +109,7 @@ Si las tarjetas no aparecen en el selector después de instalar o actualizar, fu
 | `dashboard` | Saldos de todas las cuentas y presupuesto del mes actual |
 | `transactions` | Movimientos de una cuenta con saldo acumulado; filtros (que se pueden guardar como predeterminados); añadir, editar, desglosar y transferir; liquidar (☐/☑) y conciliar (🔓/🔒) con un clic; un asistente de conciliación destaca el movimiento que explica una diferencia de saldo |
 | `accounts` | Cuentas (corriente, ahorro, tarjeta, efectivo…), saldo inicial y cierre |
-| `categories` / `tags` | Árbol de categorías (ingresos / gastos / ahorro) y clases, un segundo eje de análisis; consulta [Categorías y clases](#categories-and-classes) |
+| `categories` / `tags` | Árbol de categorías (ingresos / gastos / ahorro) y clases, un segundo eje de análisis; consulta [Categorías y clases](#categorías-y-clases) |
 | `payees` | Beneficiarios con categoría predeterminada |
 | `budgets` | Presupuesto mensual por cuenta: previsto frente a real, diferencia y copia de un presupuesto anterior |
 | `recurrences` | Movimientos programados (periódicos o a plazos), próximos vencimientos y generación automática |
@@ -127,15 +127,15 @@ Asigna a cada instancia de la tarjeta sus propios `sections` para crear, por eje
 
 | Movimientos | Presupuestos |
 |---|---|
-| ![Movimientos](docs/images/card-transactions.png) | ![Presupuestos](docs/images/card-budgets.png) |
+| ![Movimientos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-transactions.png) | ![Presupuestos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-budgets.png) |
 
 | Movimientos programados | Gastos compartidos |
 |---|---|
-| ![Movimientos programados](docs/images/card-schedules.png) | ![Gastos compartidos](docs/images/card-shares.png) |
+| ![Movimientos programados](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-schedules.png) | ![Gastos compartidos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-shares.png) |
 
 ### Tarjetas pequeñas para un panel móvil
 
-<img src="docs/images/mobile-cards.png" alt="Panel del móvil" width="320" align="right">
+<img src="https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/mobile-cards.png" alt="Panel del móvil" width="320" align="right">
 
 | Tarjeta | Opciones |
 |---|---|
@@ -153,9 +153,7 @@ Todas las tarjetas tienen un editor visual.
 
 **Tarjetas de gráficos** — historial de saldos, próximos movimientos y gastos por categoría:
 
-![Tarjetas de gráficos](docs/images/chart-cards.png)
-
-<a id="categories-and-classes"></a>
+![Tarjetas de gráficos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 
 ## Categorías y clases
 

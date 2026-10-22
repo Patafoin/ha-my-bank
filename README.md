@@ -8,7 +8,7 @@
 
 Personal bookkeeping in Home Assistant, the way desktop money managers do it: accounts with three balances, cleared and reconciled transactions, splits, transfers, hierarchical categories, scheduled transactions, budgets, and shared expenses between friends — from a dashboard card, on your phone, anywhere.
 
-![Dashboard](docs/images/card-dashboard.png)
+![Dashboard](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-dashboard.png)
 
 💬 Questions, feedback, ideas: [discussion on the Home Assistant Community forum](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114).
 
@@ -92,7 +92,7 @@ In HACS: ⋮ → **Custom repositories** → `https://github.com/Patafoin/ha-my-
 - **With the app**: Settings → Devices & services shows **My Bank** as discovered. Click **Configure** → **Submit**.
 - **With Docker**: Settings → Devices & services → **Add integration** → **My Bank**, then enter the server URL (e.g. `http://192.168.1.10:9931`) and the token generated in step 1.
 
-![Setup](docs/images/config-flow.png)
+![Setup](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/config-flow.png)
 
 ### 4. Add the card
 
@@ -127,15 +127,15 @@ Give each card instance its own `sections` to build an operations-only view, a s
 
 | Transactions | Budgets |
 |---|---|
-| ![Transactions](docs/images/card-transactions.png) | ![Budgets](docs/images/card-budgets.png) |
+| ![Transactions](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-transactions.png) | ![Budgets](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-budgets.png) |
 
 | Scheduled transactions | Shared expenses |
 |---|---|
-| ![Scheduled transactions](docs/images/card-schedules.png) | ![Shared expenses](docs/images/card-shares.png) |
+| ![Scheduled transactions](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-schedules.png) | ![Shared expenses](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-shares.png) |
 
 ### Small cards for a phone dashboard
 
-<img src="docs/images/mobile-cards.png" alt="Phone dashboard" width="320" align="right">
+<img src="https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/mobile-cards.png" alt="Phone dashboard" width="320" align="right">
 
 | Card | Options |
 |---|---|
@@ -153,7 +153,7 @@ All cards have a visual editor.
 
 **Chart cards** — balance history, upcoming occurrences, expenses by category:
 
-![Chart cards](docs/images/chart-cards.png)
+![Chart cards](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 
 ## Categories and classes
 

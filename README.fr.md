@@ -8,7 +8,7 @@
 
 La gestion de vos comptes personnels dans Home Assistant, à la manière des logiciels de comptes sur ordinateur : comptes avec trois soldes, opérations pointées et rapprochées, ventilations, virements, catégories hiérarchiques, opérations planifiées, budgets et dépenses partagées entre amis — depuis une carte de tableau de bord, sur votre téléphone, partout.
 
-![Tableau de bord](docs/images/card-dashboard.png)
+![Tableau de bord](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-dashboard.png)
 
 💬 Questions, retours, idées : [discussion sur le forum Home Assistant Community](https://community.home-assistant.io/t/my-bank-personal-bookkeeping-in-home-assistant-accounts-budgets-charts-scheduled-shared-expenses-100-local/1029114) (en anglais).
 
@@ -92,7 +92,7 @@ Dans HACS : ⋮ → **Dépôts personnalisés** → `https://github.com/Patafoin
 - **Avec l'application** : Paramètres → Appareils et services affiche **My Bank** comme découvert. Cliquez sur **Configurer** → **Valider**.
 - **Avec Docker** : Paramètres → Appareils et services → **Ajouter une intégration** → **My Bank**, puis saisissez l'URL du serveur (par ex. `http://192.168.1.10:9931`) et le jeton généré à l'étape 1.
 
-![Configuration](docs/images/config-flow.png)
+![Configuration](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/config-flow.png)
 
 ### 4. Ajouter la carte
 
@@ -127,15 +127,15 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 
 | Opérations | Budgets |
 |---|---|
-| ![Opérations](docs/images/card-transactions.png) | ![Budgets](docs/images/card-budgets.png) |
+| ![Opérations](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-transactions.png) | ![Budgets](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-budgets.png) |
 
 | Opérations planifiées | Dépenses partagées |
 |---|---|
-| ![Opérations planifiées](docs/images/card-schedules.png) | ![Dépenses partagées](docs/images/card-shares.png) |
+| ![Opérations planifiées](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-schedules.png) | ![Dépenses partagées](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-shares.png) |
 
 ### Petites cartes pour un tableau de bord sur téléphone
 
-<img src="docs/images/mobile-cards.png" alt="Tableau de bord sur téléphone" width="320" align="right">
+<img src="https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/mobile-cards.png" alt="Tableau de bord sur téléphone" width="320" align="right">
 
 | Carte | Options |
 |---|---|
@@ -153,7 +153,7 @@ Toutes les cartes disposent d'un éditeur visuel.
 
 **Cartes graphiques** — évolution du solde, échéances à venir, dépenses par rubrique :
 
-![Cartes graphiques](docs/images/chart-cards.png)
+![Cartes graphiques](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 
 ## Rubriques et classes
 
