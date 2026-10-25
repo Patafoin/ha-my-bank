@@ -107,7 +107,7 @@ Si les cartes n'apparaissent pas dans le sélecteur après une installation ou u
 | Onglet (clé `sections`) | Contenu |
 |---|---|
 | `dashboard` | Soldes de tous les comptes, budget du mois en cours |
-| `transactions` | Opérations d'un compte avec solde progressif ; filtres (enregistrables par défaut) ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic ; une aide au rapprochement surligne l'opération qui explique un écart de solde |
+| `transactions` | Opérations d'un compte avec solde progressif ; filtres (enregistrables par défaut) ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic ; une aide au rapprochement surligne l'opération qui explique un écart de solde ; lier un justificatif (lien ou fichier conservé par le serveur) à une opération, ouvert en un clic (📎) |
 | `accounts` | Comptes (courant, épargne, carte, espèces…), solde initial, clôture |
 | `categories` / `tags` | Arborescence des rubriques (recettes / dépenses / épargne) et classes, un second axe d'analyse — voir [Rubriques et classes](#rubriques-et-classes) |
 | `payees` | Tiers avec catégorie par défaut |

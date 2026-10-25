@@ -107,7 +107,7 @@ Si las tarjetas no aparecen en el selector después de instalar o actualizar, fu
 | Pestaña (clave `sections`) | Contenido |
 |---|---|
 | `dashboard` | Saldos de todas las cuentas y presupuesto del mes actual |
-| `transactions` | Movimientos de una cuenta con saldo acumulado; filtros (que se pueden guardar como predeterminados); añadir, editar, desglosar y transferir; liquidar (☐/☑) y conciliar (🔓/🔒) con un clic; un asistente de conciliación destaca el movimiento que explica una diferencia de saldo |
+| `transactions` | Movimientos de una cuenta con saldo acumulado; filtros (que se pueden guardar como predeterminados); añadir, editar, desglosar y transferir; liquidar (☐/☑) y conciliar (🔓/🔒) con un clic; un asistente de conciliación destaca el movimiento que explica una diferencia de saldo; adjuntar un justificante (un enlace, o un archivo guardado por el servidor) a un movimiento, que se abre con un clic (📎) |
 | `accounts` | Cuentas (corriente, ahorro, tarjeta, efectivo…), saldo inicial y cierre |
 | `categories` / `tags` | Árbol de categorías (ingresos / gastos / ahorro) y clases, un segundo eje de análisis; consulta [Categorías y clases](#categorías-y-clases) |
 | `payees` | Beneficiarios con categoría predeterminada |
