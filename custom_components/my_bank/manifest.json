@@ -14,5 +14,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Patafoin/ha-my-bank/issues",
   "requirements": [],
-  "version": "0.13.7"
+  "version": "0.13.8"
 }

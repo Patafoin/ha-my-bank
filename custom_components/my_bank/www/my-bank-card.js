@@ -11,6 +11,11 @@
 // sens d'un même mot (« Saisie|vue ») et n'est jamais affiché. Dictionnaires : I18N, en fin de fichier.
 let LANG = "fr";
 let LOCALE = "fr-FR";
+let DATE_LOCALE = "fr-FR";
+// Correspondance du réglage HA « Format de date » (profil utilisateur, indépendant de la langue)
+// vers une locale qui force cet ordre jour/mois/année avec Intl : en-GB → JJ/MM/AAAA, en-US →
+// MM/JJ/AAAA, en-CA → AAAA-MM-JJ. "language"/"system" (ou absent) laisse DATE_LOCALE suivre LOCALE.
+const DATE_FORMAT_LOCALE = { DMY: "en-GB", MDY: "en-US", YMD: "en-CA" };
 
 function setLanguage(hass) {
   const lang = (hass && ((hass.locale && hass.locale.language) || hass.language))
@@ -19,12 +24,19 @@ function setLanguage(hass) {
   // hass ne fournit qu'une langue nue ("en", "nl"...), sans région : Intl la résoudrait en
   // locale par défaut (ex. en-US, jj/mm vs mm/jj) au lieu de celle réellement voulue par
   // l'utilisateur. La locale du navigateur, elle, porte la région (ex. fr-BE, nl-BE) ; on la
-  // préfère pour le format des dates/nombres dès qu'elle correspond à la même langue.
+  // préfère pour le format des dates/nombres dès qu'elle correspond à la même langue. Mais le
+  // navigateur peut aussi être réglé dans une langue sans région (ex. Windows en anglais avec une
+  // région Belgique) : dans ce cas, seul le réglage explicite de HA (ci-dessous) peut corriger l'ordre.
   const browserLocale = navigator.language || lang;
   const locale = browserLocale.slice(0, 2).toLowerCase() === LANG ? browserLocale : lang;
-  if (locale === LOCALE) return;
   LOCALE = locale;
   NUMBER = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Le réglage « Format de date » du profil HA (hass.locale.date_format : DMY/MDY/YMD, ou
+  // language/system pour suivre la langue) est explicite et prioritaire sur toute déduction à
+  // partir de la langue ou du navigateur — c'est le seul endroit où l'utilisateur peut forcer
+  // l'ordre jour/mois/année quand ni HA ni le navigateur ne la devinent correctement.
+  const dateFormat = hass && hass.locale && hass.locale.date_format;
+  DATE_LOCALE = DATE_FORMAT_LOCALE[dateFormat] || LOCALE;
 }
 
 function t(text, vars) {
@@ -459,7 +471,7 @@ function autoEntryDate(date, s) {
 function frDate(iso) {
   const [y, m, d] = String(iso).split("-").map(Number);
   if (!y || !m || !d) return String(iso);
-  return new Date(y, m - 1, d).toLocaleDateString(LOCALE, { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(y, m - 1, d).toLocaleDateString(DATE_LOCALE, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function freqLabel(s) {
