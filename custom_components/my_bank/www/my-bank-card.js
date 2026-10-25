@@ -211,6 +211,8 @@ const STYLE = `
   @keyframes flash { from { background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.25); } to { background: transparent; } }
   .form-actions, .full { grid-column: 1 / -1; }
   .form-actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .att-field { display: flex; flex-direction: column; gap: 4px; }
+  .att-current { font-size: 12px; color: var(--secondary-text-color); }
   .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
   .balance-tile { background: var(--secondary-background-color); border-radius: 8px; padding: 12px; }
   .balance-tile .name { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
@@ -419,6 +421,19 @@ function gridNumber(text) {
 function toNumber(text) {
   const n = Number(String(text ?? "").trim().replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(n) ? n : NaN;
+}
+
+// Justificatif (décision 023) : même limite que l'API (routers/transactions.py, MAX_ATTACHMENT_SIZE),
+// pour prévenir avant l'envoi plutôt qu'après un 422.
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function isoDate(d) {
@@ -953,6 +968,7 @@ class MyBankCard extends HTMLElement {
             <div class="tx-balance">${t("Solde :")} ${fmtAmount(tx.balance_after)}</div>
           </div>
           <div class="tx-actions">
+            ${tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : ""}
             ${this._stateButtonsHtml(tx.state)}
             <button class="edit" title="${t("Modifier")}">✎</button>
             <button class="del" title="${t("Supprimer")}">✕</button>
@@ -1113,8 +1129,33 @@ class MyBankCard extends HTMLElement {
         this._toggleState(row, tx, "point");
       } else if (btn.classList.contains("tx-reco")) {
         this._toggleState(row, tx, "reco");
+      } else if (btn.classList.contains("att")) {
+        this._openAttachment(tx);
       }
     });
+  }
+
+  // Justificatif (décision 023) : un lien s'ouvre directement, un fichier passe par la vue de
+  // l'intégration (/api/my_bank/attachment/…) avec un chemin signé — le jeton de My Bank API
+  // n'est connu que du serveur HA, jamais du navigateur.
+  async _openAttachment(tx) {
+    const att = tx && tx.attachment;
+    if (!att) return;
+    if (att.kind === "link") {
+      window.open(att.url, "_blank", "noopener");
+      return;
+    }
+    try {
+      const signed = await this._hass.connection.sendMessagePromise({
+        type: "auth/sign_path",
+        path: `/api/my_bank/attachment/${tx.id}`,
+        expires: 30,
+      });
+      const url = this._hass.hassUrl ? this._hass.hassUrl(signed.path) : signed.path;
+      window.open(url, "_blank", "noopener");
+    } catch (err) {
+      alert(errMsg(err));
+    }
   }
 
   // Critères sur tous les champs d'une opération ; la plage de dates recharge la liste, le reste filtre sur place.
@@ -1412,6 +1453,20 @@ class MyBankCard extends HTMLElement {
         <label class="check" data-f="state"><input type="checkbox" name="pointed" ${tx && tx.state >= 1 ? "checked" : ""}>${t("Pointée")}</label>
         <label class="check" data-f="state"><input type="checkbox" name="reconciled" ${tx && tx.state === 2 ? "checked" : ""}>${t("Rapprochée")}</label>
         <label data-f="notes">${t("Notes")}<input type="text" name="notes" value="${esc(tx ? tx.notes || "" : "")}"></label>
+        <div class="full att-field" data-f="attachment">
+          <label>${t("Justificatif")}
+            <select name="att_kind">
+              <option value="" ${!tx || !tx.attachment ? "selected" : ""}>${t("Aucun")}</option>
+              <option value="link" ${tx && tx.attachment && tx.attachment.kind === "link" ? "selected" : ""}>${t("Lien")}</option>
+              <option value="file" ${tx && tx.attachment && tx.attachment.kind === "file" ? "selected" : ""}>${t("Fichier")}</option>
+            </select>
+          </label>
+          <input type="url" name="att_url" class="att-url" placeholder="https://…" style="display: none" value="${esc(tx && tx.attachment && tx.attachment.kind === "link" ? tx.attachment.url : "")}">
+          <div class="att-file-box" style="display: none">
+            <input type="file" name="att_file" class="att-file">
+            ${tx && tx.attachment && tx.attachment.kind === "file" ? `<span class="att-current">${t("Fichier actuel : {name} (choisir un autre fichier le remplace)", { name: esc(tx.attachment.filename) })}</span>` : ""}
+          </div>
+        </div>
         <div class="form-actions">
           <button type="submit">${tx ? t("Enregistrer") : t("Créer")}</button>
           <button type="button" class="secondary toggle-split" data-f="split">${t("Ventiler")}</button>
@@ -1465,6 +1520,13 @@ class MyBankCard extends HTMLElement {
       $(".f-transfer").style.display = transfer ? "" : "none";
     };
     syncType();
+    const syncAttachment = () => {
+      const kind = $('[name="att_kind"]').value;
+      $(".att-url").style.display = kind === "link" ? "" : "none";
+      $(".att-file-box").style.display = kind === "file" ? "" : "none";
+    };
+    syncAttachment();
+    $('[name="att_kind"]').addEventListener("change", syncAttachment);
     if (tx && tx.splits.length > 1) setSplitMode(true, tx.splits);
 
     $('[name="type"]').addEventListener("change", syncType);
@@ -1538,6 +1600,33 @@ class MyBankCard extends HTMLElement {
         alert(t("Montant invalide (saisir un montant positif ; le type indique le sens)."));
         return;
       }
+      // Justificatif : action à appliquer après l'enregistrement de l'opération (null = rien à changer).
+      const attKind = $('[name="att_kind"]').value;
+      let attachmentAction = null;
+      if (attKind === "") {
+        if (tx && tx.attachment) attachmentAction = { action: "remove" };
+      } else if (attKind === "link") {
+        const url = $('[name="att_url"]').value.trim();
+        if (!url) {
+          alert(t("Indiquer un lien pour le justificatif, ou choisir « Aucun »."));
+          return;
+        }
+        if (!tx || !tx.attachment || tx.attachment.kind !== "link" || tx.attachment.url !== url) {
+          attachmentAction = { action: "set", kind: "link", url };
+        }
+      } else {
+        const file = $('[name="att_file"]').files[0];
+        if (file) {
+          if (file.size > MAX_ATTACHMENT_BYTES) {
+            alert(t("Le fichier dépasse {n} Mio.", { n: Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024) }));
+            return;
+          }
+          attachmentAction = { action: "set", kind: "file", file };
+        } else if (!tx || !tx.attachment || tx.attachment.kind !== "file") {
+          alert(t("Choisir un fichier pour le justificatif, ou choisir « Aucun »."));
+          return;
+        }
+      }
       const signed = (sign() * amount).toFixed(2);
       const optId = (name) => ($(`[name="${name}"]`).value ? Number($(`[name="${name}"]`).value) : null);
       const text = (name) => $(`[name="${name}"]`).value.trim() || null;
@@ -1606,7 +1695,23 @@ class MyBankCard extends HTMLElement {
       const submit = form.querySelector('button[type="submit"]');
       submit.disabled = true;
       try {
-        await this._call(service, payload, false);
+        // Virement créé : la jambe sur le compte choisi est celle qui porte le justificatif.
+        const result = await this._call(service, payload, !tx && !!attachmentAction);
+        if (attachmentAction) {
+          const txId = tx ? tx.id : service === "create_transfer" ? result[type === "transfer_out" ? "source" : "destination"].id : result.id;
+          if (attachmentAction.action === "remove") {
+            await this._call("delete_transaction_attachment", { transaction_id: txId }, false);
+          } else if (attachmentAction.kind === "link") {
+            await this._call("set_transaction_attachment_link", { transaction_id: txId, url: attachmentAction.url }, false);
+          } else {
+            await this._call("set_transaction_attachment_file", {
+              transaction_id: txId,
+              filename: attachmentAction.file.name,
+              content_base64: await fileToBase64(attachmentAction.file),
+              mime_type: attachmentAction.file.type || undefined,
+            }, false);
+          }
+        }
         if (opts.onSaved) {
           opts.onSaved({ service, payload, accountId });
           return;
@@ -3611,6 +3716,7 @@ const ENTRY_FIELDS = [
   ["split", "Ventilation"],
   ["state", "Pointée / rapprochée"],
   ["notes", "Notes"],
+  ["attachment", "Justificatif"],
 ].map(([key, label]) => ({ key, get label() { return t(label); } }));
 const BUDGET_PERIODS = translated({ month: "Mois en cours", cumul: "Du début du budget au mois en cours", all: "Toute la période" });
 const SIMPLE_REFRESH_MS = 5 * 60 * 1000;
@@ -4070,31 +4176,47 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
     }
     occurrences.forEach((o) => {
       const b = buckets.find((x) => o.date >= x.from && o.date <= x.to);
-      if (b) b.total += Math.abs(Number(o.amount));
+      // Somme signée (dépense négative, recette positive) : une rentrée ne s'ajoute pas à une charge,
+      // elle la compense — sans ça, une semaine avec salaire + loyer affichait leur somme, pas leur solde.
+      if (b) b.total += Number(o.amount);
     });
     return buckets;
   }
 
   _paintBarChart(host, buckets) {
     const W = 560, H = 190, pad = { l: 8, r: 8, t: 22, b: 24 };
-    const max = Math.max(...buckets.map((b) => b.total), 1) * 1.15;
+    const avail = H - pad.t - pad.b;
+    const maxPos = Math.max(0, ...buckets.map((b) => b.total));
+    const maxNeg = Math.max(0, ...buckets.map((b) => -b.total));
+    // Axe du zéro placé selon la part de recettes et de dépenses (tout en bas s'il n'y a que des dépenses,
+    // comme avant ; au milieu si les deux cohabitent) ; chaque sens garde sa propre marge de 15 %.
+    const span = (maxPos + maxNeg) * 1.15 || 1;
+    const scale = avail / span;
+    const zeroY = maxPos + maxNeg ? pad.t + avail * ((maxPos * 1.15) / span) : H - pad.b;
     const bw = ((W - pad.l - pad.r) / buckets.length) * 0.6;
     const x = (i) => pad.l + (i + 0.5) * ((W - pad.l - pad.r) / buckets.length);
-    const y = (v) => H - pad.b - (v / max) * (H - pad.t - pad.b);
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
-    svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: H - pad.b, y2: H - pad.b, class: "chart-grid" }));
+    svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: zeroY, y2: zeroY, class: "chart-grid" }));
     buckets.forEach((b, i) => {
-      const top = y(b.total);
-      const r = svgEl("rect", { x: x(i) - bw / 2, y: top, width: bw, height: Math.max(0, H - pad.b - top), rx: 2, fill: "var(--primary-color)", opacity: "0.65" });
+      const h = Math.abs(b.total) * scale;
+      const top = b.total >= 0 ? zeroY - h : zeroY;
+      const color = b.total > 0 ? "var(--success-color, #43a047)" : "var(--error-color, #db4437)";
+      const r = svgEl("rect", { x: x(i) - bw / 2, y: top, width: bw, height: Math.max(0, h), rx: 2, fill: color, opacity: "0.65" });
       svg.appendChild(r);
       const lbl = svgEl("text", { x: x(i), y: H - 8, class: "chart-tick", "text-anchor": "middle" });
       lbl.textContent = b.label;
       svg.appendChild(lbl);
       if (b.total) {
         // Étiquette toujours visible (pas seulement au survol) : la carte vise d'abord un tableau de bord
-        // tactile, sans pointeur pour déclencher une infobulle.
-        const amt = svgEl("text", { x: x(i), y: Math.max(top - 4, pad.t - 6), class: "chart-label", "text-anchor": "middle" });
-        amt.textContent = `${fmtAmount(b.total)} €`;
+        // tactile, sans pointeur pour déclencher une infobulle. Au-dessus de la barre si positive, en
+        // dessous si négative (la barre descend alors sous l'axe du zéro).
+        const amt = svgEl("text", {
+          x: x(i),
+          y: b.total >= 0 ? Math.max(top - 4, pad.t - 6) : Math.min(top + h + 12, H - pad.b + 6),
+          class: "chart-label",
+          "text-anchor": "middle",
+        });
+        amt.textContent = `${b.total > 0 ? "+" : ""}${fmtAmount(b.total)} €`;
         svg.appendChild(amt);
       }
     });
@@ -4454,6 +4576,7 @@ const I18N = {
     "Archivé": "Archived",
     "Attention : « {target} » est de type {targetKind}, « {name} » de type {kind} (les suivis de budget changent).": "Warning: “{target}” is of type {targetKind}, “{name}” of type {kind} (budget tracking will change).",
     "Au": "To",
+    "Aucun": "None",
     "Aucun budget ne couvre le mois en cours.": "No budget covers the current month.",
     "Aucun budget. Un budget suit un compte : montants prévus par rubrique et par mois, puis réalisé et écarts.": "No budget. A budget follows one account: planned amounts per category and month, then actuals and variances.",
     "Aucun compte partagé en cours. Un compte partagé réunit les dépenses communes d'un groupe (vacances…) pour les équilibrer.": "No open shared account. A shared account gathers a group's common expenses (holidays…) to settle them.",
@@ -4487,6 +4610,7 @@ const I18N = {
     "Chargement…": "Loading…",
     "Choisir l'autre compte du virement.": "Choose the other account of the transfer.",
     "Choisir l'élément qui reçoit les opérations.": "Choose the item that receives the transactions.",
+    "Choisir un fichier pour le justificatif, ou choisir « Aucun ».": "Choose a file for the attachment, or choose “None”.",
     "Classe": "Class",
     "Classes": "Classes",
     "Clôturer et équilibrer": "Close and settle",
@@ -4539,6 +4663,8 @@ const I18N = {
     "Enregistrer par défaut": "Save as default",
     "Espèces": "Cash",
     "Fermer": "Close",
+    "Fichier": "File",
+    "Fichier actuel : {name} (choisir un autre fichier le remplace)": "Current file: {name} (choosing another file replaces it)",
     "Fin": "End",
     "Historique du solde d'un ou plusieurs comptes (ligne), période réglable.": "History of one or more accounts' balance (line chart), adjustable period.",
     "Horizon": "Horizon",
@@ -4547,16 +4673,20 @@ const I18N = {
     "Inclure les opérations rapprochées (les soldes rapprochés des deux comptes changent)": "Include reconciled transactions (the reconciled balances of both accounts change)",
     "Indifférent": "Any",
     "Indiquer la première échéance et la fin": "Enter the first occurrence and the end",
+    "Indiquer un lien pour le justificatif, ou choisir « Aucun ».": "Enter a link for the attachment, or choose “None”.",
     "Jamais": "Never",
     "Jours d'anticipation": "Days in advance",
     "Jusqu'à la fin du mois précédent": "Up to the end of last month",
+    "Justificatif": "Attachment",
     "L'échéancier « {label} » arrive à terme : dernière échéance le {date} ({when})": "The instalment plan “{label}” is ending: last instalment on {date} ({when})",
     "La planification a été enregistrée : vérifier ses montants (Échéances).": "The scheduled transaction was saved: check its amounts (Occurrences).",
     "La planification a été enregistrée mais laissée inactive : vérifier ses montants (Échéances) puis la réactiver.": "The scheduled transaction was saved but left inactive: check its amounts (Occurrences), then reactivate it.",
     "La planification « {label} » arrive à terme : dernière échéance le {date} ({when})": "The scheduled transaction “{label}” is ending: last occurrence on {date} ({when})",
+    "Le fichier dépasse {n} Mio.": "The file is over {n} MiB.",
     "Le mois en cours est hors du budget.": "The current month is outside the budget.",
     "Libellé": "Description",
     "Libellé / notes": "Description / notes",
+    "Lien": "Link",
     "Ligne": "Line",
     "Masquer cette alerte": "Hide this alert",
     "Mobile": "Mobile",
@@ -4602,6 +4732,7 @@ const I18N = {
     "Opérations": "Transactions",
     "Opérations planifiées": "Scheduled transactions",
     "Oui": "Yes",
+    "Ouvrir le justificatif": "Open the attachment",
     "Par défaut : le tiers": "Default: the payee",
     "Parent": "Parent",
     "Part": "Share",
@@ -4921,6 +5052,7 @@ const I18N = {
     "Archivé": "Archiviert",
     "Attention : « {target} » est de type {targetKind}, « {name} » de type {kind} (les suivis de budget changent).": "Achtung: „{target}“ ist vom Typ {targetKind}, „{name}“ vom Typ {kind} (die Budgetauswertung ändert sich).",
     "Au": "Bis",
+    "Aucun": "Keiner",
     "Aucun budget ne couvre le mois en cours.": "Kein Budget deckt den aktuellen Monat ab.",
     "Aucun budget. Un budget suit un compte : montants prévus par rubrique et par mois, puis réalisé et écarts.": "Kein Budget. Ein Budget gehört zu einem Konto: geplante Beträge je Kategorie und Monat, dann Ist-Werte und Abweichungen.",
     "Aucun compte partagé en cours. Un compte partagé réunit les dépenses communes d'un groupe (vacances…) pour les équilibrer.": "Kein offenes geteiltes Konto. Ein geteiltes Konto sammelt die gemeinsamen Ausgaben einer Gruppe (Urlaub…), um sie auszugleichen.",
@@ -4954,6 +5086,7 @@ const I18N = {
     "Chargement…": "Wird geladen…",
     "Choisir l'autre compte du virement.": "Das andere Konto der Umbuchung auswählen.",
     "Choisir l'élément qui reçoit les opérations.": "Das Ziel für die Buchungen auswählen.",
+    "Choisir un fichier pour le justificatif, ou choisir « Aucun ».": "Eine Datei für den Beleg wählen, oder „Keiner“ wählen.",
     "Classe": "Klasse",
     "Classes": "Klassen",
     "Clôturer et équilibrer": "Abschließen und ausgleichen",
@@ -5006,6 +5139,8 @@ const I18N = {
     "Enregistrer par défaut": "Als Standard speichern",
     "Espèces": "Bargeld",
     "Fermer": "Schließen",
+    "Fichier": "Datei",
+    "Fichier actuel : {name} (choisir un autre fichier le remplace)": "Aktuelle Datei: {name} (eine andere Datei wählen ersetzt sie)",
     "Fin": "Ende",
     "Historique du solde d'un ou plusieurs comptes (ligne), période réglable.": "Verlauf des Kontostands eines oder mehrerer Konten (Liniendiagramm), einstellbarer Zeitraum.",
     "Horizon": "Zeithorizont",
@@ -5014,16 +5149,20 @@ const I18N = {
     "Inclure les opérations rapprochées (les soldes rapprochés des deux comptes changent)": "Abgestimmte Buchungen einschließen (die abgestimmten Salden beider Konten ändern sich)",
     "Indifférent": "Egal",
     "Indiquer la première échéance et la fin": "Erste Ausführung und Ende angeben",
+    "Indiquer un lien pour le justificatif, ou choisir « Aucun ».": "Einen Link für den Beleg angeben, oder „Keiner“ wählen.",
     "Jamais": "Nie",
     "Jours d'anticipation": "Tage im Voraus",
     "Jusqu'à la fin du mois précédent": "Bis Ende des Vormonats",
+    "Justificatif": "Beleg",
     "L'échéancier « {label} » arrive à terme : dernière échéance le {date} ({when})": "Der Ratenplan „{label}“ läuft aus: letzte Rate am {date} ({when})",
     "La planification a été enregistrée : vérifier ses montants (Échéances).": "Der Dauerauftrag wurde gespeichert: Beträge prüfen (Ausführungen).",
     "La planification a été enregistrée mais laissée inactive : vérifier ses montants (Échéances) puis la réactiver.": "Der Dauerauftrag wurde gespeichert, bleibt aber inaktiv: Beträge prüfen (Ausführungen) und ihn wieder aktivieren.",
     "La planification « {label} » arrive à terme : dernière échéance le {date} ({when})": "Der Dauerauftrag „{label}“ läuft aus: letzte Ausführung am {date} ({when})",
+    "Le fichier dépasse {n} Mio.": "Die Datei überschreitet {n} MiB.",
     "Le mois en cours est hors du budget.": "Der aktuelle Monat liegt außerhalb des Budgets.",
     "Libellé": "Buchungstext",
     "Libellé / notes": "Text / Notizen",
+    "Lien": "Link",
     "Ligne": "Zeile",
     "Masquer cette alerte": "Diesen Hinweis ausblenden",
     "Mobile": "Mobil",
@@ -5069,6 +5208,7 @@ const I18N = {
     "Opérations": "Buchungen",
     "Opérations planifiées": "Daueraufträge",
     "Oui": "Ja",
+    "Ouvrir le justificatif": "Beleg öffnen",
     "Par défaut : le tiers": "Standard: der Empfänger",
     "Parent": "Übergeordnet",
     "Part": "Anteil",
@@ -5388,6 +5528,7 @@ const I18N = {
     "Archivé": "Archivado",
     "Attention : « {target} » est de type {targetKind}, « {name} » de type {kind} (les suivis de budget changent).": "Atención: «{target}» es de tipo {targetKind}, «{name}» de tipo {kind} (cambiará el seguimiento del presupuesto).",
     "Au": "Hasta",
+    "Aucun": "Ninguno",
     "Aucun budget ne couvre le mois en cours.": "Ningún presupuesto cubre el mes actual.",
     "Aucun budget. Un budget suit un compte : montants prévus par rubrique et par mois, puis réalisé et écarts.": "No hay ningún presupuesto. Cada presupuesto está asociado a una cuenta: importes previstos por categoría y mes, y después importes reales y desviaciones.",
     "Aucun compte partagé en cours. Un compte partagé réunit les dépenses communes d'un groupe (vacances…) pour les équilibrer.": "No hay ninguna cuenta compartida abierta. Una cuenta compartida reúne los gastos comunes de un grupo (vacaciones…) para saldarlos.",
@@ -5421,6 +5562,7 @@ const I18N = {
     "Chargement…": "Cargando…",
     "Choisir l'autre compte du virement.": "Elige la otra cuenta de la transferencia.",
     "Choisir l'élément qui reçoit les opérations.": "Elige el elemento que recibirá las operaciones.",
+    "Choisir un fichier pour le justificatif, ou choisir « Aucun ».": "Elige un archivo para el justificante, o elige «Ninguno».",
     "Classe": "Clase",
     "Classes": "Clases",
     "Clôturer et équilibrer": "Cerrar y saldar",
@@ -5473,6 +5615,8 @@ const I18N = {
     "Enregistrer par défaut": "Guardar como predeterminado",
     "Espèces": "Efectivo",
     "Fermer": "Cerrar",
+    "Fichier": "Archivo",
+    "Fichier actuel : {name} (choisir un autre fichier le remplace)": "Archivo actual: {name} (elegir otro archivo lo sustituye)",
     "Fin": "Fin",
     "Historique du solde d'un ou plusieurs comptes (ligne), période réglable.": "Historial del saldo de una o varias cuentas (gráfico de líneas), con periodo configurable.",
     "Horizon": "Horizonte",
@@ -5481,16 +5625,20 @@ const I18N = {
     "Inclure les opérations rapprochées (les soldes rapprochés des deux comptes changent)": "Incluir las operaciones conciliadas (cambiarán los saldos conciliados de ambas cuentas)",
     "Indifférent": "Cualquiera",
     "Indiquer la première échéance et la fin": "Indicar el primer vencimiento y el final",
+    "Indiquer un lien pour le justificatif, ou choisir « Aucun ».": "Indica un enlace para el justificante, o elige «Ninguno».",
     "Jamais": "Nunca",
     "Jours d'anticipation": "Días de antelación",
     "Jusqu'à la fin du mois précédent": "Hasta el final del mes anterior",
+    "Justificatif": "Justificante",
     "L'échéancier « {label} » arrive à terme : dernière échéance le {date} ({when})": "El plan de pagos «{label}» está a punto de terminar: último vencimiento el {date} ({when})",
     "La planification a été enregistrée : vérifier ses montants (Échéances).": "La operación programada se ha guardado: revisa sus importes (Vencimientos).",
     "La planification a été enregistrée mais laissée inactive : vérifier ses montants (Échéances) puis la réactiver.": "La operación programada se ha guardado, pero está inactiva: revisa sus importes (Vencimientos) y vuelve a activarla.",
     "La planification « {label} » arrive à terme : dernière échéance le {date} ({when})": "La operación programada «{label}» está a punto de terminar: último vencimiento el {date} ({when})",
+    "Le fichier dépasse {n} Mio.": "El archivo supera los {n} MiB.",
     "Le mois en cours est hors du budget.": "El mes actual queda fuera del presupuesto.",
     "Libellé": "Descripción",
     "Libellé / notes": "Descripción / notas",
+    "Lien": "Enlace",
     "Ligne": "Línea",
     "Masquer cette alerte": "Ocultar esta alerta",
     "Mobile": "Móvil",
@@ -5536,6 +5684,7 @@ const I18N = {
     "Opérations": "Operaciones",
     "Opérations planifiées": "Operaciones programadas",
     "Oui": "Sí",
+    "Ouvrir le justificatif": "Abrir el justificante",
     "Par défaut : le tiers": "Predeterminado: el beneficiario",
     "Parent": "Superior",
     "Part": "Parte",

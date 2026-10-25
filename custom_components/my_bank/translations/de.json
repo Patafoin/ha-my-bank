@@ -771,6 +771,52 @@
         }
       }
     },
+    "delete_transaction_attachment": {
+      "name": "Beleg einer Buchung entfernen",
+      "description": "Entfernt den Beleg (Link oder Datei) einer Buchung, falls vorhanden.",
+      "fields": {
+        "transaction_id": {
+          "name": "Buchung",
+          "description": "ID der Buchung."
+        }
+      }
+    },
+    "set_transaction_attachment_link": {
+      "name": "Beleg einer Buchung setzen (Link)",
+      "description": "Verknüpft einen Link mit einer Buchung und ersetzt einen bestehenden Beleg.",
+      "fields": {
+        "transaction_id": {
+          "name": "Buchung",
+          "description": "ID der Buchung."
+        },
+        "url": {
+          "name": "Link",
+          "description": "Link zum Dokument."
+        }
+      }
+    },
+    "set_transaction_attachment_file": {
+      "name": "Beleg einer Buchung setzen (Datei)",
+      "description": "Verknüpft eine Datei mit einer Buchung und ersetzt einen bestehenden Beleg. Die Datei wird in My Bank API gespeichert.",
+      "fields": {
+        "transaction_id": {
+          "name": "Buchung",
+          "description": "ID der Buchung."
+        },
+        "filename": {
+          "name": "Dateiname",
+          "description": "Name, der beim Öffnen des Belegs angezeigt wird."
+        },
+        "content_base64": {
+          "name": "Inhalt",
+          "description": "Roher Dateiinhalt, base64-kodiert."
+        },
+        "mime_type": {
+          "name": "MIME-Typ",
+          "description": "Inhaltstyp (z. B. application/pdf), damit die Datei korrekt geöffnet wird."
+        }
+      }
+    },
     "create_transfer": {
       "name": "Umbuchung anlegen",
       "description": "Bucht Geld zwischen zwei Konten um: zwei verbundene Buchungen, jede mit eigenem Status.",

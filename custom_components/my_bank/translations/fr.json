@@ -771,6 +771,52 @@
         }
       }
     },
+    "delete_transaction_attachment": {
+      "name": "Retirer le justificatif d'une opération",
+      "description": "Retire le justificatif (lien ou fichier) d'une opération, s'il y en a un.",
+      "fields": {
+        "transaction_id": {
+          "name": "Opération",
+          "description": "Identifiant de l'opération."
+        }
+      }
+    },
+    "set_transaction_attachment_link": {
+      "name": "Mettre un justificatif (lien)",
+      "description": "Lie un lien à une opération, en remplaçant le justificatif existant s'il y en a un.",
+      "fields": {
+        "transaction_id": {
+          "name": "Opération",
+          "description": "Identifiant de l'opération."
+        },
+        "url": {
+          "name": "Lien",
+          "description": "Lien vers le document."
+        }
+      }
+    },
+    "set_transaction_attachment_file": {
+      "name": "Mettre un justificatif (fichier)",
+      "description": "Lie un fichier à une opération, en remplaçant le justificatif existant s'il y en a un. Le fichier est stocké dans My Bank API.",
+      "fields": {
+        "transaction_id": {
+          "name": "Opération",
+          "description": "Identifiant de l'opération."
+        },
+        "filename": {
+          "name": "Nom du fichier",
+          "description": "Nom affiché à l'ouverture du justificatif."
+        },
+        "content_base64": {
+          "name": "Contenu",
+          "description": "Contenu brut du fichier, encodé en base64."
+        },
+        "mime_type": {
+          "name": "Type MIME",
+          "description": "Type de contenu (par exemple application/pdf), pour ouvrir correctement le fichier."
+        }
+      }
+    },
     "create_transfer": {
       "name": "Créer un virement",
       "description": "Transfère de l'argent entre deux comptes : deux opérations jumelles, chacune avec son état.",

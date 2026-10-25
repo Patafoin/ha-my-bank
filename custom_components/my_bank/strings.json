@@ -771,6 +771,52 @@
         }
       }
     },
+    "delete_transaction_attachment": {
+      "name": "Delete transaction attachment",
+      "description": "Removes the attachment (link or file) of a transaction, if any.",
+      "fields": {
+        "transaction_id": {
+          "name": "Transaction",
+          "description": "Transaction id."
+        }
+      }
+    },
+    "set_transaction_attachment_link": {
+      "name": "Set transaction attachment (link)",
+      "description": "Attaches a link to a transaction, replacing any existing attachment.",
+      "fields": {
+        "transaction_id": {
+          "name": "Transaction",
+          "description": "Transaction id."
+        },
+        "url": {
+          "name": "URL",
+          "description": "Link to the document."
+        }
+      }
+    },
+    "set_transaction_attachment_file": {
+      "name": "Set transaction attachment (file)",
+      "description": "Attaches a file to a transaction, replacing any existing attachment. The file is stored in My Bank API.",
+      "fields": {
+        "transaction_id": {
+          "name": "Transaction",
+          "description": "Transaction id."
+        },
+        "filename": {
+          "name": "File name",
+          "description": "Name shown when the attachment is opened."
+        },
+        "content_base64": {
+          "name": "Content",
+          "description": "Raw file content, base64-encoded."
+        },
+        "mime_type": {
+          "name": "MIME type",
+          "description": "Content type (e.g. application/pdf), used to open the file correctly."
+        }
+      }
+    },
     "create_transfer": {
       "name": "Create transfer",
       "description": "Moves money between two accounts: two twin transactions, each with its own state.",

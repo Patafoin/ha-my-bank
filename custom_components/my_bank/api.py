@@ -69,6 +69,20 @@ class MyBankClient:
     async def get(self, path: str, params: dict | None = None) -> Any:
         return await self._request("GET", path, params=params)
 
+    async def get_raw(self, path: str) -> tuple[bytes, str, str | None]:
+        """GET returning raw bytes, content-type and Content-Disposition, for a file download."""
+        try:
+            async with asyncio.timeout(_TIMEOUT):
+                resp = await self._session.request("GET", f"{self._base}/{path}", headers=self._headers)
+                content = await resp.read()
+        except (ClientError, TimeoutError) as err:
+            raise MyBankApiError(f"My Bank API unreachable: {err}") from err
+        if resp.status == 401:
+            raise MyBankAuthError("My Bank API rejected the token")
+        if resp.status >= 400:
+            raise MyBankApiError(_detail(content.decode(errors="replace")))
+        return content, resp.content_type, resp.headers.get("Content-Disposition")
+
     async def post(self, path: str, data: dict) -> Any:
         return await self._request("POST", path, json=data)
 

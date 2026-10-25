@@ -712,6 +712,43 @@ set_transactions_state:
           - '1'
           - '2'
           translation_key: transaction_state
+delete_transaction_attachment:
+  fields:
+    transaction_id:
+      required: true
+      selector:
+        number:
+          mode: box
+set_transaction_attachment_link:
+  fields:
+    transaction_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    url:
+      required: true
+      selector:
+        text: {}
+set_transaction_attachment_file:
+  fields:
+    transaction_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    filename:
+      required: true
+      selector:
+        text: {}
+    content_base64:
+      required: true
+      selector:
+        text: {}
+    mime_type:
+      required: false
+      selector:
+        text: {}
 create_transfer:
   fields:
     from_account_id:

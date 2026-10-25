@@ -771,6 +771,52 @@
         }
       }
     },
+    "delete_transaction_attachment": {
+      "name": "Quitar el justificante de un movimiento",
+      "description": "Quita el justificante (enlace o archivo) de un movimiento, si tiene uno.",
+      "fields": {
+        "transaction_id": {
+          "name": "Movimiento",
+          "description": "Identificador del movimiento."
+        }
+      }
+    },
+    "set_transaction_attachment_link": {
+      "name": "Añadir justificante (enlace)",
+      "description": "Vincula un enlace a un movimiento, reemplazando el justificante existente si lo hay.",
+      "fields": {
+        "transaction_id": {
+          "name": "Movimiento",
+          "description": "Identificador del movimiento."
+        },
+        "url": {
+          "name": "Enlace",
+          "description": "Enlace al documento."
+        }
+      }
+    },
+    "set_transaction_attachment_file": {
+      "name": "Añadir justificante (archivo)",
+      "description": "Vincula un archivo a un movimiento, reemplazando el justificante existente si lo hay. El archivo se guarda en My Bank API.",
+      "fields": {
+        "transaction_id": {
+          "name": "Movimiento",
+          "description": "Identificador del movimiento."
+        },
+        "filename": {
+          "name": "Nombre del archivo",
+          "description": "Nombre mostrado al abrir el justificante."
+        },
+        "content_base64": {
+          "name": "Contenido",
+          "description": "Contenido bruto del archivo, codificado en base64."
+        },
+        "mime_type": {
+          "name": "Tipo MIME",
+          "description": "Tipo de contenido (por ejemplo application/pdf), para abrir el archivo correctamente."
+        }
+      }
+    },
     "create_transfer": {
       "name": "Crear transferencia",
       "description": "Transfiere dinero entre dos cuentas: crea dos movimientos vinculados, cada uno con su propio estado.",

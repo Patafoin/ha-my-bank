@@ -23,6 +23,7 @@ from .api import MyBankApiError, MyBankClient
 from .const import CONF_TOKEN, DEFAULT_PAYMENT_METHODS, DEFAULT_URL, DOMAIN, MIN_API_VERSION
 from .coordinator import MyBankCoordinator
 from .frontend import async_register_frontend
+from .views import async_register_view
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Register the services and the card once, independently of any entry."""
     _register_services(hass)
     await async_register_frontend(hass)
+    await async_register_view(hass)
     return True
 
 
@@ -208,6 +210,15 @@ _BUDGET_FIELDS = {
     vol.Optional("notes"): _TEXT,
 }
 _BUDGET_LINE = vol.Schema({vol.Required("category_id"): _ID, vol.Required("month"): _MONTH, vol.Required("amount"): _AMOUNT})
+_ATTACHMENT_LINK = vol.Schema({vol.Required("transaction_id"): _ID, vol.Required("url"): cv.string})
+_ATTACHMENT_FILE = vol.Schema(
+    {
+        vol.Required("transaction_id"): _ID,
+        vol.Required("filename"): cv.string,
+        vol.Required("content_base64"): cv.string,
+        vol.Optional("mime_type"): cv.string,
+    }
+)
 
 # (service, schema, HTTP method, path template — its {placeholders} are taken out of the body)
 _WRITE_SERVICES: list[tuple[str, vol.Schema, str, str]] = [
@@ -231,6 +242,7 @@ _WRITE_SERVICES: list[tuple[str, vol.Schema, str, str]] = [
     ("delete_transaction", vol.Schema({vol.Required("transaction_id"): _ID}), "DELETE", "transactions/{transaction_id}"),
     ("set_transaction_state", vol.Schema({vol.Required("transaction_id"): _ID, vol.Required("state"): _STATE}), "PATCH", "transactions/{transaction_id}/state"),
     ("set_transactions_state", vol.Schema({vol.Required("ids"): [_ID], vol.Required("state"): _STATE}), "POST", "transactions/state"),
+    ("delete_transaction_attachment", vol.Schema({vol.Required("transaction_id"): _ID}), "DELETE", "transactions/{transaction_id}/attachment"),
     (
         "create_transfer",
         vol.Schema(
@@ -401,6 +413,21 @@ def _register_services(hass: HomeAssistant) -> None:
 
         return handler
 
+    def make_attachment_write(kind: str):
+        # `kind` fixe le discriminant de l'API ; pas de template générique car il n'est pas un champ saisi par l'appelant.
+        async def handler(call: ServiceCall) -> ServiceResponse:
+            coordinator = _coordinator(hass)
+            body = dict(call.data)
+            tx_id = body.pop("transaction_id")
+            try:
+                result = await coordinator.client.put(f"transactions/{tx_id}/attachment", {"kind": kind, **body})
+            except MyBankApiError as err:
+                raise HomeAssistantError(str(err)) from err
+            await coordinator.async_request_refresh()
+            return _as_response(result)
+
+        return handler
+
     def make_read(template: str):
         async def handler(call: ServiceCall) -> ServiceResponse:
             coordinator = _coordinator(hass)
@@ -415,6 +442,13 @@ def _register_services(hass: HomeAssistant) -> None:
     for name, schema, method, template in _WRITE_SERVICES:
         hass.services.async_register(
             DOMAIN, name, make_write(method, template), schema=schema, supports_response=SupportsResponse.OPTIONAL
+        )
+    for name, kind, schema in (
+        ("set_transaction_attachment_link", "link", _ATTACHMENT_LINK),
+        ("set_transaction_attachment_file", "file", _ATTACHMENT_FILE),
+    ):
+        hass.services.async_register(
+            DOMAIN, name, make_attachment_write(kind), schema=schema, supports_response=SupportsResponse.OPTIONAL
         )
     for name, schema, template in _READ_SERVICES:
         hass.services.async_register(

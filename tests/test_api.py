@@ -60,3 +60,21 @@ async def test_connection_error(hass, aioclient_mock, client):
     aioclient_mock.get(f"{API}/accounts", exc=TimeoutError())
     with pytest.raises(MyBankApiError, match="unreachable"):
         await client.get("accounts")
+
+
+async def test_get_raw_returns_content_type_and_filename(hass, aioclient_mock, client):
+    aioclient_mock.get(
+        f"{API}/transactions/1/attachment/content",
+        content=b"%PDF-1.4 fake",
+        headers={"Content-Type": "application/pdf", "Content-Disposition": 'inline; filename="facture.pdf"'},
+    )
+    content, content_type, disposition = await client.get_raw("transactions/1/attachment/content")
+    assert content == b"%PDF-1.4 fake"
+    assert content_type == "application/pdf"
+    assert disposition == 'inline; filename="facture.pdf"'
+
+
+async def test_get_raw_404(hass, aioclient_mock, client):
+    aioclient_mock.get(f"{API}/transactions/1/attachment/content", status=404, json={"detail": "Justificatif 1 introuvable"})
+    with pytest.raises(MyBankApiError, match="Justificatif"):
+        await client.get_raw("transactions/1/attachment/content")
