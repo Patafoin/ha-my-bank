@@ -15,9 +15,15 @@ let LOCALE = "fr-FR";
 function setLanguage(hass) {
   const lang = (hass && ((hass.locale && hass.locale.language) || hass.language))
     || document.documentElement.lang || navigator.language || "fr";
-  if (lang === LOCALE) return;
-  LOCALE = lang;
   LANG = lang.slice(0, 2).toLowerCase();
+  // hass ne fournit qu'une langue nue ("en", "nl"...), sans région : Intl la résoudrait en
+  // locale par défaut (ex. en-US, jj/mm vs mm/jj) au lieu de celle réellement voulue par
+  // l'utilisateur. La locale du navigateur, elle, porte la région (ex. fr-BE, nl-BE) ; on la
+  // préfère pour le format des dates/nombres dès qu'elle correspond à la même langue.
+  const browserLocale = navigator.language || lang;
+  const locale = browserLocale.slice(0, 2).toLowerCase() === LANG ? browserLocale : lang;
+  if (locale === LOCALE) return;
+  LOCALE = locale;
   NUMBER = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -249,6 +255,7 @@ const STYLE = `
   .tx-amount.debit { color: var(--error-color, #db4437); }
   .tx-balance { font-size: 11px; color: var(--secondary-text-color); }
   .tx-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .att-slot { display: inline-flex; justify-content: flex-start; width: 44px; flex-shrink: 0; }
   .tx-actions button.tx-state { border: 1px solid var(--divider-color); border-radius: 4px; line-height: 1; opacity: 0.45; }
   .tx-actions button.tx-state.on { color: var(--primary-color); border-color: var(--primary-color); opacity: 1; }
   .tx-row.editing { display: none; }
@@ -948,7 +955,7 @@ class MyBankCard extends HTMLElement {
     return p ? p.name : "";
   }
 
-  _txRowHtml(tx) {
+  _txRowHtml(tx, reserveAttachmentSlot) {
     const today = isoDate(new Date());
     const credit = Number(tx.amount) > 0;
     const method = this._lookups.method.get(tx.payment_method_id);
@@ -968,7 +975,9 @@ class MyBankCard extends HTMLElement {
             <div class="tx-balance">${t("Solde :")} ${fmtAmount(tx.balance_after)}</div>
           </div>
           <div class="tx-actions">
-            ${tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : ""}
+            ${reserveAttachmentSlot
+              ? `<span class="att-slot">${tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : ""}</span>`
+              : (tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : "")}
             ${this._stateButtonsHtml(tx.state)}
             <button class="edit" title="${t("Modifier")}">✎</button>
             <button class="del" title="${t("Supprimer")}">✕</button>
@@ -1249,6 +1258,9 @@ class MyBankCard extends HTMLElement {
     const f = this._txFilters;
     const active = this._txFilterCount();
     const items = active ? this._txAll.filter((tx) => this._txMatches(tx, f)) : this._txAll;
+    // Dès qu'une opération de la liste a une PJ, toutes les lignes réservent la place du bouton
+    // 📎 (même sans PJ) pour garder les montants alignés entre eux.
+    const reserveAttachmentSlot = items.some((tx) => tx.attachment);
     let lastMonth = null;
     const rowsHtml = items
       .map((tx) => {
@@ -1258,7 +1270,7 @@ class MyBankCard extends HTMLElement {
           lastMonth = month;
           sep = `<div class="month-sep">${esc(monthLabel(month, "long"))}</div>`;
         }
-        return sep + this._txRowHtml(tx);
+        return sep + this._txRowHtml(tx, reserveAttachmentSlot);
       })
       .join("");
     const empty = active ? t("Aucune opération ne correspond aux critères.") : t("Aucune opération sur cette période.");
