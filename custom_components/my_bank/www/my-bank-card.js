@@ -1188,7 +1188,12 @@ class MyBankCard extends HTMLElement {
     });
     filterForm.addEventListener("submit", (ev) => ev.preventDefault());
     filterForm.querySelector(".f-reset").addEventListener("click", () => {
+      // tous les champs du bandeau, y compris les dates (période initiale : mois en cours) et le rapprochement
       this._txFilters = { ...TX_FILTERS };
+      this._txRange = "month";
+      this._txStart = "";
+      this._txEnd = "";
+      this._txRecon = false;
       this._renderActive(true);
     });
     filterForm.querySelector(".f-save-default").addEventListener("click", () => {
