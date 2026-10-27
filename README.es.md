@@ -79,6 +79,8 @@ curl http://localhost:9931/api/v1/health   # the server answers
 
 El token se almacena como hash en la base de datos. Cambia la variable y reinicia para sustituirlo; elimínala para revocarlo. Si prefieres no guardar el token en `compose.yaml`, omite `MYBANK_API_TOKEN` y crea uno dentro del contenedor: `docker exec my-bank-api my-bank token create ha` (solo se muestra una vez).
 
+Si Home Assistant se ejecuta en la misma máquina con `network_mode: host`, publica el puerto solo en la interfaz local (`"127.0.0.1:9931:8000"`) e indica `http://127.0.0.1:9931` en el paso 3: el servidor deja de ser accesible desde el resto de la red. La documentación interactiva de la API (`/docs`) está desactivada por defecto; añade `MYBANK_DOCS: "true"` para consultarla.
+
 Consulta el [README de My Bank API](https://github.com/Patafoin/my-bank-api) para ver todos los ajustes.
 
 ### 2. La integración
@@ -108,7 +110,7 @@ Si las tarjetas no aparecen en el selector después de instalar o actualizar, fu
 |---|---|
 | `dashboard` | Saldos de todas las cuentas y presupuesto del mes actual |
 | `transactions` | Movimientos de una cuenta con saldo acumulado; filtros (que se pueden guardar como predeterminados); añadir, editar, desglosar y transferir; liquidar (☐/☑) y conciliar (🔓/🔒) con un clic; un asistente de conciliación destaca el movimiento que explica una diferencia de saldo; adjuntar un justificante (un enlace, o un archivo guardado por el servidor) a un movimiento, que se abre con un clic (📎) |
-| `accounts` | Cuentas (corriente, ahorro, tarjeta, efectivo…), saldo inicial y cierre |
+| `accounts` | Cuentas (corriente, ahorro, tarjeta, efectivo…), moneda, saldo inicial, cierre, una cuenta predeterminada |
 | `categories` / `tags` | Árbol de categorías (ingresos / gastos / ahorro) y clases, un segundo eje de análisis; consulta [Categorías y clases](#categorías-y-clases) |
 | `payees` | Beneficiarios con categoría predeterminada |
 | `budgets` | Presupuesto mensual por cuenta: previsto frente a real, diferencia y copia de un presupuesto anterior |
@@ -142,7 +144,7 @@ Asigna a cada instancia de la tarjeta sus propios `sections` para crear, por eje
 | `custom:my-bank-balance-card` | `account_id` — los tres saldos de una cuenta |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — entrada rápida, con campos rellenados a partir del beneficiario; el botón «Todos los campos» muestra los campos ocultos |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
-| `custom:my-bank-balance-history-card` | `account_ids`, `period` — historial de saldos (gráfico de líneas) de una o varias cuentas; una tarjeta = un gráfico, combina varias tarjetas para separar cuentas de escalas distintas |
+| `custom:my-bank-balance-history-card` | `account_ids`, `period` — historial de saldos (gráfico de líneas) de una o varias cuentas, misma moneda; una tarjeta = un gráfico, combina varias tarjetas para separar cuentas de escalas o monedas distintas |
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — importe de los próximos movimientos, por semana o por mes según el horizonte |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — gastos por categoría (barras); el importe más alto equivale al 100 % |
 | `custom:my-bank-share-card` | — gastos compartidos |
@@ -186,7 +188,7 @@ Evita asignar solo una clase sin categoría: el análisis por coche seguiría fu
 
 ## Entidades
 
-- **Un sensor por cuenta**: estado = saldo total (incluidos los movimientos con fecha futura); atributos `solde_pointe` (liquidado), `solde_rapproche` (conciliado), `account_id`, `kind`, `iban`, `closed`. Se actualiza cada 5 minutos y después de cada cambio.
+- **Un sensor por cuenta**: estado = saldo total (incluidos los movimientos con fecha futura), en la moneda propia de la cuenta; atributos `solde_pointe` (liquidado), `solde_rapproche` (conciliado), `account_id`, `kind`, `iban`, `closed`, `is_default`. Se actualiza cada 5 minutos y después de cada cambio.
 - **Movimientos programados que terminan** (`sensor.scheduled_transactions_ending` en una instalación en inglés; el ID de la entidad sigue el idioma de Home Assistant cuando se añade la integración): número de movimientos programados cuya última ocurrencia cae dentro de los próximos 30 días, con la lista en los atributos; útil para una automatización de notificaciones.
 
 ## Servicios
@@ -218,6 +220,8 @@ El servidor importa las exportaciones QIF y CSV de beneficiarios de MS Comptes B
 ## Seguridad
 
 Mantén My Bank API en tu red local. No lo expongas nunca a Internet: el acceso remoto se realiza a través de Home Assistant, que ya se encarga de la autenticación.
+
+Solo los **administradores** de Home Assistant pueden modificar los datos (servicios de escritura) o abrir un justificante de archivo; los demás usuarios siguen pudiendo leer saldos y listas. Para que todos puedan modificar los datos, desmarca **Solo los administradores pueden modificar los datos** en las opciones de la integración (Ajustes → Dispositivos y servicios → My Bank → Configurar). Las automatizaciones y scripts no se ven afectados.
 
 ## Traducciones
 

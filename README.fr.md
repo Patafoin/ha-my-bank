@@ -79,6 +79,8 @@ curl http://localhost:9931/api/v1/health   # le serveur répond
 
 Le jeton est stocké haché dans la base. Modifiez la variable et redémarrez pour le remplacer ; retirez-la pour le révoquer. Si vous préférez ne pas garder le jeton dans `compose.yaml`, laissez `MYBANK_API_TOKEN` de côté et créez-en un dans le conteneur : `docker exec my-bank-api my-bank token create ha` (affiché une seule fois).
 
+Si Home Assistant tourne sur la même machine en `network_mode: host`, publiez le port sur l'interface locale seulement (`"127.0.0.1:9931:8000"`) et indiquez `http://127.0.0.1:9931` à l'étape 3 : le serveur n'est alors plus joignable depuis le reste du réseau. La documentation interactive de l'API (`/docs`) est coupée par défaut ; ajoutez `MYBANK_DOCS: "true"` pour la consulter.
+
 Tous les réglages sont décrits dans le [README de My Bank API](https://github.com/Patafoin/my-bank-api/blob/main/README.fr.md).
 
 ### 2. L'intégration
@@ -108,7 +110,7 @@ Si les cartes n'apparaissent pas dans le sélecteur après une installation ou u
 |---|---|
 | `dashboard` | Soldes de tous les comptes, budget du mois en cours |
 | `transactions` | Opérations d'un compte avec solde progressif ; filtres (enregistrables par défaut) ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic ; une aide au rapprochement surligne l'opération qui explique un écart de solde ; lier un justificatif (lien ou fichier conservé par le serveur) à une opération, ouvert en un clic (📎) |
-| `accounts` | Comptes (courant, épargne, carte, espèces…), solde initial, clôture |
+| `accounts` | Comptes (courant, épargne, carte, espèces…), devise, solde initial, clôture, un compte par défaut |
 | `categories` / `tags` | Arborescence des rubriques (recettes / dépenses / épargne) et classes, un second axe d'analyse — voir [Rubriques et classes](#rubriques-et-classes) |
 | `payees` | Tiers avec catégorie par défaut |
 | `budgets` | Budget mensuel par compte : prévu / réalisé, écart, copie d'un budget précédent |
@@ -142,7 +144,7 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 | `custom:my-bank-balance-card` | `account_id` — les trois soldes d'un compte |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — saisie rapide, pré-remplie à partir du tiers ; bouton « Tous les champs » pour afficher les champs masqués |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
-| `custom:my-bank-balance-history-card` | `account_ids`, `period` — évolution du solde (courbe) d'un ou plusieurs comptes ; une carte = un graphique, composer plusieurs cartes pour séparer des comptes d'échelles différentes |
+| `custom:my-bank-balance-history-card` | `account_ids`, `period` — évolution du solde (courbe) d'un ou plusieurs comptes, même devise ; une carte = un graphique, composer plusieurs cartes pour séparer des comptes d'échelles ou de devises différentes |
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — montant des échéances à venir, par semaine ou par mois selon l'horizon |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — dépenses par rubrique (barres), le montant le plus élevé fait 100 % |
 | `custom:my-bank-share-card` | — dépenses partagées |
@@ -186,7 +188,7 @@ Une opération sans rubrique n'apparaît dans aucun de ces suivis.
 
 ## Entités
 
-- **Un capteur par compte** : état = solde total (y compris les opérations à date future) ; attributs `solde_pointe` (pointé), `solde_rapproche` (rapproché), `account_id`, `kind`, `iban`, `closed`. Rafraîchi toutes les 5 minutes et après chaque modification.
+- **Un capteur par compte** : état = solde total (y compris les opérations à date future), dans la devise propre au compte ; attributs `solde_pointe` (pointé), `solde_rapproche` (rapproché), `account_id`, `kind`, `iban`, `closed`, `is_default`. Rafraîchi toutes les 5 minutes et après chaque modification.
 - **Planifications arrivant à terme** (`sensor.planifications_arrivant_a_terme` sur une installation en français ; l'identifiant suit la langue de Home Assistant au moment de l'ajout de l'intégration) : nombre d'opérations planifiées dont la dernière échéance tombe dans les 30 jours, avec la liste en attributs — pratique pour une automatisation de notification.
 
 ## Services
@@ -218,6 +220,8 @@ Le serveur importe les exports QIF et le CSV des tiers de MS Comptes Bancaires �
 ## Sécurité
 
 Gardez My Bank API sur votre réseau local. Ne l'exposez jamais sur Internet : l'accès à distance passe par Home Assistant, qui gère déjà l'authentification.
+
+Seuls les **administrateurs** de Home Assistant peuvent modifier les données (services d'écriture) ou ouvrir un justificatif fichier ; les autres utilisateurs gardent la lecture des soldes et des listes. Pour ouvrir la modification à tous, décochez **Seuls les administrateurs peuvent modifier les données** dans les options de l'intégration (Paramètres → Appareils et services → My Bank → Configurer). Les automatisations et scripts ne sont pas concernés.
 
 ## Traductions
 

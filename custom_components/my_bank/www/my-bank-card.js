@@ -220,7 +220,28 @@ const STYLE = `
   }
   form.entity-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 12px; padding: 12px; background: var(--secondary-background-color); border-radius: 8px; }
   form.entity-form label { display: flex; flex-direction: column; font-size: 12px; color: var(--secondary-text-color); gap: 2px; }
-  form.entity-form label.check { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; }
+  form.entity-form .field-label { display: flex; align-items: center; gap: 4px; }
+  form.entity-form label.check { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+  form.entity-form label.check .hint { flex-basis: 100%; margin: 0; }
+  /* Sans ça, la grille étire la cellule à la hauteur de la ligne (ex. un champ texte voisin plus
+     haut) et la case, plus petite, reste collée en haut au lieu d'être centrée dans cet espace. */
+  form.entity-form label.check:not(.check-aligned) { align-self: center; }
+  /* Variante utilisée par les champs case-à-cocher génériques (_fieldHtml), mêlés dans la grille
+     à des champs texte : même rythme vertical que ceux-ci (ligne de libellé, puis une ligne de la
+     hauteur d'un input) pour que la case démarre au même niveau que ses voisins, au lieu de
+     flotter plus haut dans sa cellule comme avec .check seule (ligne unique, étirée par défaut). */
+  form.entity-form label.check-aligned { flex-direction: column; align-items: stretch; gap: 2px; }
+  form.entity-form label.check-aligned .check-spacer { font-size: 12px; visibility: hidden; }
+  form.entity-form label.check-aligned .check-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; font-size: 14px; }
+  form.entity-form label.check-aligned .hint { flex-basis: auto; }
+  form.entity-form .field-help {
+    background: none; border: 1px solid var(--divider-color); border-radius: 50%; cursor: pointer;
+    width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 14px; color: var(--primary-color);
+    flex-shrink: 0;
+  }
+  form.entity-form .field-help:hover { border-color: var(--primary-color); }
+  form.entity-form .hint { display: none; margin: 0; }
+  form.entity-form .hint.shown { display: block; }
   form.entity-form input[readonly] { opacity: 0.55; cursor: not-allowed; background: var(--secondary-background-color); }
   tr.editing { display: none; }
   tr.form-row > td { padding: 4px 0 8px; }
@@ -418,11 +439,46 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Bouton "i" cliquable à côté du libellé d'un champ de formulaire : affiche/masque le `.hint` du
+// même champ au clic (délégué par `_showForm`), au lieu de l'imposer en permanence sous le champ.
+function fieldHelpButtonHtml(help) {
+  return help ? `<button type="button" class="field-help" aria-label="${esc(t("Aide"))}" title="${esc(t("Aide"))}">i</button>` : "";
+}
+
+function fieldHintHtml(help) {
+  return help ? `<span class="hint">${esc(help)}</span>` : "";
+}
+
 // Amounts come from the API as decimal strings ("-14.80"); displayed in the user's number format.
 function fmtAmount(value) {
   if (value === null || value === undefined || value === "") return "";
   const n = Number(value);
   return Number.isFinite(n) ? esc(NUMBER.format(n)) : esc(value);
+}
+
+// Formateurs Intl « monnaie » mis en cache par devise (et par locale, en cas de changement de langue).
+const MONEY_FORMATTERS = new Map();
+function moneyFormatter(currency) {
+  const key = `${LOCALE}:${currency}`;
+  let f = MONEY_FORMATTERS.get(key);
+  if (!f) {
+    try {
+      f = new Intl.NumberFormat(LOCALE, { style: "currency", currency });
+    } catch (err) {
+      // Code devise invalide (ne devrait pas arriver, l'API le valide) : nombre nu plutôt qu'une exception.
+      f = NUMBER;
+    }
+    MONEY_FORMATTERS.set(key, f);
+  }
+  return f;
+}
+
+// Comme fmtAmount, mais avec le symbole/la position/les séparateurs propres à la devise du compte
+// (ex. 1 234,56 € en EUR, $1,234.56 en USD) plutôt qu'un € systématique.
+function fmtMoney(value, currency) {
+  if (value === null || value === undefined || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? esc(moneyFormatter(currency || "EUR").format(n)) : esc(value);
 }
 
 // For an <input>: "14,80" in French or German, "14.80" otherwise (the API accepts both).
@@ -591,6 +647,22 @@ class MyBankCard extends HTMLElement {
       account: byId(accounts), category: byId(categories), class: byId(classes), payee: byId(payees), method: byId(methods),
     };
     return this._lookups;
+  }
+
+  // Compte à préselectionner : celui configuré sur la carte (s'il existe toujours), sinon le compte
+  // par défaut de l'intégration, sinon le premier. `configured` est déjà un nombre ou NaN/undefined.
+  _pickAccountId(accounts, configured) {
+    if (accounts.some((a) => a.id === configured)) return configured;
+    const def = accounts.find((a) => a.is_default);
+    if (def) return def.id;
+    return accounts.length ? accounts[0].id : null;
+  }
+
+  // Devise d'un compte (celle réglée dans Paramètres > Général de HA si l'identifiant est inconnu,
+  // absent, ou que les comptes ne sont pas encore chargés — ex. comptes partagés, qui n'en ont pas).
+  _currency(accountId) {
+    const account = this._lookups && this._lookups.account.get(accountId);
+    return (account && account.currency) || (this._hass && this._hass.config.currency) || "EUR";
   }
 
   _render() {
@@ -872,12 +944,13 @@ class MyBankCard extends HTMLElement {
 
   async _renderDashboard() {
     const accounts = (await this._items("list_accounts")).filter((a) => !a.closed);
+    const accountById = new Map(accounts.map((a) => [a.id, a]));
     const tiles = accounts
       .map((a) => `<div class="balance-tile">
           <div class="name">${esc(a.name)}</div>
-          <div class="balance-line main"><span>${t("Solde")}</span><strong>${fmtAmount(a.balances.total)} €</strong></div>
-          <div class="balance-line"><span>${t("Pointé")}</span><strong>${fmtAmount(a.balances.pointed)} €</strong></div>
-          <div class="balance-line"><span>${t("Rapproché")}</span><strong>${fmtAmount(a.balances.reconciled)} €</strong></div>
+          <div class="balance-line main"><span>${t("Solde")}</span><strong>${fmtMoney(a.balances.total, a.currency)}</strong></div>
+          <div class="balance-line"><span>${t("Pointé")}</span><strong>${fmtMoney(a.balances.pointed, a.currency)}</strong></div>
+          <div class="balance-line"><span>${t("Rapproché")}</span><strong>${fmtMoney(a.balances.reconciled, a.currency)}</strong></div>
         </div>`)
       .join("");
     this._bodyEl.innerHTML = `<div class="dashboard-grid">${tiles || `<div class="empty">${t("Aucun compte.")}</div>`}</div>`;
@@ -892,7 +965,7 @@ class MyBankCard extends HTMLElement {
       const upcoming = await this._items("list_upcoming_occurrences", { days: 7 });
       if (!upcoming.length) return;
       const lines = upcoming
-        .map((o) => `<div class="balance-line ${o.overdue ? "neg" : ""}"><span>${esc(frDate(o.date))} · ${esc(o.label)}${o.overdue ? ` (${t("en retard")})` : ""}</span><strong>${fmtAmount(o.amount)} €</strong></div>`)
+        .map((o) => `<div class="balance-line ${o.overdue ? "neg" : ""}"><span>${esc(frDate(o.date))} · ${esc(o.label)}${o.overdue ? ` (${t("en retard")})` : ""}</span><strong>${fmtMoney(o.amount, (accountById.get(o.account_id) || {}).currency)}</strong></div>`)
         .join("");
       this._bodyEl.insertAdjacentHTML("beforeend", `<div class="month-sep">${t("Échéances des 7 prochains jours")}</div><div class="balance-tile">${lines}</div>`);
     } catch (err) {
@@ -915,15 +988,16 @@ class MyBankCard extends HTMLElement {
       const i = r.months.indexOf(month);
       if (i < 0) return "";
       const ctx = { account: b.account_id, ...this._monthBounds(month, month) };
+      const currency = this._currency(b.account_id);
       const groups = this._byKind(r.rows.filter((x) => x.depth <= 1 && (Number(x.planned[i]) || Number(x.actual[i]))))
         .filter((g) => g.rows.length)
         .map((g) => {
           const tot = r.totals[g.kind];
-          return `<tr class="kind-row"><td>${esc(KIND_TITLES[g.kind])}</td><td class="bar">${this._progressHtml(g.kind, tot.planned[i], tot.actual[i])}</td><td class="num">${fmtAmount(tot.actual[i])} / ${fmtAmount(tot.planned[i])} €</td></tr>`
+          return `<tr class="kind-row"><td>${esc(KIND_TITLES[g.kind])}</td><td class="bar">${this._progressHtml(g.kind, tot.planned[i], tot.actual[i])}</td><td class="num">${fmtAmount(tot.actual[i])} / ${fmtMoney(tot.planned[i], currency)}</td></tr>`
             + g.rows.map((x) => `<tr class="${x.depth === 0 && x.has_children ? "tree-branch" : ""}">
             <td><span style="display: inline-block; padding-left: ${x.depth * 20}px">${esc(x.name)}</span>${this._catInfoHtml(x.category_id, ctx)}</td>
             <td class="bar">${this._progressHtml(g.kind, x.planned[i], x.actual[i])}</td>
-            <td class="num">${fmtAmount(x.actual[i])} / ${fmtAmount(x.planned[i])} €</td>
+            <td class="num">${fmtAmount(x.actual[i])} / ${fmtMoney(x.planned[i], currency)}</td>
           </tr>`).join("");
         })
         .join("");
@@ -967,7 +1041,7 @@ class MyBankCard extends HTMLElement {
     return p ? p.name : "";
   }
 
-  _txRowHtml(tx, reserveAttachmentSlot) {
+  _txRowHtml(tx) {
     const today = isoDate(new Date());
     const credit = Number(tx.amount) > 0;
     const method = this._lookups.method.get(tx.payment_method_id);
@@ -983,13 +1057,11 @@ class MyBankCard extends HTMLElement {
         </div>
         <div class="tx-right">
           <div class="tx-amounts">
-            <div class="tx-amount ${credit ? "credit" : Number(tx.amount) < 0 ? "debit" : ""}">${credit ? "+" : ""}${fmtAmount(tx.amount)} €</div>
+            <div class="tx-amount ${credit ? "credit" : Number(tx.amount) < 0 ? "debit" : ""}">${credit ? "+" : ""}${fmtMoney(tx.amount, this._currency(tx.account_id))}</div>
             <div class="tx-balance">${t("Solde :")} ${fmtAmount(tx.balance_after)}</div>
           </div>
           <div class="tx-actions">
-            ${reserveAttachmentSlot
-              ? `<span class="att-slot">${tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : ""}</span>`
-              : (tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : "")}
+            <span class="att-slot">${tx.attachment ? `<button class="att" title="${t("Ouvrir le justificatif")}">📎</button>` : ""}</span>
             ${this._stateButtonsHtml(tx.state)}
             <button class="edit" title="${t("Modifier")}">✎</button>
             <button class="del" title="${t("Supprimer")}">✕</button>
@@ -1006,7 +1078,7 @@ class MyBankCard extends HTMLElement {
       this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte. Crée d'abord un compte dans l'onglet « Comptes ».")}</div>`;
       return;
     }
-    if (!accounts.some((a) => a.id === this._txAccountId)) this._txAccountId = accounts[0].id;
+    if (!accounts.some((a) => a.id === this._txAccountId)) this._txAccountId = this._pickAccountId(accounts);
     this._txRange = this._txRange || "month";
     this._txFilters = this._txFilters || this._loadDefaultTxFilters();
     const query = { account_id: this._txAccountId, order: "desc" };
@@ -1163,7 +1235,8 @@ class MyBankCard extends HTMLElement {
     const att = tx && tx.attachment;
     if (!att) return;
     if (att.kind === "link") {
-      window.open(att.url, "_blank", "noopener");
+      // http(s) seulement : un lien javascript: enregistré avant que l'API ne le refuse s'exécuterait ici.
+      if (/^https?:\/\//i.test(att.url || "")) window.open(att.url, "_blank", "noopener");
       return;
     }
     try {
@@ -1270,9 +1343,6 @@ class MyBankCard extends HTMLElement {
     const f = this._txFilters;
     const active = this._txFilterCount();
     const items = active ? this._txAll.filter((tx) => this._txMatches(tx, f)) : this._txAll;
-    // Dès qu'une opération de la liste a une PJ, toutes les lignes réservent la place du bouton
-    // 📎 (même sans PJ) pour garder les montants alignés entre eux.
-    const reserveAttachmentSlot = items.some((tx) => tx.attachment);
     let lastMonth = null;
     const rowsHtml = items
       .map((tx) => {
@@ -1282,7 +1352,7 @@ class MyBankCard extends HTMLElement {
           lastMonth = month;
           sep = `<div class="month-sep">${esc(monthLabel(month, "long"))}</div>`;
         }
-        return sep + this._txRowHtml(tx, reserveAttachmentSlot);
+        return sep + this._txRowHtml(tx);
       })
       .join("");
     const empty = active ? t("Aucune opération ne correspond aux critères.") : t("Aucune opération sur cette période.");
@@ -1297,7 +1367,7 @@ class MyBankCard extends HTMLElement {
     const part = (tx) => (catIds ? tx.splits.filter((x) => catIds.has(x.category_id)).reduce((a, x) => a + Number(x.amount), 0) : Number(tx.amount));
     const total = items.reduce((acc, tx) => acc + part(tx), 0);
     this._bodyEl.querySelector(".tx-count").textContent = active
-      ? t("{n} opération(s) sur {all} · total {total} €", { n: items.length, all: this._txAll.length, total: NUMBER.format(total) })
+      ? t("{n} opération(s) sur {all} · total {total}", { n: items.length, all: this._txAll.length, total: fmtMoney(total, this._currency(this._txAccountId)) })
         + (catIds ? ` ${t("(part de la rubrique)")}` : "")
       : "";
     if (this._txRecon) this._paintRecon(); // la liste vient d'être redessinée : la mise en évidence doit l'être aussi
@@ -1324,7 +1394,7 @@ class MyBankCard extends HTMLElement {
       return;
     }
     const diff = diffCents / 100;
-    diffEl.textContent = t("Écart : {diff} €", { diff: (diff > 0 ? "+" : "") + NUMBER.format(diff) });
+    diffEl.textContent = t("Écart : {diff}", { diff: (diff > 0 ? "+" : "") + fmtMoney(diff, account.currency) });
     list.querySelectorAll(".tx-row").forEach((row) => {
       const tx = this._txItems.get(Number(row.dataset.id));
       if (tx && Math.abs(Math.round(Number(tx.amount) * 100)) === Math.abs(diffCents)) row.classList.add("recon-match");
@@ -1335,9 +1405,9 @@ class MyBankCard extends HTMLElement {
     const el = this._bodyEl.querySelector(".tx-summary");
     if (!el || !account) return;
     const b = account.balances;
-    el.innerHTML = `<span>${t("Solde prévisionnel :")} <strong>${fmtAmount(b.total)} €</strong></span>
-      <span>${t("Solde banque :")} <strong>${fmtAmount(b.pointed)} €</strong></span>
-      <span>${t("Rapproché :")} <strong>${fmtAmount(b.reconciled)} €</strong></span>
+    el.innerHTML = `<span>${t("Solde prévisionnel :")} <strong>${fmtMoney(b.total, account.currency)}</strong></span>
+      <span>${t("Solde banque :")} <strong>${fmtMoney(b.pointed, account.currency)}</strong></span>
+      <span>${t("Rapproché :")} <strong>${fmtMoney(b.reconciled, account.currency)}</strong></span>
       <button type="button" class="tx-refresh" title="${t("Rafraîchir la liste selon les critères sélectionnés")}">↻</button>`;
   }
 
@@ -1368,9 +1438,10 @@ class MyBankCard extends HTMLElement {
       next = previous === 2 ? 1 : 2;
     }
     const box = row.querySelector(".tx-actions");
+    const attSlot = box.querySelector(".att-slot");
     const paint = (s) => {
       box.querySelectorAll(".tx-state").forEach((el) => el.remove());
-      box.insertAdjacentHTML("afterbegin", this._stateButtonsHtml(s));
+      attSlot.insertAdjacentHTML("afterend", this._stateButtonsHtml(s));
     };
     tx.state = next;
     paint(next);
@@ -1474,8 +1545,8 @@ class MyBankCard extends HTMLElement {
           <div class="split-lines"></div>
           <div class="form-actions"><button type="button" class="secondary add-split">+ ${t("Ligne")}</button><span class="split-rest"></span></div>
         </div>
-        <label class="check" data-f="state"><input type="checkbox" name="pointed" ${tx && tx.state >= 1 ? "checked" : ""}>${t("Pointée")}</label>
-        <label class="check" data-f="state"><input type="checkbox" name="reconciled" ${tx && tx.state === 2 ? "checked" : ""}>${t("Rapprochée")}</label>
+        <label class="check check-aligned" data-f="state"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="pointed" ${tx && tx.state >= 1 ? "checked" : ""}>${t("Pointée")}</span></label>
+        <label class="check check-aligned" data-f="state"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="reconciled" ${tx && tx.state === 2 ? "checked" : ""}>${t("Rapprochée")}</span></label>
         <label data-f="notes">${t("Notes")}<input type="text" name="notes" value="${esc(tx ? tx.notes || "" : "")}"></label>
         <div class="full att-field" data-f="attachment">
           <label>${t("Justificatif")}
@@ -1777,7 +1848,7 @@ class MyBankCard extends HTMLElement {
               ].filter(Boolean).join(" · "))}</div>
             </div>
             <div class="tx-right">
-              <div class="tx-amounts"><div class="tx-amount ${Number(o.amount) > 0 ? "credit" : Number(o.amount) < 0 ? "debit" : ""}">${Number(o.amount) > 0 ? "+" : ""}${fmtAmount(o.amount)} €</div></div>
+              <div class="tx-amounts"><div class="tx-amount ${Number(o.amount) > 0 ? "credit" : Number(o.amount) < 0 ? "debit" : ""}">${Number(o.amount) > 0 ? "+" : ""}${fmtMoney(o.amount, this._currency(o.account_id))}</div></div>
               <div class="tx-actions">
                 <button class="occ-generate" title="${t("Saisir l'opération maintenant")}">✓</button>
                 <button class="occ-skip" title="${t("Sauter cette échéance")}">⏭</button>
@@ -1805,7 +1876,7 @@ class MyBankCard extends HTMLElement {
               <div class="tx-sub">${esc(sub.join(" · "))}</div>
             </div>
             <div class="tx-right">
-              <div class="tx-amounts"><div class="tx-amount ${Number(amount) > 0 ? "credit" : Number(amount) < 0 ? "debit" : ""}">${Number(amount) > 0 ? "+" : ""}${fmtAmount(amount)} €</div></div>
+              <div class="tx-amounts"><div class="tx-amount ${Number(amount) > 0 ? "credit" : Number(amount) < 0 ? "debit" : ""}">${Number(amount) > 0 ? "+" : ""}${fmtMoney(amount, this._currency(s.account_id))}</div></div>
               <div class="tx-actions">
                 <button class="grid" title="${t("Échéances")}">📅</button>
                 <button class="edit" title="${t("Modifier")}">✎</button>
@@ -1933,7 +2004,7 @@ class MyBankCard extends HTMLElement {
   _showScheduleForm(container, s) {
     const L = this._lookups;
     const accounts = L.accounts.filter((a) => !a.closed || (s && (a.id === s.account_id || a.id === s.transfer_account_id)));
-    const accountId = s ? s.account_id : (this._txAccountId || (accounts[0] && accounts[0].id));
+    const accountId = s ? s.account_id : (this._txAccountId || this._pickAccountId(accounts));
     const type = s
       ? (s.transfer_account_id ? (Number(s.amount) <= 0 ? "transfer_out" : "transfer_in") : (Number(s.amount) < 0 ? "expense" : "income"))
       : "expense";
@@ -2067,7 +2138,7 @@ class MyBankCard extends HTMLElement {
       }
       const total = gridRanks.reduce((acc, r) => acc + (toNumber(valueOf(r.rank)) || 0), 0);
       info.textContent = gridRanks.length
-        ? t("{n} échéance(s) · total {total} €", { n: gridRanks.length, total: NUMBER.format(total) })
+        ? t("{n} échéance(s) · total {total}", { n: gridRanks.length, total: fmtMoney(total, this._currency(Number($('[name="account_id"]').value))) })
         : t("Indiquer la première échéance et la fin");
       info.classList.remove("bad");
     };
@@ -2111,10 +2182,11 @@ class MyBankCard extends HTMLElement {
       box.hidden = $('[name="mode"]').value !== "installments";
       if (box.hidden) return;
       gridRanks = ranks();
+      const currency = this._currency(Number($('[name="account_id"]').value));
       gridBody.innerHTML = (gridRanks || []).map((r) => {
         const { rank } = r;
         return frozen.has(rank)
-        ? `<tr class="muted" data-rank="${rank}"><td class="num">${rank}</td><td>${frDate(dateOf(r))}</td><td class="num">${fmtAmount(Math.abs(Number(frozen.get(rank).amount)))} €</td><td>${t("Saisie")}</td></tr>`
+        ? `<tr class="muted" data-rank="${rank}"><td class="num">${rank}</td><td>${frDate(dateOf(r))}</td><td class="num">${fmtMoney(Math.abs(Number(frozen.get(rank).amount)), currency)}</td><td>${t("Saisie")}</td></tr>`
         : `<tr data-rank="${rank}"><td class="num">${rank}</td>
             <td><input class="i-date ${customDate.has(rank) ? "custom" : ""}" type="date" value="${esc(dateOf(r))}"></td>
             <td class="num"><input class="i-amount ${custom.has(rank) ? "custom" : ""}" type="text" inputmode="decimal" value="${esc(valueOf(rank))}"></td>
@@ -2305,11 +2377,12 @@ class MyBankCard extends HTMLElement {
     const editable = s.mode === "installments";
     const sign = Number(s.amount) < 0 ? -1 : 1;
     const statusLabel = { pending: t("À venir"), generated: t("Saisie"), skipped: t("Sautée"), ignored: t("Antérieure") };
+    const currency = this._currency(s.account_id);
     const rowHtml = (o) => {
       const frozen = o.status === "generated";
       const amount = editable && !frozen
         ? `<input class="o-amount" type="text" inputmode="decimal" value="${esc(inputAmount(o.amount))}">`
-        : `${fmtAmount(o.amount)} €`;
+        : fmtMoney(o.amount, currency);
       const date = editable && !frozen
         ? `<input class="o-date ${o.own_date ? "custom" : ""}" type="date" value="${esc(o.date)}">`
         : frDate(o.date);
@@ -2484,7 +2557,9 @@ class MyBankCard extends HTMLElement {
       },
       fields: [
         { key: "name", label: t("Nom"), required: true },
-        { key: "account_id", label: t("Compte"), type: "select", options: () => this._lookups.accounts.filter((a) => !a.closed).map((a) => ({ id: a.id, name: a.name })) },
+        { key: "account_id", label: t("Compte"), type: "select",
+          options: () => this._lookups.accounts.filter((a) => !a.closed).map((a) => ({ id: a.id, name: a.name })),
+          default: this._pickAccountId(this._lookups.accounts.filter((a) => !a.closed)) },
         { key: "start_month", label: t("Premier mois"), type: "month", required: true, default: `${new Date().getFullYear()}-01` },
         { key: "months", label: t("Nombre de mois"), type: "number", default: 12 },
         { key: "notes", label: t("Notes") },
@@ -2872,7 +2947,7 @@ class MyBankCard extends HTMLElement {
             <div class="tx-desc">${esc(a.name)}</div>
             <div class="tx-sub">${esc(sub.filter(Boolean).join(" · "))}</div>
           </div>
-          <div class="tx-right"><div class="tx-amounts"><div class="tx-amount">${fmtAmount(a.total)} €</div></div><span class="share-go">›</span></div>
+          <div class="tx-right"><div class="tx-amounts"><div class="tx-amount">${fmtMoney(a.total, this._currency())}</div></div><span class="share-go">›</span></div>
         </div>
       </div>`;
     };
@@ -2972,17 +3047,18 @@ class MyBankCard extends HTMLElement {
     const name = new Map(a.participants.map((p) => [p.id, p.name]));
     const next = a.participants.find((p) => p.id === a.next_participant_id);
     const share = a.participants.length ? a.participants[0].share : "0";
-    const signed = (v) => `${Number(v) > 0 ? "+" : ""}${fmtAmount(v)} €`;
+    const currency = this._currency();
+    const signed = (v) => `${Number(v) > 0 ? "+" : ""}${fmtMoney(v, currency)}`;
     const people = `<div class="table-wrap"><table class="share-table">
         <thead><tr><th>${t("Participant")}</th><th class="num">${t("Payé")}</th><th class="num">${t("Part")}</th><th class="num">${t("Solde")}</th></tr></thead>
         <tbody>${a.participants.map((p) => `<tr class="${p.id === a.next_participant_id ? "share-next" : ""}">
           <td>${esc(p.name)}${p.id === a.next_participant_id ? ` <span class="badge warn">${t("prochain")}</span>` : ""}</td>
-          <td class="num">${fmtAmount(p.paid)} €</td><td class="num">${fmtAmount(p.share)} €</td>
+          <td class="num">${fmtMoney(p.paid, currency)}</td><td class="num">${fmtMoney(p.share, currency)}</td>
           <td class="num ${Number(p.balance) < 0 ? "neg" : Number(p.balance) > 0 ? "pos" : ""}">${signed(p.balance)}</td></tr>`).join("")}</tbody>
       </table></div>
       <div class="muted hint">${t("Solde = payé − part : positif, la personne doit recevoir ; négatif, elle doit verser.")}</div>`;
     const transfers = a.settlement.length
-      ? a.settlement.map((x) => `<div class="share-transfer"><span>${t("{from} verse à {to}", { from: `<strong>${esc(x.from_name)}</strong>`, to: `<strong>${esc(x.to_name)}</strong>` })}</span><strong>${fmtAmount(x.amount)} €</strong></div>`).join("")
+      ? a.settlement.map((x) => `<div class="share-transfer"><span>${t("{from} verse à {to}", { from: `<strong>${esc(x.from_name)}</strong>`, to: `<strong>${esc(x.to_name)}</strong>` })}</span><strong>${fmtMoney(x.amount, currency)}</strong></div>`).join("")
       : `<div class="empty">${t("Personne ne doit rien : chacun a payé sa part.")}</div>`;
     const expenses = a.expenses.map((e) => `<div class="tx-row" data-expense="${e.id}">
         <div class="tx-main">
@@ -2991,14 +3067,14 @@ class MyBankCard extends HTMLElement {
             <div class="tx-sub">${esc(`${frDate(e.date)} · ${t("payé par {name}", { name: name.get(e.participant_id) || "?" })}`)}</div>
           </div>
           <div class="tx-right">
-            <div class="tx-amounts"><div class="tx-amount">${fmtAmount(e.amount)} €</div></div>
+            <div class="tx-amounts"><div class="tx-amount">${fmtMoney(e.amount, currency)}</div></div>
             ${a.closed ? "" : `<div class="tx-actions"><button class="edit" title="${t("Modifier")}">✎</button><button class="del" title="${t("Supprimer")}">✕</button></div>`}
           </div>
         </div>
       </div>`).join("") || `<div class="empty">${t("Aucune dépense pour l'instant.")}</div>`;
     const head = `<div class="tx-toolbar"><button class="secondary tx-back sh-back">← ${t("Comptes partagés")}</button></div>
       <div class="share-head"><div class="share-name">${esc(a.name)}</div>
-        <div class="muted">${t("Total {total} € · part de chacun {share} €", { total: fmtAmount(a.total), share: fmtAmount(share) })}${a.participants.length && a.participants.some((p) => p.share !== share) ? ` ${t("(à un centime près)")}` : ""}${a.notes ? ` · ${esc(a.notes)}` : ""}</div></div>
+        <div class="muted">${t("Total {total} · part de chacun {share}", { total: fmtMoney(a.total, currency), share: fmtMoney(share, currency) })}${a.participants.length && a.participants.some((p) => p.share !== share) ? ` ${t("(à un centime près)")}` : ""}${a.notes ? ` · ${esc(a.notes)}` : ""}</div></div>
       <div class="ok-msg" hidden></div>
       <div class="form-container"></div>`;
     const actions = a.closed
@@ -3014,7 +3090,7 @@ class MyBankCard extends HTMLElement {
     } else {
       const options = a.participants.map((p) => `<option value="${p.id}" ${p.id === a.next_participant_id ? "selected" : ""}>${esc(p.name)}</option>`).join("");
       this._bodyEl.innerHTML = `${head}
-        <div class="share-nextpayer">${t("Prochaine dépense :")} <strong>${esc(next ? next.name : "")}</strong>${next && a.total !== "0.00" ? ` <span class="muted">${t("(a payé {paid} €, le moins du groupe)", { paid: fmtAmount(next.paid) })}</span>` : ""}</div>
+        <div class="share-nextpayer">${t("Prochaine dépense :")} <strong>${esc(next ? next.name : "")}</strong>${next && a.total !== "0.00" ? ` <span class="muted">${t("(a payé {paid}, le moins du groupe)", { paid: fmtMoney(next.paid, currency) })}</span>` : ""}</div>
         <form class="entity-form sh-add">
           <label>${t("Payé par")}<select name="participant_id">${options}</select></label>
           <label>${t("Montant")}<input type="text" name="amount" inputmode="decimal" required></label>
@@ -3070,7 +3146,7 @@ class MyBankCard extends HTMLElement {
           await this._renderActive(true);
           const after = res && res.participants && res.participants.find((p) => p.id === res.next_participant_id);
           const msg = $(".ok-msg");
-          msg.textContent = `✓ ${t("{amount} € payés par {name}.", { amount: NUMBER.format(amount), name: name.get(pid) })}${after ? ` ${t("Prochaine dépense : {name}.", { name: after.name })}` : ""}`;
+          msg.textContent = `✓ ${t("{amount} payés par {name}.", { amount: fmtMoney(amount, currency), name: name.get(pid) })}${after ? ` ${t("Prochaine dépense : {name}.", { name: after.name })}` : ""}`;
           msg.hidden = false;
           clearTimeout(this._msgTimer);
           this._msgTimer = setTimeout(() => (msg.hidden = true), 8000);
@@ -3086,7 +3162,7 @@ class MyBankCard extends HTMLElement {
       if (!btn || !row) return;
       const e = a.expenses.find((x) => x.id === Number(row.dataset.expense));
       if (btn.classList.contains("del")) {
-        if (!confirm(t("Supprimer la dépense « {label} » de {amount} € ?", { label: e.label || t("Dépense"), amount: NUMBER.format(Number(e.amount)) }))) return;
+        if (!confirm(t("Supprimer la dépense « {label} » de {amount} ?", { label: e.label || t("Dépense"), amount: fmtMoney(e.amount, currency) }))) return;
         run("delete_shared_expense", { expense_id: e.id });
       } else if (btn.classList.contains("edit")) {
         this._bodyEl.querySelectorAll(".tx-edit").forEach((el) => el.remove());
@@ -3329,9 +3405,10 @@ class MyBankCard extends HTMLElement {
         targets: (item) => this._lookups.accounts.filter((a) => a.id !== item.id).map((a) => ({ id: a.id, name: `${a.name}${a.closed ? ` ${t("(clos)")}` : ""}` })),
       },
       columns: [
-        { label: t("Nom"), html: (a) => `${esc(a.name)}${a.closed ? ` <span class="muted">${t("(clos)")}</span>` : ""}` },
+        { label: t("Nom"), html: (a) => `${esc(a.name)}${a.is_default ? ` <span class="muted" title="${t("Compte par défaut")}">★</span>` : ""}${a.closed ? ` <span class="muted">${t("(clos)")}</span>` : ""}` },
         { label: t("Type"), html: (a) => esc(ACCOUNT_KINDS[a.kind] || a.kind) },
-        { label: t("Solde"), num: true, html: (a) => `${fmtAmount(a.balances.total)} €` },
+        { label: t("Devise"), html: (a) => esc(a.currency) },
+        { label: t("Solde"), num: true, html: (a) => fmtMoney(a.balances.total, a.currency) },
         this._countColumn(), // chaque jambe d'un virement compte sur son compte
       ],
       fields: [
@@ -3339,10 +3416,14 @@ class MyBankCard extends HTMLElement {
         { key: "kind", label: t("Type"), type: "select", options: () => Object.entries(ACCOUNT_KINDS).map(([id, name]) => ({ id, name })), default: "checking" },
         { key: "number", label: t("Numéro") },
         { key: "iban", label: "IBAN" },
+        { key: "currency", label: t("Devise"), default: this._hass.config.currency,
+          help: t("Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.") },
         { key: "opening_balance", label: t("Solde initial"), type: "amount", default: "0" },
         { key: "opening_date", label: t("Date du solde initial"), type: "date" },
         { key: "notes", label: t("Notes") },
         { key: "closed", label: t("Compte clos"), type: "checkbox" },
+        { key: "is_default", label: t("Compte par défaut"), type: "checkbox",
+          help: t("Préselectionné partout où un compte se choisit. Un seul compte à la fois ; le cocher ici décoche l'ancien.") },
       ],
     };
   }
@@ -3631,13 +3712,18 @@ class MyBankCard extends HTMLElement {
       return `<label>${esc(f.label)}<select name="${name}">${empty}${opts}</select></label>`;
     }
     if (f.type === "checkbox") {
-      return `<label class="check"><input type="checkbox" name="${name}" ${value ? "checked" : ""}>${esc(f.label)}</label>`;
+      // Espaceur invisible de la même hauteur que la ligne de libellé des autres champs (texte
+      // 12px + l'espacement de `label`), pour que la case à cocher démarre au même niveau que
+      // les champs de saisie voisins au lieu de flotter plus haut dans sa cellule de la grille.
+      return `<label class="check check-aligned"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="${name}" ${value ? "checked" : ""}>${esc(f.label)}${fieldHelpButtonHtml(f.help)}</span>${fieldHintHtml(f.help)}</label>`;
     }
     if (f.type === "date" || f.type === "month" || f.type === "number") {
       return `<label>${esc(f.label)}<input type="${f.type}" name="${name}" value="${esc(value ?? "")}" ${f.required ? "required" : ""}></label>`;
     }
     const shown = f.type === "amount" && (LANG === "fr" || LANG === "de") ? String(value ?? "").replace(".", ",") : value ?? "";
-    return `<label>${esc(f.label)}<input type="text" name="${name}" ${f.type === "amount" ? 'inputmode="decimal"' : ""} value="${esc(shown)}" ${f.required ? "required" : ""}></label>`;
+    // Le libellé et le bouton d'aide doivent être sur la même ligne : dans un `label` en colonne,
+    // un texte brut suivi d'un élément devient deux lignes distinctes sans ce conteneur commun.
+    return `<label><span class="field-label">${esc(f.label)}${fieldHelpButtonHtml(f.help)}</span><input type="text" name="${name}" ${f.type === "amount" ? 'inputmode="decimal"' : ""} value="${esc(shown)}" ${f.required ? "required" : ""}>${fieldHintHtml(f.help)}</label>`;
   }
 
   _showForm(container, cfg, item, preset, onClose) {
@@ -3653,6 +3739,12 @@ class MyBankCard extends HTMLElement {
     const form = container.querySelector("form");
     if (cfg.onFormReady) cfg.onFormReady(form, item, preset);
     form.querySelector(".cancel").addEventListener("click", () => (onClose ? onClose() : (container.innerHTML = "")));
+    form.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".field-help");
+      if (!btn) return;
+      const hint = btn.closest("label").querySelector(".hint");
+      if (hint) hint.classList.toggle("shown");
+    });
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       let payload = {};
@@ -3872,8 +3964,7 @@ class MyBankEntryCard extends MyBankSimpleCard {
       return;
     }
     if (!accounts.some((a) => a.id === this._txAccountId)) {
-      const wanted = Number(this._config.account_id);
-      this._txAccountId = accounts.some((a) => a.id === wanted) ? wanted : accounts[0].id;
+      this._txAccountId = this._pickAccountId(accounts, Number(this._config.account_id));
     }
     const shown = Array.isArray(this._config.fields) ? new Set(this._config.fields) : null;
     const hidden = new Set(ENTRY_FIELDS.map((f) => f.key).filter((k) => shown && !shown.has(k)));
@@ -3904,14 +3995,15 @@ class MyBankEntryCard extends MyBankSimpleCard {
   _savedMessage(service, payload, accountId) {
     const L = this._lookups;
     const name = (id) => (L.account.get(id) || {}).name || "";
-    const amount = NUMBER.format(Math.abs(Number(payload.amount)));
     if (service === "create_transfer") {
-      return `✓ ${t("Virement de {amount} € enregistré : {from} → {to}.", { amount, from: name(payload.from_account_id), to: name(payload.to_account_id) })}`;
+      const amount = fmtMoney(Math.abs(Number(payload.amount)), this._currency(payload.from_account_id));
+      return `✓ ${t("Virement de {amount} enregistré : {from} → {to}.", { amount, from: name(payload.from_account_id), to: name(payload.to_account_id) })}`;
     }
+    const amount = fmtMoney(Math.abs(Number(payload.amount)), this._currency(accountId));
     const vars = { amount, who: payload.payee_name ? ` — ${payload.payee_name}` : "", account: name(accountId), date: frDate(payload.date) };
     return `✓ ${Number(payload.amount) < 0
-      ? t("Dépense de {amount} € enregistrée{who} ({account}, {date}).", vars)
-      : t("Recette de {amount} € enregistrée{who} ({account}, {date}).", vars)}`;
+      ? t("Dépense de {amount} enregistrée{who} ({account}, {date}).", vars)
+      : t("Recette de {amount} enregistrée{who} ({account}, {date}).", vars)}`;
   }
 }
 
@@ -3935,14 +4027,17 @@ class MyBankBalanceCard extends MyBankSimpleCard {
     }
   }
 
-  // Capteur du compte choisi (attribut account_id), ou du premier compte à défaut.
+  // Capteur du compte choisi (attribut account_id) ; sinon le compte par défaut de l'intégration, sinon le premier.
   _accountState() {
     if (!this._hass) return null;
     const sensors = Object.values(this._hass.states)
       .filter((s) => s.entity_id.startsWith("sensor.") && s.attributes.account_id !== undefined && "solde_pointe" in s.attributes)
       .sort((a, b) => a.attributes.account_id - b.attributes.account_id);
-    const wanted = Number(this._config.account_id);
-    return sensors.find((s) => s.attributes.account_id === wanted) || (this._config.account_id ? null : sensors[0]) || null;
+    if (this._config.account_id) {
+      const wanted = Number(this._config.account_id);
+      return sensors.find((s) => s.attributes.account_id === wanted) || null;
+    }
+    return sensors.find((s) => s.attributes.is_default) || sensors[0] || null;
   }
 
   async _renderCard() {
@@ -3952,10 +4047,11 @@ class MyBankBalanceCard extends MyBankSimpleCard {
       return;
     }
     const n = (v) => Number(v);
-    const line = (label, value) => `<div class="balance-line ${n(value) < 0 ? "neg" : ""}"><span>${label}</span><strong>${fmtAmount(value)} €</strong></div>`;
+    const currency = s.attributes.unit_of_measurement || this._currency();
+    const line = (label, value) => `<div class="balance-line ${n(value) < 0 ? "neg" : ""}"><span>${label}</span><strong>${fmtMoney(value, currency)}</strong></div>`;
     this._bodyEl.innerHTML = `
       <div class="bal-name">${esc(s.attributes.friendly_name || "")}</div>
-      <div class="bal-main ${n(s.state) < 0 ? "neg" : ""}" title="${t("Solde prévisionnel (toutes opérations)")}">${fmtAmount(s.state)} €</div>
+      <div class="bal-main ${n(s.state) < 0 ? "neg" : ""}" title="${t("Solde prévisionnel (toutes opérations)")}">${fmtMoney(s.state, currency)}</div>
       ${line(t("Solde prévisionnel"), s.state)}
       ${line(t("Solde banque (pointé)"), s.attributes.solde_pointe)}
       ${line(t("Rapproché"), s.attributes.solde_rapproche)}`;
@@ -3983,6 +4079,7 @@ class MyBankBudgetCard extends MyBankSimpleCard {
   }
 
   async _renderCard() {
+    await this._ensureLookups();
     const month = isoDate(new Date()).slice(0, 7);
     const budgets = await this._items("list_budgets");
     const wanted = Number(this._config.budget_id);
@@ -3992,6 +4089,7 @@ class MyBankBudgetCard extends MyBankSimpleCard {
       this._bodyEl.innerHTML = `<div class="empty">${this._config.budget_id ? t("Budget introuvable.") : t("Aucun budget ne couvre le mois en cours.")}</div>`;
       return;
     }
+    const currency = this._currency(budget.account_id);
     const r = await this._call("get_budget_report", { budget_id: budget.id }, true);
     const period = BUDGET_PERIODS[this._config.period] ? this._config.period : "month";
     const current = r.months.indexOf(month);
@@ -4002,7 +4100,7 @@ class MyBankBudgetCard extends MyBankSimpleCard {
     const pick = (arr) => idx.reduce((acc, i) => acc + Number(arr[i]), 0).toFixed(2);
     const levels = Math.max(1, Number(this._config.levels) || 2);
     const line = (cls, name, depth, kind, planned, actual) => `<div class="bl ${cls}" style="padding-left: ${depth * 14}px">
-        <div class="bl-head"><span class="bl-name">${esc(name)}</span><span class="bl-amt">${fmtAmount(actual)} / ${fmtAmount(planned)} €</span></div>
+        <div class="bl-head"><span class="bl-name">${esc(name)}</span><span class="bl-amt">${fmtAmount(actual)} / ${fmtMoney(planned, currency)}</span></div>
         ${this._progressHtml(kind, planned, actual)}
       </div>`;
     const groups = this._byKind(r.rows)
@@ -4054,6 +4152,11 @@ class MyBankBalanceHistoryCard extends MyBankSimpleCard {
       this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte sélectionné.")}</div>`;
       return;
     }
+    if (new Set(chosen.map((a) => a.currency)).size > 1) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Les comptes sélectionnés n'ont pas tous la même devise : choisir des comptes dans une seule devise pour cette carte.")}</div>`;
+      return;
+    }
+    const currency = chosen[0].currency;
     const period = TREND_PERIODS[this._config.period] ? this._config.period : "12months";
     const start = this._rangeStart(period);
     const today = isoDate(new Date());
@@ -4070,10 +4173,10 @@ class MyBankBalanceHistoryCard extends MyBankSimpleCard {
     }));
     const heading = this._config.title ? "" : `<div class="bal-name">${t("Évolution du solde")} — ${esc(TREND_PERIODS[period])}</div>`;
     this._bodyEl.innerHTML = `${heading}<div class="chart-wrap"></div>`;
-    this._paintLineChart(this._bodyEl.querySelector(".chart-wrap"), series, start, today);
+    this._paintLineChart(this._bodyEl.querySelector(".chart-wrap"), series, start, today, currency);
   }
 
-  _paintLineChart(host, series, start, end) {
+  _paintLineChart(host, series, start, end, currency) {
     const colors = seriesColors(this._hass);
     const W = 560, H = 190, pad = { l: 8, r: 54, t: 10, b: 20 };
     const t0 = new Date(start).getTime(), t1 = Math.max(new Date(end).getTime(), t0 + 1);
@@ -4109,13 +4212,13 @@ class MyBankBalanceHistoryCard extends MyBankSimpleCard {
       s.points.forEach((p) => {
         const dot = svgEl("circle", { cx: x(p.date), cy: y(p.value), r: 2.5, fill: color });
         const title = svgEl("title", {});
-        title.textContent = `${s.name} — ${frDate(p.date)} : ${fmtAmount(p.value)} €`;
+        title.textContent = `${s.name} — ${frDate(p.date)} : ${fmtMoney(p.value, currency)}`;
         dot.appendChild(title);
         svg.appendChild(dot);
       });
       const last = s.points[s.points.length - 1];
       const lbl = svgEl("text", { x: x(last.date) + 6, y: labelY.get(s) + 3, class: "chart-label" });
-      lbl.textContent = `${fmtAmount(last.value)} €`;
+      lbl.textContent = fmtMoney(last.value, currency);
       svg.appendChild(lbl);
     });
     host.innerHTML = "";
@@ -4161,6 +4264,12 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
       this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte sélectionné.")}</div>`;
       return;
     }
+    const chosen = accounts.filter((a) => ids.includes(a.id));
+    if (new Set(chosen.map((a) => a.currency)).size > 1) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Les comptes sélectionnés n'ont pas tous la même devise : choisir des comptes dans une seule devise pour cette carte.")}</div>`;
+      return;
+    }
+    const currency = chosen[0].currency;
     const horizon = HORIZON_DAYS[this._config.horizon] ? this._config.horizon : "8weeks";
     const days = HORIZON_DAYS[horizon];
     const all = ids.length === accounts.length;
@@ -4178,7 +4287,7 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
     const buckets = this._buildBuckets(HORIZON_BUCKET[horizon], days, occurrences);
     const heading = this._config.title ? "" : `<div class="bal-name">${t("Échéances à venir")} — ${esc(UPCOMING_HORIZONS[horizon])}</div>`;
     this._bodyEl.innerHTML = `${heading}<div class="chart-wrap"></div>`;
-    this._paintBarChart(this._bodyEl.querySelector(".chart-wrap"), buckets);
+    this._paintBarChart(this._bodyEl.querySelector(".chart-wrap"), buckets, currency);
   }
 
   _buildBuckets(unit, days, occurrences) {
@@ -4207,7 +4316,7 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
     return buckets;
   }
 
-  _paintBarChart(host, buckets) {
+  _paintBarChart(host, buckets, currency) {
     const W = 560, H = 190, pad = { l: 8, r: 8, t: 22, b: 24 };
     const avail = H - pad.t - pad.b;
     const maxPos = Math.max(0, ...buckets.map((b) => b.total));
@@ -4240,7 +4349,7 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
           class: "chart-label",
           "text-anchor": "middle",
         });
-        amt.textContent = `${b.total > 0 ? "+" : ""}${fmtAmount(b.total)} €`;
+        amt.textContent = `${b.total > 0 ? "+" : ""}${fmtMoney(b.total, currency)}`;
         svg.appendChild(amt);
       }
     });
@@ -4282,6 +4391,12 @@ class MyBankCategorySpendingCard extends MyBankSimpleCard {
       this._bodyEl.innerHTML = `<div class="empty">${t("Aucun compte sélectionné.")}</div>`;
       return;
     }
+    const chosen = accounts.filter((a) => ids.includes(a.id));
+    if (new Set(chosen.map((a) => a.currency)).size > 1) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Les comptes sélectionnés n'ont pas tous la même devise : choisir des comptes dans une seule devise pour cette carte.")}</div>`;
+      return;
+    }
+    const currency = chosen[0].currency;
     const period = TREND_PERIODS[this._config.period] ? this._config.period : "month";
     const start = this._rangeStart(period);
     const all = ids.length === accounts.length;
@@ -4303,7 +4418,7 @@ class MyBankCategorySpendingCard extends MyBankSimpleCard {
       const amount = sums.get(c.id) || 0;
       const pct = Math.round((amount / max) * 100);
       return `<div class="bl ${hasChildren.has(c.id) ? "branch" : ""}" style="padding-left: ${c.depth * 14}px">
-        <div class="bl-head"><span class="bl-name">${esc(c.name)}</span>${amount > 0 ? `<span class="bl-amt">${fmtAmount(amount)} €</span>` : ""}</div>
+        <div class="bl-head"><span class="bl-name">${esc(c.name)}</span>${amount > 0 ? `<span class="bl-amt">${fmtMoney(amount, currency)}</span>` : ""}</div>
         ${amount > 0 ? `<div class="pbar"><div style="width: ${pct}%"></div></div>` : ""}
       </div>`;
     }).join("");
@@ -4431,12 +4546,26 @@ class MyBankSimpleEditor extends HTMLElement {
       if (el.checked) config[el.dataset.bool] = true;
       else delete config[el.dataset.bool];
     });
+    const fields = this._fields();
     const groups = new Set([...this.shadowRoot.querySelectorAll("[data-check]")].map((el) => el.dataset.check));
-    groups.forEach((key) => {
+    for (const key of groups) {
       const boxes = [...this.shadowRoot.querySelectorAll(`[data-check="${key}"]`)];
-      if (boxes.every((el) => el.checked)) delete config[key]; // tout coché = valeur par défaut
-      else config[key] = boxes.filter((el) => el.checked).map((el) => el.value);
-    });
+      const allChecked = boxes.every((el) => el.checked);
+      const checked = boxes.filter((el) => el.checked).map((el) => el.value);
+      // Sous-ensemble choisi (pas « tous », qui reste permis même mélangé : la carte avertit alors elle-même) :
+      // pas de sens d'additionner des comptes de devises différentes.
+      const field = fields.find((f) => f.key === key);
+      if (field && field.sameCurrency && !allChecked && checked.length > 1) {
+        const currencyOf = new Map(field.options.map((o) => [String(o.key), o.currency]));
+        if (new Set(checked.map((k) => currencyOf.get(k))).size > 1) {
+          alert(t("Choisis des comptes dans une seule devise : des comptes de devises différentes ne peuvent pas être additionnés sur cette carte."));
+          this._render();
+          return;
+        }
+      }
+      if (allChecked) delete config[key]; // tout coché = valeur par défaut
+      else config[key] = checked;
+    }
     this._config = config;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config } }));
   }
@@ -4450,7 +4579,7 @@ class MyBankEntryCardEditor extends MyBankSimpleEditor {
   _fields() {
     return [
       { key: "title", label: t("Titre (facultatif)") },
-      { key: "account_id", label: t("Compte par défaut"), type: "select", number: true, empty: t("Premier compte") },
+      { key: "account_id", label: t("Compte"), type: "select", number: true, empty: t("Compte par défaut") },
       { key: "fields", label: t("Champs affichés (le montant l'est toujours) :"), type: "checks", options: ENTRY_FIELDS,
         help: t("Un champ masqué reste pré-rempli depuis la dernière opération du tiers et enregistré ; la date est celle du jour.") },
     ];
@@ -4465,7 +4594,7 @@ class MyBankBalanceCardEditor extends MyBankSimpleEditor {
   _fields() {
     return [
       { key: "title", label: t("Titre (facultatif)") },
-      { key: "account_id", label: t("Compte"), type: "select", number: true, empty: t("Premier compte") },
+      { key: "account_id", label: t("Compte"), type: "select", number: true, empty: t("Compte par défaut") },
     ];
   }
 }
@@ -4494,10 +4623,11 @@ class MyBankBudgetCardEditor extends MyBankSimpleEditor {
   }
 }
 
-// Comptes à cocher, partagé par les trois éditeurs de cartes graphiques ci-dessous.
+// Comptes à cocher, partagé par les trois éditeurs de cartes graphiques ci-dessous. La devise accolée au nom
+// prévient avant de cocher un mélange que la carte refusera (sommes ou axe communs à plusieurs comptes).
 async function loadAccountChecks(editor) {
   const accounts = (await editor._items("list_accounts")).filter((a) => !a.closed);
-  return { account_ids: accounts.map((a) => ({ key: String(a.id), label: a.name })) };
+  return { account_ids: accounts.map((a) => ({ key: String(a.id), label: `${a.name} (${a.currency})`, currency: a.currency })) };
 }
 
 class MyBankBalanceHistoryCardEditor extends MyBankSimpleEditor {
@@ -4509,9 +4639,9 @@ class MyBankBalanceHistoryCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       {
-        key: "account_ids", label: t("Comptes affichés"), type: "checks",
+        key: "account_ids", label: t("Comptes affichés"), type: "checks", sameCurrency: true,
         options: this._options ? this._options.account_ids : [],
-        help: t("Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes)."),
+        help: t("Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes). Une seule devise à la fois."),
       },
       { key: "period", label: t("Période"), type: "select", options: Object.entries(TREND_PERIODS).map(([id, name]) => ({ id, name })) },
     ];
@@ -4527,9 +4657,9 @@ class MyBankUpcomingChargeCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       {
-        key: "account_ids", label: t("Comptes pris en compte"), type: "checks",
+        key: "account_ids", label: t("Comptes pris en compte"), type: "checks", sameCurrency: true,
         options: this._options ? this._options.account_ids : [],
-        help: t("Tous cochés par défaut."),
+        help: t("Tous cochés par défaut. Une seule devise à la fois."),
       },
       { key: "horizon", label: t("Horizon"), type: "select", options: Object.entries(UPCOMING_HORIZONS).map(([id, name]) => ({ id, name })) },
     ];
@@ -4545,9 +4675,9 @@ class MyBankCategorySpendingCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       {
-        key: "account_ids", label: t("Comptes pris en compte"), type: "checks",
+        key: "account_ids", label: t("Comptes pris en compte"), type: "checks", sameCurrency: true,
         options: this._options ? this._options.account_ids : [],
-        help: t("Tous cochés par défaut."),
+        help: t("Tous cochés par défaut. Une seule devise à la fois."),
       },
       { key: "period", label: t("Période"), type: "select", options: Object.entries(TREND_PERIODS).map(([id, name]) => ({ id, name })) },
     ];
@@ -4558,7 +4688,7 @@ class MyBankCategorySpendingCardEditor extends MyBankSimpleEditor {
 const I18N = {
   en: {
     " · encore {n} échéances": " · {n} left",
-    "(a payé {paid} €, le moins du groupe)": "(paid {paid} €, the least in the group)",
+    "(a payé {paid}, le moins du groupe)": "(paid {paid}, the least in the group)",
     "(archivé)": "(archived)",
     "(clos)": "(closed)",
     "(inactif)": "(inactive)",
@@ -4646,6 +4776,11 @@ const I18N = {
     "Compte clos": "Account closed",
     "Compte introuvable (capteur My Bank absent).": "Account not found (no My Bank sensor).",
     "Compte par défaut": "Default account",
+    "Devise": "Currency",
+    "Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.": "ISO 4217 code, 3 letters (EUR, USD, GBP…). Home Assistant's own currency by default for a new account.",
+    "Les comptes sélectionnés n'ont pas tous la même devise : choisir des comptes dans une seule devise pour cette carte.": "The selected accounts don't all share the same currency: choose accounts in a single currency for this card.",
+    "Choisis des comptes dans une seule devise : des comptes de devises différentes ne peuvent pas être additionnés sur cette carte.": "Choose accounts in a single currency: accounts in different currencies cannot be added together on this card.",
+    "Préselectionné partout où un compte se choisit. Un seul compte à la fois ; le cocher ici décoche l'ancien.": "Preselected wherever an account is chosen. Only one at a time; checking this one unchecks the previous one.",
     "Compte partagé": "Shared account",
     "Comptes": "Accounts",
     "Comptes affichés": "Accounts shown",
@@ -4669,7 +4804,7 @@ const I18N = {
     "Dé-rapprocher cette opération (elle reste pointée) ?": "Un-reconcile this transaction (it stays cleared)?",
     "Dé-rapprocher et dé-pointer cette opération ?": "Un-reconcile and un-clear this transaction?",
     "Dépense": "Expense",
-    "Dépense de {amount} € enregistrée{who} ({account}, {date}).": "Expense of {amount} € saved{who} ({account}, {date}).",
+    "Dépense de {amount} enregistrée{who} ({account}, {date}).": "Expense of {amount} saved{who} ({account}, {date}).",
     "Dépenses": "Expenses",
     "Dépenses ({n})": "Expenses ({n})",
     "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture.": "A group's shared expenses: who pays next, who owes how much to whom when closing.",
@@ -4790,7 +4925,7 @@ const I18N = {
     "Rapproché :": "Reconciled:",
     "Rapprochée": "Reconciled",
     "Recette": "Income",
-    "Recette de {amount} € enregistrée{who} ({account}, {date}).": "Income of {amount} € saved{who} ({account}, {date}).",
+    "Recette de {amount} enregistrée{who} ({account}, {date}).": "Income of {amount} saved{who} ({account}, {date}).",
     "Recettes": "Income",
     "Rechercher…": "Search…",
     "Recopier ce montant sur les échéances suivantes": "Copy this amount to the following occurrences",
@@ -4851,7 +4986,7 @@ const I18N = {
     "Supprimer cette classe ?": "Delete this class?",
     "Supprimer cette opération ?": "Delete this transaction?",
     "Supprimer cette rubrique ?": "Delete this category?",
-    "Supprimer la dépense « {label} » de {amount} € ?": "Delete the expense “{label}” of {amount} €?",
+    "Supprimer la dépense « {label} » de {amount} ?": "Delete the expense “{label}” of {amount}?",
     "Supprimer le budget « {name} » et tous ses montants ?": "Delete the budget “{name}” and all its amounts?",
     "Supprimer « {label} » ? Les opérations déjà saisies restent.": "Delete “{label}”? Transactions already entered are kept.",
     "Supprimer « {name} » ensuite": "Then delete “{name}”",
@@ -4863,10 +4998,12 @@ const I18N = {
     "Titre (facultatif)": "Title (optional)",
     "Total": "Total",
     "Total {name}": "Total {name}",
-    "Total {total} € · part de chacun {share} €": "Total {total} € · each person's share {share} €",
+    "Total {total} · part de chacun {share}": "Total {total} · each person's share {share}",
     "Tous": "All",
     "Tous cochés par défaut.": "All checked by default.",
     "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes).": "All checked by default. To compare accounts of very different scale, prefer one card per account (or group of accounts).",
+    "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes). Une seule devise à la fois.": "All checked by default. To compare accounts of very different scale, prefer one card per account (or group of accounts). One currency at a time.",
+    "Tous cochés par défaut. Une seule devise à la fois.": "All checked by default. One currency at a time.",
     "Tous les": "Every",
     "Tous les ans": "Every year",
     "Tous les champs": "All fields",
@@ -4900,7 +5037,7 @@ const I18N = {
     "Vers": "To",
     "Ville": "City",
     "Virement": "Transfer",
-    "Virement de {amount} € enregistré : {from} → {to}.": "Transfer of {amount} € saved: {from} → {to}.",
+    "Virement de {amount} enregistré : {from} → {to}.": "Transfer of {amount} saved: {from} → {to}.",
     "Virement depuis…": "Transfer from…",
     "Virement vers…": "Transfer to…",
     "Virements": "Transfers",
@@ -4932,7 +5069,7 @@ const I18N = {
     "terminée": "finished",
     "trimestre(s)": "quarter(s)",
     "{actual} réalisés sur {planned} prévus": "{actual} actual of {planned} planned",
-    "{amount} € payés par {name}.": "{amount} € paid by {name}.",
+    "{amount} payés par {name}.": "{amount} paid by {name}.",
     "{base}, jusqu'au {date}": "{base}, until {date}",
     "{base}, {n} fois": "{base}, {n} times",
     "{done}/{total} générées": "{done}/{total} generated",
@@ -4941,9 +5078,9 @@ const I18N = {
     "{n} dépense(s)": "{n} expense(s)",
     "{n} opération(s) déplacée(s) de « {name} » vers « {target} ».": "{n} transaction(s) moved from “{name}” to “{target}”.",
     "{n} opération(s) et {s} planification(s) déplacée(s) de « {name} » vers « {target} ».": "{n} transaction(s) and {s} scheduled transaction(s) moved from “{name}” to “{target}”.",
-    "{n} opération(s) sur {all} · total {total} €": "{n} of {all} transaction(s) · total {total} €",
+    "{n} opération(s) sur {all} · total {total}": "{n} of {all} transaction(s) · total {total}",
     "{n} planification(s) arrivant à terme dans les {days} jours": "{n} scheduled transaction(s) ending within {days} days",
-    "{n} échéance(s) · total {total} €": "{n} occurrence(s) · total {total} €",
+    "{n} échéance(s) · total {total}": "{n} occurrence(s) · total {total}",
     "{n} échéances au maximum : réduire la durée": "{n} occurrences at most: shorten the duration",
     "« {name} » a été supprimé.": "“{name}” was deleted.",
     "« {name} » n'a pas pu être supprimé : {error}": "“{name}” could not be deleted: {error}",
@@ -4951,7 +5088,7 @@ const I18N = {
     "À venir": "Upcoming",
     "À venir (30 jours)": "Upcoming (30 days)",
     "Écart": "Variance",
-    "Écart : {diff} €": "Difference: {diff} €",
+    "Écart : {diff}": "Difference: {diff}",
     "Écart nul : tout est rapproché.": "No difference: everything is reconciled.",
     "Écart positif = favorable (moins dépensé, plus reçu ou épargné). Montants des rubriques parentes, sous-rubriques comprises. ▾ / ▸ replie ou déplie une rubrique.": "Positive variance = favourable (less spent, more received or saved). Parent category amounts include their subcategories. ▾ / ▸ collapses or expands a category.",
     "Échéance {n} : montant invalide (saisir un montant positif ; le type indique le sens).": "Occurrence {n}: invalid amount (enter a positive amount; the type gives the direction).",
@@ -5034,7 +5171,7 @@ const I18N = {
   },
   de: {
     " · encore {n} échéances": " · noch {n}",
-    "(a payé {paid} €, le moins du groupe)": "(hat {paid} € bezahlt, am wenigsten in der Gruppe)",
+    "(a payé {paid}, le moins du groupe)": "(hat {paid} bezahlt, am wenigsten in der Gruppe)",
     "(archivé)": "(archiviert)",
     "(clos)": "(geschlossen)",
     "(inactif)": "(inaktiv)",
@@ -5122,6 +5259,11 @@ const I18N = {
     "Compte clos": "Konto geschlossen",
     "Compte introuvable (capteur My Bank absent).": "Konto nicht gefunden (kein My-Bank-Sensor).",
     "Compte par défaut": "Standardkonto",
+    "Devise": "Währung",
+    "Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.": "ISO-4217-Code, 3 Buchstaben (EUR, USD, GBP…). Standardmäßig die Währung von Home Assistant für ein neues Konto.",
+    "Les comptes sélectionnés n'ont pas tous la même devise : choisir des comptes dans une seule devise pour cette carte.": "Die ausgewählten Konten haben nicht alle dieselbe Währung: für diese Karte Konten in nur einer Währung wählen.",
+    "Choisis des comptes dans une seule devise : des comptes de devises différentes ne peuvent pas être additionnés sur cette carte.": "Wähle Konten in nur einer Währung: Konten mit unterschiedlichen Währungen können auf dieser Karte nicht addiert werden.",
+    "Préselectionné partout où un compte se choisit. Un seul compte à la fois ; le cocher ici décoche l'ancien.": "Wird überall vorausgewählt, wo ein Konto gewählt wird. Nur eines gleichzeitig; dieses hier ankreuzen hebt das vorherige auf.",
     "Compte partagé": "Geteiltes Konto",
     "Comptes": "Konten",
     "Comptes affichés": "Angezeigte Konten",
@@ -5145,7 +5287,7 @@ const I18N = {
     "Dé-rapprocher cette opération (elle reste pointée) ?": "Abstimmung dieser Buchung aufheben (sie bleibt abgeglichen)?",
     "Dé-rapprocher et dé-pointer cette opération ?": "Abstimmung und Abgleich dieser Buchung aufheben?",
     "Dépense": "Ausgabe",
-    "Dépense de {amount} € enregistrée{who} ({account}, {date}).": "Ausgabe über {amount} € gespeichert{who} ({account}, {date}).",
+    "Dépense de {amount} enregistrée{who} ({account}, {date}).": "Ausgabe über {amount} gespeichert{who} ({account}, {date}).",
     "Dépenses": "Ausgaben",
     "Dépenses ({n})": "Ausgaben ({n})",
     "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture.": "Gemeinsame Ausgaben einer Gruppe: wer als Nächstes zahlt, wer wem beim Abschluss wie viel schuldet.",
@@ -5266,7 +5408,7 @@ const I18N = {
     "Rapproché :": "Abgestimmt:",
     "Rapprochée": "Abgestimmt",
     "Recette": "Einnahme",
-    "Recette de {amount} € enregistrée{who} ({account}, {date}).": "Einnahme über {amount} € gespeichert{who} ({account}, {date}).",
+    "Recette de {amount} enregistrée{who} ({account}, {date}).": "Einnahme über {amount} gespeichert{who} ({account}, {date}).",
     "Recettes": "Einnahmen",
     "Rechercher…": "Suchen…",
     "Recopier ce montant sur les échéances suivantes": "Diesen Betrag auf die folgenden Ausführungen übertragen",
@@ -5327,7 +5469,7 @@ const I18N = {
     "Supprimer cette classe ?": "Diese Klasse löschen?",
     "Supprimer cette opération ?": "Diese Buchung löschen?",
     "Supprimer cette rubrique ?": "Diese Kategorie löschen?",
-    "Supprimer la dépense « {label} » de {amount} € ?": "Die Ausgabe „{label}“ über {amount} € löschen?",
+    "Supprimer la dépense « {label} » de {amount} ?": "Die Ausgabe „{label}“ über {amount} löschen?",
     "Supprimer le budget « {name} » et tous ses montants ?": "Das Budget „{name}“ mit allen Beträgen löschen?",
     "Supprimer « {label} » ? Les opérations déjà saisies restent.": "„{label}“ löschen? Bereits erfasste Buchungen bleiben erhalten.",
     "Supprimer « {name} » ensuite": "„{name}“ danach löschen",
@@ -5339,10 +5481,12 @@ const I18N = {
     "Titre (facultatif)": "Titel (optional)",
     "Total": "Summe",
     "Total {name}": "Summe {name}",
-    "Total {total} € · part de chacun {share} €": "Summe {total} € · Anteil pro Person {share} €",
+    "Total {total} · part de chacun {share}": "Summe {total} · Anteil pro Person {share}",
     "Tous": "Alle",
     "Tous cochés par défaut.": "Standardmäßig alle ausgewählt.",
     "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes).": "Standardmäßig alle ausgewählt. Um Konten sehr unterschiedlicher Größenordnung zu vergleichen, lieber eine Karte pro Konto (oder Kontogruppe) verwenden.",
+    "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes). Une seule devise à la fois.": "Standardmäßig alle ausgewählt. Um Konten sehr unterschiedlicher Größenordnung zu vergleichen, lieber eine Karte pro Konto (oder Kontogruppe) verwenden. Nur eine Währung gleichzeitig.",
+    "Tous cochés par défaut. Une seule devise à la fois.": "Standardmäßig alle ausgewählt. Nur eine Währung gleichzeitig.",
     "Tous les": "Alle",
     "Tous les ans": "Jährlich",
     "Tous les champs": "Alle Felder",
@@ -5376,7 +5520,7 @@ const I18N = {
     "Vers": "Nach",
     "Ville": "Ort",
     "Virement": "Umbuchung",
-    "Virement de {amount} € enregistré : {from} → {to}.": "Umbuchung über {amount} € gespeichert: {from} → {to}.",
+    "Virement de {amount} enregistré : {from} → {to}.": "Umbuchung über {amount} gespeichert: {from} → {to}.",
     "Virement depuis…": "Umbuchung von…",
     "Virement vers…": "Umbuchung auf…",
     "Virements": "Umbuchungen",
@@ -5408,7 +5552,7 @@ const I18N = {
     "terminée": "beendet",
     "trimestre(s)": "Quartal(e)",
     "{actual} réalisés sur {planned} prévus": "{actual} Ist von {planned} geplant",
-    "{amount} € payés par {name}.": "{amount} € bezahlt von {name}.",
+    "{amount} payés par {name}.": "{amount} bezahlt von {name}.",
     "{base}, jusqu'au {date}": "{base}, bis {date}",
     "{base}, {n} fois": "{base}, {n}-mal",
     "{done}/{total} générées": "{done}/{total} erzeugt",
@@ -5417,9 +5561,9 @@ const I18N = {
     "{n} dépense(s)": "{n} Ausgabe(n)",
     "{n} opération(s) déplacée(s) de « {name} » vers « {target} ».": "{n} Buchung(en) von „{name}“ nach „{target}“ verschoben.",
     "{n} opération(s) et {s} planification(s) déplacée(s) de « {name} » vers « {target} ».": "{n} Buchung(en) und {s} Dauerauftrag/-aufträge von „{name}“ nach „{target}“ verschoben.",
-    "{n} opération(s) sur {all} · total {total} €": "{n} von {all} Buchung(en) · Summe {total} €",
+    "{n} opération(s) sur {all} · total {total}": "{n} von {all} Buchung(en) · Summe {total}",
     "{n} planification(s) arrivant à terme dans les {days} jours": "{n} Dauerauftrag/-aufträge endet/enden innerhalb von {days} Tagen",
-    "{n} échéance(s) · total {total} €": "{n} Ausführung(en) · Summe {total} €",
+    "{n} échéance(s) · total {total}": "{n} Ausführung(en) · Summe {total}",
     "{n} échéances au maximum : réduire la durée": "Höchstens {n} Ausführungen: Laufzeit verkürzen",
     "« {name} » a été supprimé.": "„{name}“ wurde gelöscht.",
     "« {name} » n'a pas pu être supprimé : {error}": "„{name}“ konnte nicht gelöscht werden: {error}",
@@ -5427,7 +5571,7 @@ const I18N = {
     "À venir": "Ausstehend",
     "À venir (30 jours)": "Demnächst (30 Tage)",
     "Écart": "Abweichung",
-    "Écart : {diff} €": "Differenz: {diff} €",
+    "Écart : {diff}": "Differenz: {diff}",
     "Écart nul : tout est rapproché.": "Keine Differenz: alles ist abgestimmt.",
     "Écart positif = favorable (moins dépensé, plus reçu ou épargné). Montants des rubriques parentes, sous-rubriques comprises. ▾ / ▸ replie ou déplie une rubrique.": "Positive Abweichung = günstig (weniger ausgegeben, mehr erhalten oder gespart). Beträge übergeordneter Kategorien enthalten die Unterkategorien. ▾ / ▸ klappt eine Kategorie zu oder auf.",
     "Échéance {n} : montant invalide (saisir un montant positif ; le type indique le sens).": "Ausführung {n}: ungültiger Betrag (positiven Betrag eingeben; die Art bestimmt die Richtung).",
@@ -5510,7 +5654,7 @@ const I18N = {
   },
   es: {
     " · encore {n} échéances": "· {n} pendientes",
-    "(a payé {paid} €, le moins du groupe)": "(quien menos ha pagado: {paid} €)",
+    "(a payé {paid}, le moins du groupe)": "(quien menos ha pagado: {paid})",
     "(archivé)": "(archivado)",
     "(clos)": "(cerrado)",
     "(inactif)": "(inactivo)",
@@ -5598,6 +5742,11 @@ const I18N = {
     "Compte clos": "Cuenta cerrada",
     "Compte introuvable (capteur My Bank absent).": "No se ha encontrado la cuenta (falta el sensor My Bank).",
     "Compte par défaut": "Cuenta predeterminada",
+    "Devise": "Divisa",
+    "Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.": "Código ISO 4217 de 3 letras (EUR, USD, GBP…). Por defecto, la divisa de Home Assistant para una cuenta nueva.",
+    "Les comptes sélectionnés n'ont pas tous la même devise : choisir des comptes dans une seule devise pour cette carte.": "Las cuentas seleccionadas no tienen todas la misma divisa: elige cuentas de una sola divisa para esta tarjeta.",
+    "Choisis des comptes dans une seule devise : des comptes de devises différentes ne peuvent pas être additionnés sur cette carte.": "Elige cuentas de una sola divisa: no se pueden sumar cuentas de divisas distintas en esta tarjeta.",
+    "Préselectionné partout où un compte se choisit. Un seul compte à la fois ; le cocher ici décoche l'ancien.": "Preseleccionada en todos los sitios donde se elige una cuenta. Solo una a la vez; marcar esta desmarca la anterior.",
     "Compte partagé": "Cuenta compartida",
     "Comptes": "Cuentas",
     "Comptes affichés": "Cuentas visibles",
@@ -5621,7 +5770,7 @@ const I18N = {
     "Dé-rapprocher cette opération (elle reste pointée) ?": "¿Deshacer la conciliación de esta operación (seguirá marcada)?",
     "Dé-rapprocher et dé-pointer cette opération ?": "¿Deshacer la conciliación y desmarcar esta operación?",
     "Dépense": "Gasto",
-    "Dépense de {amount} € enregistrée{who} ({account}, {date}).": "Gasto de {amount} € guardado{who} ({account}, {date}).",
+    "Dépense de {amount} enregistrée{who} ({account}, {date}).": "Gasto de {amount} guardado{who} ({account}, {date}).",
     "Dépenses": "Gastos",
     "Dépenses ({n})": "Gastos ({n})",
     "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture.": "Gastos compartidos de un grupo: quién paga la próxima vez y quién debe cuánto a quién al cerrar.",
@@ -5742,7 +5891,7 @@ const I18N = {
     "Rapproché :": "Conciliado:",
     "Rapprochée": "Conciliada",
     "Recette": "Ingreso",
-    "Recette de {amount} € enregistrée{who} ({account}, {date}).": "Ingreso de {amount} € guardado{who} ({account}, {date}).",
+    "Recette de {amount} enregistrée{who} ({account}, {date}).": "Ingreso de {amount} guardado{who} ({account}, {date}).",
     "Recettes": "Ingreso",
     "Rechercher…": "Buscar…",
     "Recopier ce montant sur les échéances suivantes": "Copiar este importe a los siguientes vencimientos",
@@ -5803,7 +5952,7 @@ const I18N = {
     "Supprimer cette classe ?": "¿Eliminar esta clase?",
     "Supprimer cette opération ?": "¿Eliminar esta operación?",
     "Supprimer cette rubrique ?": "¿Eliminar esta categoría?",
-    "Supprimer la dépense « {label} » de {amount} € ?": "¿Eliminar el gasto «{label}» de {amount} €?",
+    "Supprimer la dépense « {label} » de {amount} ?": "¿Eliminar el gasto «{label}» de {amount}?",
     "Supprimer le budget « {name} » et tous ses montants ?": "¿Eliminar el presupuesto «{name}» y todos sus importes?",
     "Supprimer « {label} » ? Les opérations déjà saisies restent.": "¿Eliminar «{label}»? Se conservarán las operaciones ya registradas.",
     "Supprimer « {name} » ensuite": "Eliminar después «{name}»",
@@ -5815,10 +5964,12 @@ const I18N = {
     "Titre (facultatif)": "Título (opcional)",
     "Total": "Total",
     "Total {name}": "Total de {name}",
-    "Total {total} € · part de chacun {share} €": "Total: {total} € · parte de cada persona: {share} €",
+    "Total {total} · part de chacun {share}": "Total: {total} · parte de cada persona: {share}",
     "Tous": "Todas",
     "Tous cochés par défaut.": "Todas seleccionadas de forma predeterminada.",
     "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes).": "Todas seleccionadas de forma predeterminada. Para comparar cuentas de escalas muy distintas, es preferible usar una tarjeta por cuenta (o grupo de cuentas).",
+    "Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes). Une seule devise à la fois.": "Todas seleccionadas de forma predeterminada. Para comparar cuentas de escalas muy distintas, es preferible usar una tarjeta por cuenta (o grupo de cuentas). Solo una divisa a la vez.",
+    "Tous cochés par défaut. Une seule devise à la fois.": "Todas seleccionadas de forma predeterminada. Solo una divisa a la vez.",
     "Tous les": "Cada",
     "Tous les ans": "Cada año",
     "Tous les champs": "Todos los campos",
@@ -5852,7 +6003,7 @@ const I18N = {
     "Vers": "Hasta",
     "Ville": "Ciudad",
     "Virement": "Transferencia",
-    "Virement de {amount} € enregistré : {from} → {to}.": "Transferencia de {amount} € registrada: {from} → {to}.",
+    "Virement de {amount} enregistré : {from} → {to}.": "Transferencia de {amount} registrada: {from} → {to}.",
     "Virement depuis…": "Transferencia desde…",
     "Virement vers…": "Transferencia a…",
     "Virements": "Transferencias",
@@ -5884,7 +6035,7 @@ const I18N = {
     "terminée": "finalizada",
     "trimestre(s)": "trimestre(s)",
     "{actual} réalisés sur {planned} prévus": "{actual} realizados de {planned} previstos",
-    "{amount} € payés par {name}.": "{amount} € pagados por {name}.",
+    "{amount} payés par {name}.": "{amount} pagados por {name}.",
     "{base}, jusqu'au {date}": "{base}, hasta el {date}",
     "{base}, {n} fois": "{base}, {n} veces",
     "{done}/{total} générées": "{done}/{total} registradas",
@@ -5893,9 +6044,9 @@ const I18N = {
     "{n} dépense(s)": "{n} gasto(s)",
     "{n} opération(s) déplacée(s) de « {name} » vers « {target} ».": "Se han movido {n} operaciones de «{name}» a «{target}».",
     "{n} opération(s) et {s} planification(s) déplacée(s) de « {name} » vers « {target} ».": "Se han movido {n} operaciones y {s} operaciones programadas de «{name}» a «{target}».",
-    "{n} opération(s) sur {all} · total {total} €": "{n} de {all} operaciones · total {total} €",
+    "{n} opération(s) sur {all} · total {total}": "{n} de {all} operaciones · total {total}",
     "{n} planification(s) arrivant à terme dans les {days} jours": "{n} operaciones programadas que terminan en los próximos {days} días",
-    "{n} échéance(s) · total {total} €": "{n} vencimiento(s) · total {total} €",
+    "{n} échéance(s) · total {total}": "{n} vencimiento(s) · total {total}",
     "{n} échéances au maximum : réduire la durée": "Como máximo {n} vencimientos: reduce la duración",
     "« {name} » a été supprimé.": "Se ha eliminado «{name}».",
     "« {name} » n'a pas pu être supprimé : {error}": "No se ha podido eliminar «{name}»: {error}",
@@ -5903,7 +6054,7 @@ const I18N = {
     "À venir": "Próximos",
     "À venir (30 jours)": "Próximos (30 días)",
     "Écart": "Desviación",
-    "Écart : {diff} €": "Diferencia: {diff} €",
+    "Écart : {diff}": "Diferencia: {diff}",
     "Écart nul : tout est rapproché.": "Diferencia cero: todo está conciliado.",
     "Écart positif = favorable (moins dépensé, plus reçu ou épargné). Montants des rubriques parentes, sous-rubriques comprises. ▾ / ▸ replie ou déplie une rubrique.": "Una desviación positiva es favorable (menos gastos, más ingresos o más ahorro). Los importes de las categorías principales incluyen sus subcategorías. ▾ / ▸ contrae o despliega una categoría.",
     "Échéance {n} : montant invalide (saisir un montant positif ; le type indique le sens).": "Vencimiento {n}: importe no válido (introduce un importe positivo; el tipo indica el sentido).",

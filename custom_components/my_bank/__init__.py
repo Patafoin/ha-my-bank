@@ -16,11 +16,11 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_URL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, Unauthorized, UnknownUser
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
 
 from .api import MyBankApiError, MyBankClient
-from .const import CONF_TOKEN, DEFAULT_PAYMENT_METHODS, DEFAULT_URL, DOMAIN, MIN_API_VERSION
+from .const import CONF_ADMIN_ONLY, CONF_TOKEN, DEFAULT_PAYMENT_METHODS, DEFAULT_URL, DOMAIN, MIN_API_VERSION
 from .coordinator import MyBankCoordinator
 from .frontend import async_register_frontend
 from .views import async_register_view
@@ -115,11 +115,29 @@ async def async_unload_entry(hass: HomeAssistant, entry: MyBankConfigEntry) -> b
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-def _coordinator(hass: HomeAssistant) -> MyBankCoordinator:
+def _entry(hass: HomeAssistant) -> MyBankConfigEntry:
     for entry in hass.config_entries.async_entries(DOMAIN):
         if entry.state is ConfigEntryState.LOADED:
-            return entry.runtime_data
+            return entry
     raise HomeAssistantError(translation_domain=DOMAIN, translation_key="not_loaded")
+
+
+def _coordinator(hass: HomeAssistant) -> MyBankCoordinator:
+    return _entry(hass).runtime_data
+
+
+async def _check_write_allowed(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Option `admin_only` (par défaut) : écriture réservée aux administrateurs, comme un service admin de HA.
+
+    Sans utilisateur (automatisation, script lancé par HA) : toujours permis.
+    """
+    if not _entry(hass).options.get(CONF_ADMIN_ONLY, True) or not call.context.user_id:
+        return
+    user = await hass.auth.async_get_user(call.context.user_id)
+    if user is None:
+        raise UnknownUser(context=call.context, user_id=call.context.user_id)
+    if not user.is_admin:
+        raise Unauthorized(context=call.context)
 
 
 # --- Schémas ---------------------------------------------------------------------------------------
@@ -130,6 +148,7 @@ _AMOUNT = cv.string  # "-14,80" ou -14.8 : la conversion et le contrôle sont fa
 _TEXT = vol.Any(None, cv.string)
 _STATE = vol.All(vol.Coerce(int), vol.In([0, 1, 2]))
 _DATE = cv.matches_regex(r"^\d{4}-\d{2}-\d{2}$")
+_CURRENCY = vol.All(cv.string, lambda v: v.strip().upper(), cv.matches_regex(r"^[A-Z]{3}$"))
 
 _SPLIT = vol.Schema(
     {
@@ -144,11 +163,13 @@ _ACCOUNT_FIELDS = {
     vol.Optional("kind"): vol.In(["checking", "savings", "card", "cash", "other"]),
     vol.Optional("number"): _TEXT,
     vol.Optional("iban"): _TEXT,
+    vol.Optional("currency"): _CURRENCY,
     vol.Optional("opening_balance"): _AMOUNT,
     vol.Optional("opening_date"): vol.Any(None, _DATE),
     vol.Optional("closed"): cv.boolean,
     vol.Optional("position"): vol.Coerce(int),
     vol.Optional("notes"): _TEXT,
+    vol.Optional("is_default"): cv.boolean,
 }
 _TREE_FIELDS = {
     vol.Optional("parent_id"): _OPT_ID,
@@ -210,7 +231,8 @@ _BUDGET_FIELDS = {
     vol.Optional("notes"): _TEXT,
 }
 _BUDGET_LINE = vol.Schema({vol.Required("category_id"): _ID, vol.Required("month"): _MONTH, vol.Required("amount"): _AMOUNT})
-_ATTACHMENT_LINK = vol.Schema({vol.Required("transaction_id"): _ID, vol.Required("url"): cv.string})
+# cv.url : http(s) seulement (un lien javascript: s'exécuterait à l'ouverture dans la carte)
+_ATTACHMENT_LINK = vol.Schema({vol.Required("transaction_id"): _ID, vol.Required("url"): cv.url})
 _ATTACHMENT_FILE = vol.Schema(
     {
         vol.Required("transaction_id"): _ID,
@@ -393,10 +415,14 @@ def _register_services(hass: HomeAssistant) -> None:
         return
     hass.data[_SERVICES_REGISTERED] = True
 
-    def make_write(method: str, template: str):
+    def make_write(name: str, method: str, template: str):
         async def handler(call: ServiceCall) -> ServiceResponse:
+            await _check_write_allowed(hass, call)
             coordinator = _coordinator(hass)
             path, body = _split_path(template, call.data)
+            if name == "create_account":
+                # Pas de devise choisie : celle réglée dans Paramètres > Général de HA plutôt que le EUR par défaut de l'API.
+                body.setdefault("currency", hass.config.currency)
             try:
                 if method == "POST":
                     result = await coordinator.client.post(path, body)
@@ -416,6 +442,7 @@ def _register_services(hass: HomeAssistant) -> None:
     def make_attachment_write(kind: str):
         # `kind` fixe le discriminant de l'API ; pas de template générique car il n'est pas un champ saisi par l'appelant.
         async def handler(call: ServiceCall) -> ServiceResponse:
+            await _check_write_allowed(hass, call)
             coordinator = _coordinator(hass)
             body = dict(call.data)
             tx_id = body.pop("transaction_id")
@@ -439,9 +466,10 @@ def _register_services(hass: HomeAssistant) -> None:
 
         return handler
 
+    # Écritures : contrôle des droits dans chaque appel (option `admin_only`, modifiable sans redémarrer).
     for name, schema, method, template in _WRITE_SERVICES:
         hass.services.async_register(
-            DOMAIN, name, make_write(method, template), schema=schema, supports_response=SupportsResponse.OPTIONAL
+            DOMAIN, name, make_write(name, method, template), schema=schema, supports_response=SupportsResponse.OPTIONAL
         )
     for name, kind, schema in (
         ("set_transaction_attachment_link", "link", _ATTACHMENT_LINK),

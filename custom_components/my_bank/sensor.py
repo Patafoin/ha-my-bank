@@ -107,6 +107,7 @@ class AccountBalanceSensor(CoordinatorEntity[MyBankCoordinator], SensorEntity):
             "kind": account.get("kind"),
             "iban": account.get("iban"),
             "closed": account.get("closed"),
+            "is_default": account.get("is_default"),
         }
 
 

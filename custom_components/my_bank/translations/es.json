@@ -39,6 +39,20 @@
       "reauth_successful": "Se ha actualizado la conexión con la API de My Bank."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de My Bank",
+        "description": "Quién puede modificar los datos de My Bank desde Home Assistant.",
+        "data": {
+          "admin_only": "Solo los administradores pueden modificar los datos"
+        },
+        "data_description": {
+          "admin_only": "Activado (recomendado): solo los administradores de Home Assistant pueden crear, modificar o eliminar datos y abrir justificantes de archivo; los demás usuarios siguen pudiendo leer saldos y listas. Las automatizaciones y scripts no se ven afectados."
+        }
+      }
+    }
+  },
   "issues": {
     "api_too_old": {
       "title": "La API de My Bank necesita actualizarse",
@@ -87,6 +101,10 @@
           "name": "IBAN",
           "description": "IBAN."
         },
+        "currency": {
+          "name": "Divisa",
+          "description": "Código ISO 4217, por ejemplo EUR, USD, GBP; por defecto la de Home Assistant."
+        },
         "opening_balance": {
           "name": "Saldo inicial",
           "description": "Saldo anterior al primer movimiento, p. ej., 1250.00."
@@ -106,6 +124,10 @@
         "notes": {
           "name": "Notas",
           "description": "Notas libres."
+        },
+        "is_default": {
+          "name": "Cuenta predeterminada",
+          "description": "Preseleccionada en todos los lugares donde se elige una cuenta; solo una cuenta puede ser la predeterminada."
         }
       }
     },
@@ -133,6 +155,10 @@
           "name": "IBAN",
           "description": "IBAN."
         },
+        "currency": {
+          "name": "Divisa",
+          "description": "Código ISO 4217, por ejemplo EUR, USD, GBP; por defecto la de Home Assistant."
+        },
         "opening_balance": {
           "name": "Saldo inicial",
           "description": "Saldo anterior al primer movimiento, p. ej., 1250.00."
@@ -152,6 +178,10 @@
         "notes": {
           "name": "Notas",
           "description": "Notas libres."
+        },
+        "is_default": {
+          "name": "Cuenta predeterminada",
+          "description": "Preseleccionada en todos los lugares donde se elige una cuenta; solo una cuenta puede ser la predeterminada."
         }
       }
     },

@@ -21,7 +21,7 @@ async def test_outdated_server_raises_a_repair_issue(hass: HomeAssistant, aiocli
     await _setup(hass, aioclient_mock, config_entry, "0.4.1")
     issue = ir.async_get(hass).async_get_issue(DOMAIN, "api_too_old")
     assert issue is not None
-    assert issue.translation_placeholders == {"version": "0.4.1", "minimum": "0.5.0"}
+    assert issue.translation_placeholders == {"version": "0.4.1", "minimum": "0.8.0"}
     # The entry still loads: the issue is a warning, not a blocker.
     assert hass.states.get("sensor.compte_courant") is not None
 

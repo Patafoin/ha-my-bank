@@ -39,6 +39,20 @@
       "reauth_successful": "My Bank API connection updated."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "My Bank options",
+        "description": "Who may change My Bank data from Home Assistant.",
+        "data": {
+          "admin_only": "Only administrators can change data"
+        },
+        "data_description": {
+          "admin_only": "When on (recommended), only Home Assistant administrators can create, change or delete data and open file attachments; other users can still read balances and lists. Automations and scripts are not affected."
+        }
+      }
+    }
+  },
   "issues": {
     "api_too_old": {
       "title": "My Bank API needs an update",
@@ -87,6 +101,10 @@
           "name": "IBAN",
           "description": "IBAN."
         },
+        "currency": {
+          "name": "Currency",
+          "description": "ISO 4217 code, e.g. EUR, USD, GBP; defaults to Home Assistant's currency."
+        },
         "opening_balance": {
           "name": "Opening balance",
           "description": "Balance before the first transaction, e.g. 1250.00."
@@ -106,6 +124,10 @@
         "notes": {
           "name": "Notes",
           "description": "Free notes."
+        },
+        "is_default": {
+          "name": "Default account",
+          "description": "Preselected wherever an account is chosen; only one account can be the default."
         }
       }
     },
@@ -133,6 +155,10 @@
           "name": "IBAN",
           "description": "IBAN."
         },
+        "currency": {
+          "name": "Currency",
+          "description": "ISO 4217 code, e.g. EUR, USD, GBP; defaults to Home Assistant's currency."
+        },
         "opening_balance": {
           "name": "Opening balance",
           "description": "Balance before the first transaction, e.g. 1250.00."
@@ -152,6 +178,10 @@
         "notes": {
           "name": "Notes",
           "description": "Free notes."
+        },
+        "is_default": {
+          "name": "Default account",
+          "description": "Preselected wherever an account is chosen; only one account can be the default."
         }
       }
     },

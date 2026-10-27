@@ -56,6 +56,36 @@ async def test_create_transaction_body(hass, aioclient_mock, loaded_entry):
     assert body == {"account_id": 1, "date": "2026-10-06", "amount": "-14.8", "payee_name": "Supermarché", "category_id": 3, "state": 1}
 
 
+async def test_create_account_defaults_currency_to_hass(hass, aioclient_mock, loaded_entry):
+    """No currency given: use the one set in HA's own settings, not the API's own EUR default."""
+    hass.config.currency = "USD"
+    aioclient_mock.post(f"{API}/accounts", json={"id": 3})
+
+    await _call(hass, "create_account", {"name": "Compte US"})
+
+    method, url, body = _last(aioclient_mock)
+    assert (method, url) == ("POST", f"{API}/accounts")
+    assert body == {"name": "Compte US", "currency": "USD"}
+
+
+async def test_create_account_keeps_explicit_currency(hass, aioclient_mock, loaded_entry):
+    hass.config.currency = "USD"
+    aioclient_mock.post(f"{API}/accounts", json={"id": 3})
+
+    await _call(hass, "create_account", {"name": "Compte courant", "currency": "gbp"})
+
+    assert _last(aioclient_mock)[2] == {"name": "Compte courant", "currency": "GBP"}
+
+
+async def test_update_account_does_not_force_a_currency(hass, aioclient_mock, loaded_entry):
+    """Only `create_account` defaults to HA's currency; an update must not silently change it."""
+    aioclient_mock.patch(f"{API}/accounts/1", json={"id": 1})
+
+    await _call(hass, "update_account", {"account_id": 1, "name": "CC"})
+
+    assert _last(aioclient_mock)[2] == {"name": "CC"}
+
+
 async def test_update_transaction_moves_id_to_path_and_keeps_nulls(hass, aioclient_mock, loaded_entry):
     aioclient_mock.patch(f"{API}/transactions/5", json={"id": 5})
 
@@ -244,3 +274,50 @@ async def test_move_services(hass, aioclient_mock, loaded_entry):
     assert _last(aioclient_mock) == ("POST", f"{API}/categories/3/move", {"target_id": 8})
     await _call(hass, "move_account", {"account_id": 4, "target_id": 1, "include_reconciled": True})
     assert _last(aioclient_mock) == ("POST", f"{API}/accounts/4/move", {"target_id": 1, "include_reconciled": True})
+
+
+async def test_attachment_link_must_be_http(hass, aioclient_mock, loaded_entry):
+    """A javascript: link would run when the card opens it."""
+    calls = len(aioclient_mock.mock_calls)
+    for url in ("javascript:alert(1)", "data:text/html,x", "facture.pdf"):
+        with pytest.raises(Exception):
+            await _call(hass, "set_transaction_attachment_link", {"transaction_id": 5, "url": url})
+    assert len(aioclient_mock.mock_calls) == calls
+    aioclient_mock.put(f"{API}/transactions/5/attachment", json={"kind": "link", "url": "https://example.org/f.pdf"})
+    await _call(hass, "set_transaction_attachment_link", {"transaction_id": 5, "url": "https://example.org/f.pdf"})
+    assert _last(aioclient_mock) == ("PUT", f"{API}/transactions/5/attachment", {"kind": "link", "url": "https://example.org/f.pdf"})
+
+
+async def test_writes_are_admin_only_reads_are_not(hass, aioclient_mock, loaded_entry, hass_read_only_user):
+    from homeassistant.core import Context
+    from homeassistant.exceptions import Unauthorized
+
+    context = Context(user_id=hass_read_only_user.id)
+    calls = len(aioclient_mock.mock_calls)
+    for service, data in (
+        ("delete_account", {"account_id": 1}),
+        ("set_transaction_attachment_link", {"transaction_id": 5, "url": "https://example.org/f.pdf"}),
+    ):
+        with pytest.raises(Unauthorized):
+            await hass.services.async_call(DOMAIN, service, data, blocking=True, context=context)
+    assert len(aioclient_mock.mock_calls) == calls
+    response = await hass.services.async_call(DOMAIN, "list_accounts", {}, blocking=True, context=context, return_response=True)
+    assert response == {"items": ACCOUNTS}
+
+
+async def test_option_opens_writes_to_every_user(hass, aioclient_mock, loaded_entry, hass_read_only_user):
+    from homeassistant.core import Context
+
+    hass.config_entries.async_update_entry(loaded_entry, options={"admin_only": False})
+    aioclient_mock.delete(f"{API}/accounts/1", status=204)
+    await hass.services.async_call(DOMAIN, "delete_account", {"account_id": 1}, blocking=True, context=Context(user_id=hass_read_only_user.id))
+    assert _last(aioclient_mock) == ("DELETE", f"{API}/accounts/1", None)
+
+
+async def test_options_flow(hass, loaded_entry):
+    result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+    assert result["type"] == "form" and result["step_id"] == "init"
+    assert result["data_schema"]({}) == {"admin_only": True}  # coché par défaut
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"admin_only": False})
+    assert result["type"] == "create_entry"
+    assert loaded_entry.options == {"admin_only": False}

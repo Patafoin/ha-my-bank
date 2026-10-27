@@ -79,6 +79,8 @@ curl http://localhost:9931/api/v1/health   # the server answers
 
 The token is stored hashed in the database. Change the variable and restart to replace it; remove it to revoke it. If you prefer not to keep the token in `compose.yaml`, leave `MYBANK_API_TOKEN` out and create one in the container instead: `docker exec my-bank-api my-bank token create ha` (shown only once).
 
+If Home Assistant runs on the same host with `network_mode: host`, publish the port on the loopback interface only (`"127.0.0.1:9931:8000"`) and use `http://127.0.0.1:9931` at step 3: the server is then out of reach of the rest of your network. The interactive API documentation (`/docs`) is off by default; add `MYBANK_DOCS: "true"` to browse it.
+
 See the [My Bank API README](https://github.com/Patafoin/my-bank-api) for all settings.
 
 ### 2. The integration
@@ -108,7 +110,7 @@ If the cards don't show up in the picker after installing or updating, force-rel
 |---|---|
 | `dashboard` | Balances of every account, budget of the current month |
 | `transactions` | Transactions of an account with running balance; filters (savable as default); add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click; a reconciliation helper highlights the transaction that explains a balance gap; attach a receipt (a link, or a file kept by the server) to a transaction, opened in one click (📎) |
-| `accounts` | Accounts (checking, savings, card, cash…), opening balance, closing |
+| `accounts` | Accounts (checking, savings, card, cash…), currency, opening balance, closing, one default account |
 | `categories` / `tags` | Category tree (income / expense / savings) and classes, a second axis for analysis — see [Categories and classes](#categories-and-classes) |
 | `payees` | Payees with default category |
 | `budgets` | Monthly budget per account: planned vs actual, variance, copy from a previous budget |
@@ -142,7 +144,7 @@ Give each card instance its own `sections` to build an operations-only view, a s
 | `custom:my-bank-balance-card` | `account_id` — the three balances of one account |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — quick entry, pre-filled from the payee; an "All fields" button shows the hidden fields |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
-| `custom:my-bank-balance-history-card` | `account_ids`, `period` — balance history (line chart) of one or more accounts; one card = one chart, compose several cards to separate accounts of different scale |
+| `custom:my-bank-balance-history-card` | `account_ids`, `period` — balance history (line chart) of one or more accounts, same currency; one card = one chart, compose several cards to separate accounts of different scale or currency |
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — amount of upcoming occurrences, by week or by month depending on the horizon |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — spending by category (bars), the highest amount is 100 % |
 | `custom:my-bank-share-card` | — shared expenses |
@@ -186,7 +188,7 @@ Avoid setting only the class, without a category: the per-car analysis would sti
 
 ## Entities
 
-- **One sensor per account**: state = total balance (including future-dated transactions); attributes `solde_pointe` (cleared), `solde_rapproche` (reconciled), `account_id`, `kind`, `iban`, `closed`. Refreshed every 5 minutes and after every change.
+- **One sensor per account**: state = total balance (including future-dated transactions), in the account's own currency; attributes `solde_pointe` (cleared), `solde_rapproche` (reconciled), `account_id`, `kind`, `iban`, `closed`, `is_default`. Refreshed every 5 minutes and after every change.
 - **Scheduled transactions ending** (`sensor.scheduled_transactions_ending` on an English installation; the entity ID follows the language of Home Assistant when the integration is added): number of scheduled transactions whose last occurrence falls within 30 days, with the list in attributes — handy for a notification automation.
 
 ## Services
@@ -218,6 +220,8 @@ The server imports the QIF and payee CSV exports of MS Comptes Bancaires — see
 ## Security
 
 Keep My Bank API on your local network. Never expose it to the Internet: remote access goes through Home Assistant, which already handles authentication.
+
+Only Home Assistant **administrators** can change data (write services) or open file attachments; other users can still read balances and lists. To let every user change data, untick **Only administrators can change data** in the integration options (Settings → Devices & services → My Bank → Configure). Automations and scripts are not affected.
 
 ## Translations
 

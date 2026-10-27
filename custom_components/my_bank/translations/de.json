@@ -39,6 +39,20 @@
       "reauth_successful": "Verbindung zu My Bank API aktualisiert."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "My Bank-Optionen",
+        "description": "Wer die Daten von My Bank aus Home Assistant ändern darf.",
+        "data": {
+          "admin_only": "Nur Administratoren dürfen Daten ändern"
+        },
+        "data_description": {
+          "admin_only": "Aktiviert (empfohlen): Nur Administratoren von Home Assistant können Daten anlegen, ändern oder löschen und Dateibelege öffnen; andere Benutzer können Salden und Listen weiterhin lesen. Automationen und Skripte sind nicht betroffen."
+        }
+      }
+    }
+  },
   "issues": {
     "api_too_old": {
       "title": "My Bank API muss aktualisiert werden",
@@ -87,6 +101,10 @@
           "name": "IBAN",
           "description": "IBAN."
         },
+        "currency": {
+          "name": "Währung",
+          "description": "ISO-4217-Code, z. B. EUR, USD, GBP; standardmäßig die Währung von Home Assistant."
+        },
         "opening_balance": {
           "name": "Anfangssaldo",
           "description": "Saldo vor der ersten Buchung, z. B. 1250,00."
@@ -106,6 +124,10 @@
         "notes": {
           "name": "Notizen",
           "description": "Freie Notizen."
+        },
+        "is_default": {
+          "name": "Standardkonto",
+          "description": "Wird überall vorausgewählt, wo ein Konto gewählt wird; nur ein Konto kann das Standardkonto sein."
         }
       }
     },
@@ -133,6 +155,10 @@
           "name": "IBAN",
           "description": "IBAN."
         },
+        "currency": {
+          "name": "Währung",
+          "description": "ISO-4217-Code, z. B. EUR, USD, GBP; standardmäßig die Währung von Home Assistant."
+        },
         "opening_balance": {
           "name": "Anfangssaldo",
           "description": "Saldo vor der ersten Buchung, z. B. 1250,00."
@@ -152,6 +178,10 @@
         "notes": {
           "name": "Notizen",
           "description": "Freie Notizen."
+        },
+        "is_default": {
+          "name": "Standardkonto",
+          "description": "Wird überall vorausgewählt, wo ein Konto gewählt wird; nur ein Konto kann das Standardkonto sein."
         }
       }
     },

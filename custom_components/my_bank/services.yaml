@@ -24,6 +24,11 @@ create_account:
       required: false
       selector:
         text: {}
+    currency:
+      required: false
+      selector:
+        text: {}
+      example: EUR
     opening_balance:
       required: false
       selector:
@@ -46,6 +51,10 @@ create_account:
       required: false
       selector:
         text: {}
+    is_default:
+      required: false
+      selector:
+        boolean: {}
 update_account:
   fields:
     account_id:
@@ -76,6 +85,11 @@ update_account:
       required: false
       selector:
         text: {}
+    currency:
+      required: false
+      selector:
+        text: {}
+      example: EUR
     opening_balance:
       required: false
       selector:
@@ -98,6 +112,10 @@ update_account:
       required: false
       selector:
         text: {}
+    is_default:
+      required: false
+      selector:
+        boolean: {}
 delete_account:
   fields:
     account_id:

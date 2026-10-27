@@ -79,6 +79,8 @@ curl http://localhost:9931/api/v1/health   # der Server antwortet
 
 Das Token wird gehasht in der Datenbank gespeichert. Ändern Sie die Variable und starten Sie neu, um es zu ersetzen; entfernen Sie sie, um es zu widerrufen. Wenn Sie das Token nicht in `compose.yaml` aufbewahren möchten, lassen Sie `MYBANK_API_TOKEN` weg und erstellen Sie stattdessen eines im Container: `docker exec my-bank-api my-bank token create ha` (wird nur einmal angezeigt).
 
+Läuft Home Assistant auf demselben Rechner mit `network_mode: host`, veröffentlichen Sie den Port nur auf der Loopback-Schnittstelle (`"127.0.0.1:9931:8000"`) und geben Sie in Schritt 3 `http://127.0.0.1:9931` an: Der Server ist dann vom übrigen Netzwerk aus nicht erreichbar. Die interaktive API-Dokumentation (`/docs`) ist standardmäßig aus; fügen Sie `MYBANK_DOCS: "true"` hinzu, um sie aufzurufen.
+
 Alle Einstellungen stehen im [README von My Bank API](https://github.com/Patafoin/my-bank-api) (auf Englisch).
 
 ### 2. Die Integration
@@ -108,7 +110,7 @@ Wenn die Karten nach einer Installation oder einem Update nicht in der Auswahl e
 |---|---|
 | `dashboard` | Kontostände aller Konten, Budget des laufenden Monats |
 | `transactions` | Buchungen eines Kontos mit laufendem Kontostand; Filter (als Standard speicherbar); Hinzufügen, Bearbeiten, Aufteilen, Umbuchen; Abgleichen (☐/☑) und Abstimmen (🔓/🔒) mit einem Klick; eine Abstimmungshilfe hebt die Buchung hervor, die eine Saldodifferenz erklärt; einen Beleg (Link oder vom Server gespeicherte Datei) mit einer Buchung verknüpfen, mit einem Klick zu öffnen (📎) |
-| `accounts` | Konten (Girokonto, Sparkonto, Karte, Bargeld…), Anfangssaldo, Schließung |
+| `accounts` | Konten (Girokonto, Sparkonto, Karte, Bargeld…), Währung, Anfangssaldo, Schließung, ein Standardkonto |
 | `categories` / `tags` | Kategorienbaum (Einnahmen / Ausgaben / Sparen) und Klassen, eine zweite Achse für Auswertungen — siehe [Kategorien und Klassen](#kategorien-und-klassen) |
 | `payees` | Empfänger mit Standardkategorie |
 | `budgets` | Monatsbudget pro Konto: geplant / tatsächlich, Abweichung, Kopie eines früheren Budgets |
@@ -142,7 +144,7 @@ Geben Sie jeder Karteninstanz eigene `sections`, um eine Ansicht nur für die Er
 | `custom:my-bank-balance-card` | `account_id` — die drei Kontostände eines Kontos |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — Schnellerfassung, vorausgefüllt anhand des Empfängers; die Schaltfläche „Alle Felder“ zeigt die ausgeblendeten Felder |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
-| `custom:my-bank-balance-history-card` | `account_ids`, `period` — Kontostandsverlauf (Linie) eines oder mehrerer Konten; eine Karte = ein Diagramm, mehrere Karten kombinieren, um Konten unterschiedlicher Größenordnung zu trennen |
+| `custom:my-bank-balance-history-card` | `account_ids`, `period` — Kontostandsverlauf (Linie) eines oder mehrerer Konten, gleiche Währung; eine Karte = ein Diagramm, mehrere Karten kombinieren, um Konten unterschiedlicher Größenordnung oder Währung zu trennen |
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — Betrag der anstehenden Ausführungen, je nach Zeitraum pro Woche oder pro Monat |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — Ausgaben nach Kategorie (Balken), der höchste Betrag entspricht 100 % |
 | `custom:my-bank-share-card` | — geteilte Ausgaben |
@@ -186,7 +188,7 @@ Vermeiden Sie es, nur die Klasse ohne Kategorie zu setzen: Die Auswertung pro Fa
 
 ## Entitäten
 
-- **Ein Sensor pro Konto**: Zustand = Gesamtsaldo (einschließlich Buchungen mit künftigem Datum); Attribute `solde_pointe` (abgeglichen), `solde_rapproche` (abgestimmt), `account_id`, `kind`, `iban`, `closed`. Wird alle 5 Minuten und nach jeder Änderung aktualisiert.
+- **Ein Sensor pro Konto**: Zustand = Gesamtsaldo (einschließlich Buchungen mit künftigem Datum), in der Währung des Kontos; Attribute `solde_pointe` (abgeglichen), `solde_rapproche` (abgestimmt), `account_id`, `kind`, `iban`, `closed`, `is_default`. Wird alle 5 Minuten und nach jeder Änderung aktualisiert.
 - **Auslaufende Daueraufträge** (`sensor.auslaufende_dauerauftrage` auf einer deutschen Installation; die Entitäts-ID folgt der Sprache von Home Assistant beim Hinzufügen der Integration): Anzahl der Daueraufträge, deren letzte Ausführung in die nächsten 30 Tage fällt, mit der Liste als Attribute — praktisch für eine Benachrichtigungs-Automatisierung.
 
 ## Dienste
@@ -218,6 +220,8 @@ Der Server importiert die QIF-Exporte und die Empfänger-CSV von MS Comptes Banc
 ## Sicherheit
 
 Behalten Sie My Bank API in Ihrem lokalen Netzwerk. Stellen Sie sie nie ins Internet: Der Fernzugriff läuft über Home Assistant, das die Authentifizierung bereits übernimmt.
+
+Nur **Administratoren** von Home Assistant können Daten ändern (schreibende Dienste) oder Dateibelege öffnen; andere Benutzer können Salden und Listen weiterhin lesen. Damit alle Benutzer Daten ändern können, deaktivieren Sie **Nur Administratoren dürfen Daten ändern** in den Optionen der Integration (Einstellungen → Geräte & Dienste → My Bank → Konfigurieren). Automationen und Skripte sind nicht betroffen.
 
 ## Übersetzungen
 

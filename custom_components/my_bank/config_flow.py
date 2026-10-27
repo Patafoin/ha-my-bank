@@ -6,12 +6,12 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_URL
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .api import MyBankApiError, MyBankAuthError, MyBankClient
-from .const import CONF_TOKEN, DEFAULT_URL, DOMAIN
+from .const import CONF_ADMIN_ONLY, CONF_TOKEN, DEFAULT_URL, DOMAIN
 
 
 def _schema(url: str) -> vol.Schema:
@@ -22,6 +22,10 @@ class MyBankConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for My Bank."""
 
     VERSION = 2
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return MyBankOptionsFlow()
 
     def __init__(self) -> None:
         self._discovered: dict[str, Any] = {}
@@ -85,4 +89,16 @@ class MyBankConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=_schema(entry.data.get(CONF_URL) or DEFAULT_URL),
             errors=errors,
+        )
+
+
+class MyBankOptionsFlow(OptionsFlow):
+    """Who may change data: Home Assistant administrators only (default), or every user."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+        current = self.config_entry.options.get(CONF_ADMIN_ONLY, True)
+        return self.async_show_form(
+            step_id="init", data_schema=vol.Schema({vol.Required(CONF_ADMIN_ONLY, default=current): bool})
         )
