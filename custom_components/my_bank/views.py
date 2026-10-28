@@ -14,7 +14,8 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
 from .api import MyBankApiError
-from .const import CONF_ADMIN_ONLY, DOMAIN
+from .access import READ, allows, user_level
+from .const import DOMAIN
 
 _REGISTERED = f"{DOMAIN}_attachment_view_registered"
 
@@ -30,9 +31,9 @@ class MyBankAttachmentView(HomeAssistantView):
         )
         if entry is None:
             return web.Response(status=503)
-        # Option `admin_only` (par défaut), comme les services d'écriture. 403 et non `Unauthorized` (401) :
+        # Même droit que les services de lecture. 403 et non `Unauthorized` (401) :
         # HA compte chaque 401 comme une connexion ratée et finirait par bannir l'IP de l'utilisateur.
-        if entry.options.get(CONF_ADMIN_ONLY, True) and not request[KEY_HASS_USER].is_admin:
+        if not allows(user_level(entry, request[KEY_HASS_USER]), READ):
             return web.Response(status=403)
         coordinator = entry.runtime_data
         # Entier seulement : aiohttp décode %2F et %3F dans le paramètre, qui sortirait sinon du chemin prévu.

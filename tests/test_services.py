@@ -288,36 +288,101 @@ async def test_attachment_link_must_be_http(hass, aioclient_mock, loaded_entry):
     assert _last(aioclient_mock) == ("PUT", f"{API}/transactions/5/attachment", {"kind": "link", "url": "https://example.org/f.pdf"})
 
 
-async def test_writes_are_admin_only_reads_are_not(hass, aioclient_mock, loaded_entry, hass_read_only_user):
+def _options(default="none", access=None, **extra):
+    return {"default_access": default, "access": access or {}, "ending_sensor": False, "balance_sensors": [], **extra}
+
+
+async def _as_user(hass, user, service, data, **kwargs):
     from homeassistant.core import Context
+
+    return await hass.services.async_call(DOMAIN, service, data, blocking=True, context=Context(user_id=user.id), **kwargs)
+
+
+async def test_legacy_entry_writes_are_admin_only_reads_are_not(hass, aioclient_mock, loaded_entry, hass_read_only_user):
+    """Entry older than 0.16.0 (no `default_access`): `admin_only`, checked by default, as before."""
     from homeassistant.exceptions import Unauthorized
 
-    context = Context(user_id=hass_read_only_user.id)
     calls = len(aioclient_mock.mock_calls)
     for service, data in (
         ("delete_account", {"account_id": 1}),
         ("set_transaction_attachment_link", {"transaction_id": 5, "url": "https://example.org/f.pdf"}),
     ):
         with pytest.raises(Unauthorized):
-            await hass.services.async_call(DOMAIN, service, data, blocking=True, context=context)
+            await _as_user(hass, hass_read_only_user, service, data)
     assert len(aioclient_mock.mock_calls) == calls
-    response = await hass.services.async_call(DOMAIN, "list_accounts", {}, blocking=True, context=context, return_response=True)
+    response = await _as_user(hass, hass_read_only_user, "list_accounts", {}, return_response=True)
     assert response == {"items": ACCOUNTS}
 
 
-async def test_option_opens_writes_to_every_user(hass, aioclient_mock, loaded_entry, hass_read_only_user):
-    from homeassistant.core import Context
-
+async def test_legacy_option_opens_writes_to_every_user(hass, aioclient_mock, loaded_entry, hass_read_only_user):
     hass.config_entries.async_update_entry(loaded_entry, options={"admin_only": False})
     aioclient_mock.delete(f"{API}/accounts/1", status=204)
-    await hass.services.async_call(DOMAIN, "delete_account", {"account_id": 1}, blocking=True, context=Context(user_id=hass_read_only_user.id))
+    await _as_user(hass, hass_read_only_user, "delete_account", {"account_id": 1})
     assert _last(aioclient_mock) == ("DELETE", f"{API}/accounts/1", None)
 
 
-async def test_options_flow(hass, loaded_entry):
+@pytest.mark.parametrize(
+    ("options", "can_read", "can_write"),
+    [
+        (_options(), False, False),  # nouvelle entrée : rien par défaut
+        (_options(default="read"), True, False),
+        (_options(default="write"), True, True),
+        (_options(default="write", access={"USER": "none"}), False, False),  # niveau propre à l'utilisateur
+        (_options(access={"USER": "read"}), True, False),
+        (_options(access={"USER": "write"}), True, True),
+    ],
+)
+async def test_access_level_per_user(hass, aioclient_mock, loaded_entry, hass_read_only_user, options, can_read, can_write):
+    from homeassistant.exceptions import Unauthorized
+
+    access = {hass_read_only_user.id if k == "USER" else k: v for k, v in options["access"].items()}
+    hass.config_entries.async_update_entry(loaded_entry, options={**options, "access": access})
+    aioclient_mock.delete(f"{API}/accounts/1", status=204)
+    calls = len(aioclient_mock.mock_calls)
+
+    if can_read:
+        assert await _as_user(hass, hass_read_only_user, "list_accounts", {}, return_response=True) == {"items": ACCOUNTS}
+    else:
+        with pytest.raises(Unauthorized):
+            await _as_user(hass, hass_read_only_user, "list_accounts", {}, return_response=True)
+    if can_write:
+        await _as_user(hass, hass_read_only_user, "delete_account", {"account_id": 1})
+        assert _last(aioclient_mock) == ("DELETE", f"{API}/accounts/1", None)
+    else:
+        with pytest.raises(Unauthorized):
+            await _as_user(hass, hass_read_only_user, "delete_account", {"account_id": 1})
+    if not can_read:
+        assert len(aioclient_mock.mock_calls) == calls  # rien n'est parti vers l'API
+    expected = "write" if can_write else "read" if can_read else "none"
+    assert await _as_user(hass, hass_read_only_user, "get_access", {}, return_response=True) == {"level": expected}
+
+
+async def test_admins_and_automations_always_have_full_access(hass, aioclient_mock, loaded_entry, hass_admin_user):
+    hass.config_entries.async_update_entry(loaded_entry, options=_options(access={hass_admin_user.id: "none"}))
+    aioclient_mock.delete(f"{API}/accounts/1", status=204)
+    await _as_user(hass, hass_admin_user, "delete_account", {"account_id": 1})
+    await _call(hass, "delete_account", {"account_id": 1})  # sans utilisateur : automatisation, script lancé par HA
+    assert await _call(hass, "get_access", {}, return_response=True) == {"level": "write"}
+    assert await _as_user(hass, hass_admin_user, "get_access", {}, return_response=True) == {"level": "write"}
+
+
+async def test_options_flow_lists_non_admin_users_and_accounts(hass, loaded_entry, hass_admin_user, hass_read_only_user):
+    hass_read_only_user.name = "Alice"
     result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
     assert result["type"] == "form" and result["step_id"] == "init"
-    assert result["data_schema"]({}) == {"admin_only": True}  # coché par défaut
-    result = await hass.config_entries.options.async_configure(result["flow_id"], {"admin_only": False})
+    # Entrée antérieure à 0.16.0 : les réglages affichés reproduisent le comportement d'avant
+    defaults = result["data_schema"]({"users": {}, "sensors": {}})
+    assert defaults["users"] == {"default_access": "read", "Alice": "read"}  # pas les administrateurs
+    assert defaults["sensors"] == {"ending_sensor": True, "balance_sensors": ["1", "2"]}
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"users": {"default_access": "none", "Alice": "read"}, "sensors": {"ending_sensor": False, "balance_sensors": ["2"]}},
+    )
+    await hass.async_block_till_done()
     assert result["type"] == "create_entry"
-    assert loaded_entry.options == {"admin_only": False}
+    assert loaded_entry.options == _options(access={hass_read_only_user.id: "read"}, balance_sensors=["2"])
+    # rechargée : seuls les capteurs choisis restent
+    assert hass.states.get("sensor.livret_d_epargne") is not None
+    assert hass.states.get("sensor.compte_courant") is None
+    assert hass.states.get("sensor.scheduled_transactions_ending") is None

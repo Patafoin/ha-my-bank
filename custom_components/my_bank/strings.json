@@ -43,12 +43,30 @@
     "step": {
       "init": {
         "title": "My Bank options",
-        "description": "Who may change My Bank data from Home Assistant.",
-        "data": {
-          "admin_only": "Only administrators can change data"
-        },
-        "data_description": {
-          "admin_only": "When on (recommended), only Home Assistant administrators can create, change or delete data and open file attachments; other users can still read balances and lists. Automations and scripts are not affected."
+        "description": "Home Assistant administrators always have full access to My Bank. Automations and scripts started by Home Assistant are not restricted.",
+        "sections": {
+          "users": {
+            "name": "Access of the other users",
+            "description": "One line per Home Assistant user who is not an administrator. \"No access\": the My Bank cards show a message instead of the data. Reading also opens the file attachments.",
+            "data": {
+              "default_access": "Users created later"
+            },
+            "data_description": {
+              "default_access": "Level given to a Home Assistant user created after this setting was saved, until you choose one here."
+            }
+          },
+          "sensors": {
+            "name": "Published sensors",
+            "description": "The state of a sensor can be read by every Home Assistant user, whatever their access above: publish only what you need in automations or on dashboards. The My Bank cards do not need any sensor.",
+            "data": {
+              "ending_sensor": "Scheduled transactions ending",
+              "balance_sensors": "Account balances"
+            },
+            "data_description": {
+              "ending_sensor": "Number and list of the scheduled transactions whose last occurrence falls within 30 days (for a notification).",
+              "balance_sensors": "One sensor per chosen account (total balance; cleared and reconciled balances as attributes). An account created later is not published until it is chosen here."
+            }
+          }
         }
       }
     }
@@ -1641,6 +1659,10 @@
         }
       }
     },
+    "get_access": {
+      "name": "Get my access",
+      "description": "Returns the access level to My Bank of the user calling the action (none, read or write); always write for an automation or an administrator."
+    },
     "move_account": {
       "name": "Move account transactions",
       "description": "Moves every transaction and schedule of an account to another account.",
@@ -1752,6 +1774,13 @@
         "never": "Never",
         "date": "On a date",
         "count": "After N occurrences"
+      }
+    },
+    "access_level": {
+      "options": {
+        "none": "No access",
+        "read": "Read only",
+        "write": "Read and write"
       }
     }
   }

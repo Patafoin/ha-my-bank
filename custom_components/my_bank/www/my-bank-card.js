@@ -92,6 +92,28 @@ const TERM_DISMISS_KEY = "my-bank-term-dismissed";
 const TERM_REFRESH_MS = 5 * 60 * 1000;
 const NAV_KEY = "myBankCard"; // clé de la carte dans history.state (bouton Retour du navigateur)
 
+// Niveau d'accès de l'utilisateur connecté (none / read / write, options de l'intégration), demandé une fois par
+// connexion et partagé par toutes les cartes : sans accès, un message clair au lieu d'une série d'appels refusés.
+const ACCESS = new WeakMap();
+function myBankAccess(hass) {
+  const conn = hass.connection;
+  if (!ACCESS.has(conn)) {
+    ACCESS.set(conn, conn
+      .sendMessagePromise({ type: "call_service", domain: "my_bank", service: "get_access", service_data: {}, return_response: true })
+      // en cas d'échec (intégration non chargée…) : laisser passer, l'appel suivant affichera la vraie erreur
+      .then((res) => (res && res.response && res.response.level) || "write", () => { ACCESS.delete(conn); return "write"; }));
+  }
+  return ACCESS.get(conn);
+}
+
+// Prévient les cartes de la page qu'une donnée a changé (la carte de solde ne lit plus de capteur).
+const CHANGES = new EventTarget();
+let changeTimer = null;
+function notifyChange() {
+  clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => CHANGES.dispatchEvent(new Event("changed")), 500);
+}
+
 // Planifications à durée finie dont la dernière échéance tombe dans les TERM_DAYS jours (ou est en retard) :
 // toutes leurs échéances restantes figurent dans les échéances à venir de la période. Triées par date de fin.
 function endingSchedules(schedules, upcoming) {
@@ -545,6 +567,9 @@ function monthLabel(ym, style) {
 }
 
 function errMsg(err) {
+  if (err && (err.code === "unauthorized" || err.message === "Unauthorized")) {
+    return t("Action refusée : votre compte Home Assistant n'a pas les droits nécessaires sur My Bank.");
+  }
   return (err && (err.message || err.error || (err.body && err.body.message))) || String(err);
 }
 
@@ -624,6 +649,7 @@ class MyBankCard extends HTMLElement {
       service_data: data || {},
       return_response: !!wantResponse,
     });
+    if (!/^(list|get|search)_/.test(service)) notifyChange();
     return wantResponse ? res && res.response : res;
   }
 
@@ -735,6 +761,12 @@ class MyBankCard extends HTMLElement {
   async _renderActive(quiet) {
     if (!this._hass) return;
     if (!quiet) this._bodyEl.innerHTML = `<div class="loading">${t("Chargement…")}</div>`;
+    if ((await myBankAccess(this._hass)) === "none") {
+      this._tabsEl.style.display = "none";
+      this._alertsEl.innerHTML = "";
+      this._bodyEl.innerHTML = `<div class="empty">${t("Votre compte Home Assistant n'a pas accès à My Bank.")}</div>`;
+      return;
+    }
     // L'échéancier rafraîchit lui-même le bandeau « arrive à terme » avec ses propres données.
     if (!this._noAlerts && this._active !== "recurrences" && Date.now() - this._alertsAt > TERM_REFRESH_MS) this._refreshAlerts();
     try {
@@ -1107,8 +1139,8 @@ class MyBankCard extends HTMLElement {
         <span class="recon-diff"></span>
       </div>
       <div class="tx-summary"></div>
-      <div class="form-container"></div>
       <div class="tx-count"></div>
+      <div class="form-container"></div>
       <div class="tx-list"></div>
     `;
     this._paintSummary(this._lookups.account.get(this._txAccountId));
@@ -1371,10 +1403,14 @@ class MyBankCard extends HTMLElement {
       : null;
     const part = (tx) => (catIds ? tx.splits.filter((x) => catIds.has(x.category_id)).reduce((a, x) => a + Number(x.amount), 0) : Number(tx.amount));
     const total = items.reduce((acc, tx) => acc + part(tx), 0);
-    this._bodyEl.querySelector(".tx-count").textContent = active
-      ? t("{n} opération(s) sur {all} · total {total}", { n: items.length, all: this._txAll.length, total: fmtMoney(total, this._currency(this._txAccountId)) })
+    // Toujours affiché, sous les soldes : période et critères compris ; avec des critères, le total en plus.
+    const shown = items.length === 1
+      ? t("{n} opération affichée selon les critères", { n: 1 })
+      : t("{n} opérations affichées selon les critères", { n: items.length });
+    this._bodyEl.querySelector(".tx-count").textContent = shown + (active
+      ? ` · ${t("sur {all} · total {total}", { all: this._txAll.length, total: fmtMoney(total, this._currency(this._txAccountId)) })}`
         + (catIds ? ` ${t("(part de la rubrique)")}` : "")
-      : "";
+      : "");
     if (this._txRecon) this._paintRecon(); // la liste vient d'être redessinée : la mise en évidence doit l'être aussi
   }
 
@@ -3938,6 +3974,10 @@ class MyBankSimpleCard extends MyBankCard {
   async _renderActive() {
     if (!this._hass) return;
     this._loadedAt = Date.now();
+    if ((await myBankAccess(this._hass)) === "none") {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Votre compte Home Assistant n'a pas accès à My Bank.")}</div>`;
+      return;
+    }
     try {
       await this._renderCard();
     } catch (err) {
@@ -4012,7 +4052,7 @@ class MyBankEntryCard extends MyBankSimpleCard {
   }
 }
 
-// Les trois soldes d'un compte, lus sur son capteur (mis à jour par l'intégration toutes les 5 min et après chaque écriture).
+// Les trois soldes d'un compte, lus par le service list_accounts (aucun capteur nécessaire).
 class MyBankBalanceCard extends MyBankSimpleCard {
   static getStubConfig() {
     return {};
@@ -4022,44 +4062,43 @@ class MyBankBalanceCard extends MyBankSimpleCard {
     return document.createElement("my-bank-balance-card-editor");
   }
 
-  set hass(hass) {
-    this._hass = hass;
-    setLanguage(hass);
-    const state = this._accountState();
-    if (state !== this._lastState) {
-      this._lastState = state;
-      this._renderActive();
-    }
+  // Soldes lus par le service (droits de l'utilisateur appliqués), pas sur un capteur : les capteurs ne sont
+  // publiés qu'à la demande. Relus après une saisie dans une autre carte My Bank de la page, sinon toutes les 5 minutes.
+  connectedCallback() {
+    if (!this._onChange) this._onChange = () => this._renderActive();
+    CHANGES.addEventListener("changed", this._onChange);
+    if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
   }
 
-  // Capteur du compte choisi (attribut account_id) ; sinon le compte par défaut de l'intégration, sinon le premier.
-  _accountState() {
-    if (!this._hass) return null;
-    const sensors = Object.values(this._hass.states)
-      .filter((s) => s.entity_id.startsWith("sensor.") && s.attributes.account_id !== undefined && "solde_pointe" in s.attributes)
-      .sort((a, b) => a.attributes.account_id - b.attributes.account_id);
-    if (this._config.account_id) {
-      const wanted = Number(this._config.account_id);
-      return sensors.find((s) => s.attributes.account_id === wanted) || null;
-    }
-    return sensors.find((s) => s.attributes.is_default) || sensors[0] || null;
+  disconnectedCallback() {
+    if (this._onChange) CHANGES.removeEventListener("changed", this._onChange);
+  }
+
+  set hass(hass) {
+    super.hass = hass;
+    if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
   }
 
   async _renderCard() {
-    const s = this._accountState();
-    if (!s) {
-      this._bodyEl.innerHTML = `<div class="empty">${t("Compte introuvable (capteur My Bank absent).")}</div>`;
+    const accounts = await this._items("list_accounts");
+    // Compte choisi ; sinon le compte par défaut de l'intégration, sinon le premier.
+    const a = this._config.account_id
+      ? accounts.find((x) => x.id === Number(this._config.account_id))
+      : accounts.find((x) => x.is_default) || accounts[0];
+    if (!a) {
+      this._bodyEl.innerHTML = `<div class="empty">${t("Compte introuvable.")}</div>`;
       return;
     }
+    const b = a.balances || {};
     const n = (v) => Number(v);
-    const currency = s.attributes.unit_of_measurement || this._currency();
+    const currency = a.currency || this._currency();
     const line = (label, value) => `<div class="balance-line ${n(value) < 0 ? "neg" : ""}"><span>${label}</span><strong>${fmtMoney(value, currency)}</strong></div>`;
     this._bodyEl.innerHTML = `
-      <div class="bal-name">${esc(s.attributes.friendly_name || "")}</div>
-      <div class="bal-main ${n(s.state) < 0 ? "neg" : ""}" title="${t("Solde prévisionnel (toutes opérations)")}">${fmtMoney(s.state, currency)}</div>
-      ${line(t("Solde prévisionnel"), s.state)}
-      ${line(t("Solde banque (pointé)"), s.attributes.solde_pointe)}
-      ${line(t("Rapproché"), s.attributes.solde_rapproche)}`;
+      <div class="bal-name">${esc(a.name || "")}</div>
+      <div class="bal-main ${n(b.total) < 0 ? "neg" : ""}" title="${t("Solde prévisionnel (toutes opérations)")}">${fmtMoney(b.total, currency)}</div>
+      ${line(t("Solde prévisionnel"), b.total)}
+      ${line(t("Solde banque (pointé)"), b.pointed)}
+      ${line(t("Rapproché"), b.reconciled)}`;
   }
 }
 
@@ -4779,7 +4818,9 @@ const I18N = {
     "Code postal": "Postcode",
     "Compte": "Account",
     "Compte clos": "Account closed",
-    "Compte introuvable (capteur My Bank absent).": "Account not found (no My Bank sensor).",
+    "Votre compte Home Assistant n'a pas accès à My Bank.": "Your Home Assistant account has no access to My Bank.",
+    "Action refusée : votre compte Home Assistant n'a pas les droits nécessaires sur My Bank.": "Action refused: your Home Assistant account does not have the required rights on My Bank.",
+    "Compte introuvable.": "Account not found.",
     "Compte par défaut": "Default account",
     "Devise": "Currency",
     "Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.": "ISO 4217 code, 3 letters (EUR, USD, GBP…). Home Assistant's own currency by default for a new account.",
@@ -5083,7 +5124,9 @@ const I18N = {
     "{n} dépense(s)": "{n} expense(s)",
     "{n} opération(s) déplacée(s) de « {name} » vers « {target} ».": "{n} transaction(s) moved from “{name}” to “{target}”.",
     "{n} opération(s) et {s} planification(s) déplacée(s) de « {name} » vers « {target} ».": "{n} transaction(s) and {s} scheduled transaction(s) moved from “{name}” to “{target}”.",
-    "{n} opération(s) sur {all} · total {total}": "{n} of {all} transaction(s) · total {total}",
+    "{n} opération affichée selon les critères": "{n} transaction shown for the criteria",
+    "{n} opérations affichées selon les critères": "{n} transactions shown for the criteria",
+    "sur {all} · total {total}": "of {all} · total {total}",
     "{n} planification(s) arrivant à terme dans les {days} jours": "{n} scheduled transaction(s) ending within {days} days",
     "{n} échéance(s) · total {total}": "{n} occurrence(s) · total {total}",
     "{n} échéances au maximum : réduire la durée": "{n} occurrences at most: shorten the duration",
@@ -5262,7 +5305,9 @@ const I18N = {
     "Code postal": "Postleitzahl",
     "Compte": "Konto",
     "Compte clos": "Konto geschlossen",
-    "Compte introuvable (capteur My Bank absent).": "Konto nicht gefunden (kein My-Bank-Sensor).",
+    "Votre compte Home Assistant n'a pas accès à My Bank.": "Ihr Home-Assistant-Konto hat keinen Zugriff auf My Bank.",
+    "Action refusée : votre compte Home Assistant n'a pas les droits nécessaires sur My Bank.": "Aktion verweigert: Ihr Home-Assistant-Konto hat nicht die nötigen Rechte für My Bank.",
+    "Compte introuvable.": "Konto nicht gefunden.",
     "Compte par défaut": "Standardkonto",
     "Devise": "Währung",
     "Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.": "ISO-4217-Code, 3 Buchstaben (EUR, USD, GBP…). Standardmäßig die Währung von Home Assistant für ein neues Konto.",
@@ -5566,7 +5611,9 @@ const I18N = {
     "{n} dépense(s)": "{n} Ausgabe(n)",
     "{n} opération(s) déplacée(s) de « {name} » vers « {target} ».": "{n} Buchung(en) von „{name}“ nach „{target}“ verschoben.",
     "{n} opération(s) et {s} planification(s) déplacée(s) de « {name} » vers « {target} ».": "{n} Buchung(en) und {s} Dauerauftrag/-aufträge von „{name}“ nach „{target}“ verschoben.",
-    "{n} opération(s) sur {all} · total {total}": "{n} von {all} Buchung(en) · Summe {total}",
+    "{n} opération affichée selon les critères": "{n} Buchung gemäß den Kriterien angezeigt",
+    "{n} opérations affichées selon les critères": "{n} Buchungen gemäß den Kriterien angezeigt",
+    "sur {all} · total {total}": "von {all} · Summe {total}",
     "{n} planification(s) arrivant à terme dans les {days} jours": "{n} Dauerauftrag/-aufträge endet/enden innerhalb von {days} Tagen",
     "{n} échéance(s) · total {total}": "{n} Ausführung(en) · Summe {total}",
     "{n} échéances au maximum : réduire la durée": "Höchstens {n} Ausführungen: Laufzeit verkürzen",
@@ -5745,7 +5792,9 @@ const I18N = {
     "Code postal": "Código postal",
     "Compte": "Cuenta",
     "Compte clos": "Cuenta cerrada",
-    "Compte introuvable (capteur My Bank absent).": "No se ha encontrado la cuenta (falta el sensor My Bank).",
+    "Votre compte Home Assistant n'a pas accès à My Bank.": "Tu cuenta de Home Assistant no tiene acceso a My Bank.",
+    "Action refusée : votre compte Home Assistant n'a pas les droits nécessaires sur My Bank.": "Acción rechazada: tu cuenta de Home Assistant no tiene los permisos necesarios en My Bank.",
+    "Compte introuvable.": "No se ha encontrado la cuenta.",
     "Compte par défaut": "Cuenta predeterminada",
     "Devise": "Divisa",
     "Code ISO 4217 sur 3 lettres (EUR, USD, GBP…). Celle de Home Assistant par défaut pour un nouveau compte.": "Código ISO 4217 de 3 letras (EUR, USD, GBP…). Por defecto, la divisa de Home Assistant para una cuenta nueva.",
@@ -6049,7 +6098,9 @@ const I18N = {
     "{n} dépense(s)": "{n} gasto(s)",
     "{n} opération(s) déplacée(s) de « {name} » vers « {target} ».": "Se han movido {n} operaciones de «{name}» a «{target}».",
     "{n} opération(s) et {s} planification(s) déplacée(s) de « {name} » vers « {target} ».": "Se han movido {n} operaciones y {s} operaciones programadas de «{name}» a «{target}».",
-    "{n} opération(s) sur {all} · total {total}": "{n} de {all} operaciones · total {total}",
+    "{n} opération affichée selon les critères": "{n} movimiento mostrado según los criterios",
+    "{n} opérations affichées selon les critères": "{n} movimientos mostrados según los criterios",
+    "sur {all} · total {total}": "de {all} · total {total}",
     "{n} planification(s) arrivant à terme dans les {days} jours": "{n} operaciones programadas que terminan en los próximos {days} días",
     "{n} échéance(s) · total {total}": "{n} vencimiento(s) · total {total}",
     "{n} échéances au maximum : réduire la durée": "Como máximo {n} vencimientos: reduce la duración",

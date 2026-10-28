@@ -43,12 +43,30 @@
     "step": {
       "init": {
         "title": "Options de My Bank",
-        "description": "Qui peut modifier les données de My Bank depuis Home Assistant.",
-        "data": {
-          "admin_only": "Seuls les administrateurs peuvent modifier les données"
-        },
-        "data_description": {
-          "admin_only": "Activé (recommandé) : seuls les administrateurs de Home Assistant peuvent créer, modifier ou supprimer des données et ouvrir les justificatifs fichiers ; les autres utilisateurs gardent la lecture des soldes et des listes. Les automatisations et scripts ne sont pas concernés."
+        "description": "Les administrateurs de Home Assistant ont toujours un accès complet à My Bank. Les automatisations et scripts lancés par Home Assistant ne sont pas limités.",
+        "sections": {
+          "users": {
+            "name": "Accès des autres utilisateurs",
+            "description": "Une ligne par utilisateur de Home Assistant qui n'est pas administrateur. « Aucun accès » : les cartes My Bank affichent un message à la place des données. La lecture ouvre aussi les justificatifs fichiers.",
+            "data": {
+              "default_access": "Utilisateurs créés plus tard"
+            },
+            "data_description": {
+              "default_access": "Niveau donné à un utilisateur de Home Assistant créé après l'enregistrement de ce réglage, tant que vous ne lui en choisissez pas un ici."
+            }
+          },
+          "sensors": {
+            "name": "Capteurs publiés",
+            "description": "L'état d'un capteur est lisible par tous les utilisateurs de Home Assistant, quel que soit leur accès ci-dessus : ne publiez que ce dont vous avez besoin dans des automatisations ou des tableaux de bord. Les cartes My Bank n'ont besoin d'aucun capteur.",
+            "data": {
+              "ending_sensor": "Planifications arrivant à terme",
+              "balance_sensors": "Soldes des comptes"
+            },
+            "data_description": {
+              "ending_sensor": "Nombre et liste des planifications dont la dernière échéance tombe dans les 30 jours (pour une notification).",
+              "balance_sensors": "Un capteur par compte choisi (solde total ; soldes pointé et rapproché en attributs). Un compte créé plus tard n'est pas publié tant qu'il n'est pas choisi ici."
+            }
+          }
         }
       }
     }
@@ -1641,6 +1659,10 @@
         }
       }
     },
+    "get_access": {
+      "name": "Connaître mon accès",
+      "description": "Renvoie le niveau d'accès à My Bank de l'utilisateur qui appelle l'action (none, read ou write) ; toujours write pour une automatisation ou un administrateur."
+    },
     "move_account": {
       "name": "Déplacer les opérations d'un compte",
       "description": "Déplace toutes les opérations et planifications d'un compte vers un autre.",
@@ -1752,6 +1774,13 @@
         "never": "Jamais",
         "date": "À une date",
         "count": "Après N échéances"
+      }
+    },
+    "access_level": {
+      "options": {
+        "none": "Aucun accès",
+        "read": "Lecture seule",
+        "write": "Lecture et écriture"
       }
     }
   }

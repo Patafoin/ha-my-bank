@@ -1,4 +1,4 @@
-"""One balance sensor per My Bank account (state = total balance), plus the schedules coming to an end."""
+"""Balance sensor of each chosen My Bank account (state = total balance), plus the schedules coming to an end."""
 from __future__ import annotations
 
 import logging
@@ -10,6 +10,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .access import published_accounts, publishes_ending
 from .const import DOMAIN, TERM_DAYS
 from .coordinator import MyBankCoordinator
 
@@ -28,31 +29,40 @@ def _unique_id(account_id: int) -> str:
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
+    """Only the sensors chosen in the options: their state is visible to every Home Assistant user."""
     coordinator: MyBankCoordinator = entry.runtime_data
-    _prune_stale_entities(hass, entry, coordinator.data.accounts)
-    known: set[int] = set(coordinator.data.accounts)
-    async_add_entities([EndingSchedulesSensor(coordinator), *(AccountBalanceSensor(coordinator, aid) for aid in known)])
+    chosen = published_accounts(entry)
+    ending = publishes_ending(entry)
+
+    def wanted(accounts: dict) -> set[int]:
+        return {aid for aid in accounts if chosen is None or aid in chosen}
+
+    _prune_stale_entities(hass, entry, wanted(coordinator.data.accounts), ending)
+    known = wanted(coordinator.data.accounts)
+    async_add_entities(
+        [*([EndingSchedulesSensor(coordinator)] if ending else []), *(AccountBalanceSensor(coordinator, aid) for aid in known)]
+    )
 
     @callback
     def _sync_entities() -> None:
-        current = set(coordinator.data.accounts)
+        current = wanted(coordinator.data.accounts)
         if new := current - known:
             known.update(new)
             async_add_entities(AccountBalanceSensor(coordinator, aid) for aid in new)
         if known - current:
             known.intersection_update(current)
-            _prune_stale_entities(hass, entry, coordinator.data.accounts)
+            _prune_stale_entities(hass, entry, current, ending)
 
     entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
 
 
-def _prune_stale_entities(hass: HomeAssistant, entry: ConfigEntry, accounts: dict) -> None:
-    """Remove this entry's sensors whose account no longer exists (or from the Firefly III era)."""
+def _prune_stale_entities(hass: HomeAssistant, entry: ConfigEntry, accounts: set[int], ending: bool) -> None:
+    """Remove this entry's sensors no longer published: account deleted or unchosen, Firefly III era."""
     registry = er.async_get(hass)
-    valid = {_unique_id(aid) for aid in accounts} | {_ENDING_UNIQUE_ID}
+    valid = {_unique_id(aid) for aid in accounts} | ({_ENDING_UNIQUE_ID} if ending else set())
     for entity in list(er.async_entries_for_config_entry(registry, entry.entry_id)):
         if entity.domain == "sensor" and entity.unique_id not in valid:
-            _LOGGER.info("Removing obsolete sensor %s", entity.entity_id)
+            _LOGGER.info("Removing sensor %s (no longer published)", entity.entity_id)
             registry.async_remove(entity.entity_id)
 
 
@@ -64,7 +74,10 @@ def _float(value) -> float | None:
 
 
 class AccountBalanceSensor(CoordinatorEntity[MyBankCoordinator], SensorEntity):
-    """Total balance of an account; pointed and reconciled balances as attributes."""
+    """Total balance of an account; pointed and reconciled balances as attributes.
+
+    No IBAN in the attributes: the state of a sensor is readable by every Home Assistant user.
+    """
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:bank"
@@ -105,7 +118,6 @@ class AccountBalanceSensor(CoordinatorEntity[MyBankCoordinator], SensorEntity):
             "solde_pointe": _float(balances.get("pointed")),
             "solde_rapproche": _float(balances.get("reconciled")),
             "kind": account.get("kind"),
-            "iban": account.get("iban"),
             "closed": account.get("closed"),
             "is_default": account.get("is_default"),
         }

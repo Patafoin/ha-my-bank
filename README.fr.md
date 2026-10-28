@@ -188,7 +188,9 @@ Une opération sans rubrique n'apparaît dans aucun de ces suivis.
 
 ## Entités
 
-- **Un capteur par compte** : état = solde total (y compris les opérations à date future), dans la devise propre au compte ; attributs `solde_pointe` (pointé), `solde_rapproche` (rapproché), `account_id`, `kind`, `iban`, `closed`, `is_default`. Rafraîchi toutes les 5 minutes et après chaque modification.
+Aucun capteur n'est créé sur une nouvelle installation : choisissez ceux à publier dans les options de l'intégration (Paramètres → Appareils et services → My Bank → Configurer). L'état d'un capteur est lisible par **tous** les utilisateurs de Home Assistant, quel que soit leur accès à My Bank : ne publiez que ce dont vous vous servez dans des automatisations ou des tableaux de bord ; les cartes n'ont besoin d'aucun capteur. Un compte créé plus tard n'est publié qu'une fois choisi.
+
+- **Un capteur par compte** : état = solde total (y compris les opérations à date future), dans la devise propre au compte ; attributs `solde_pointe` (pointé), `solde_rapproche` (rapproché), `account_id`, `kind`, `closed`, `is_default`. Rafraîchi toutes les 5 minutes et après chaque modification.
 - **Planifications arrivant à terme** (`sensor.planifications_arrivant_a_terme` sur une installation en français ; l'identifiant suit la langue de Home Assistant au moment de l'ajout de l'intégration) : nombre d'opérations planifiées dont la dernière échéance tombe dans les 30 jours, avec la liste en attributs — pratique pour une automatisation de notification.
 
 ## Services
@@ -221,7 +223,9 @@ Le serveur importe les exports QIF et le CSV des tiers de MS Comptes Bancaires �
 
 Gardez My Bank API sur votre réseau local. Ne l'exposez jamais sur Internet : l'accès à distance passe par Home Assistant, qui gère déjà l'authentification.
 
-Seuls les **administrateurs** de Home Assistant peuvent modifier les données (services d'écriture) ou ouvrir un justificatif fichier ; les autres utilisateurs gardent la lecture des soldes et des listes. Pour ouvrir la modification à tous, décochez **Seuls les administrateurs peuvent modifier les données** dans les options de l'intégration (Paramètres → Appareils et services → My Bank → Configurer). Les automatisations et scripts ne sont pas concernés.
+L'accès à My Bank se règle **par utilisateur de Home Assistant** dans les options de l'intégration (Paramètres → Appareils et services → My Bank → Configurer) : pour chaque utilisateur qui n'est pas administrateur, **Aucun accès**, **Lecture seule** ou **Lecture et écriture**, plus un niveau pour les utilisateurs créés plus tard. Sans accès, les cartes affichent un message à la place des données ; la lecture ouvre aussi les justificatifs fichiers. Sur une nouvelle installation, les utilisateurs non administrateurs n'ont aucun accès. Les administrateurs ont toujours un accès complet (ils peuvent de toute façon changer les options), et les automatisations et scripts lancés par Home Assistant ne sont pas limités.
+
+Les capteurs font exception : Home Assistant transmet l'état de toutes les entités à tout utilisateur connecté. Voir [Entités](#entités) : ne publiez que les capteurs utiles.
 
 ## Traductions
 

@@ -79,16 +79,19 @@ async def test_image_is_shown_inline_in_a_sandbox(hass, aioclient_mock, loaded_e
     assert resp.headers["Content-Security-Policy"].startswith("sandbox")
 
 
-async def test_non_admin_is_refused_with_403(hass, aioclient_mock, loaded_entry, hass_client, hass_read_only_access_token) -> None:
+async def test_user_without_access_is_refused_with_403(hass, aioclient_mock, loaded_entry, hass_client, hass_read_only_access_token) -> None:
     """403, not 401: Home Assistant counts every 401 as a failed login and would end up banning the IP."""
+    hass.config_entries.async_update_entry(
+        loaded_entry, options={"default_access": "none", "access": {}, "ending_sensor": False, "balance_sensors": []}
+    )
     client = await hass_client(hass_read_only_access_token)
     resp = await client.get("/api/my_bank/attachment/1")
     assert resp.status == 403
     assert not [call for call in aioclient_mock.mock_calls if "attachment" in str(call[1])]
 
 
-async def test_option_opens_attachments_to_every_user(hass, aioclient_mock, loaded_entry, hass_client, hass_read_only_access_token) -> None:
-    hass.config_entries.async_update_entry(loaded_entry, options={"admin_only": False})
+async def test_read_access_opens_attachments(hass, aioclient_mock, loaded_entry, hass_client, hass_read_only_access_token) -> None:
+    """Reading an attachment is reading: a user with read access may (entry older than 0.16.0: everyone could read)."""
     aioclient_mock.get(
         f"{API}/transactions/1/attachment/content",
         content=b"%PDF-1.4 fake",

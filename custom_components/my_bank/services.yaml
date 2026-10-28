@@ -1545,6 +1545,7 @@ get_shared_account:
       selector:
         number:
           mode: box
+get_access: {}
 move_account:
   fields:
     account_id:

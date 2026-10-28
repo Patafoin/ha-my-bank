@@ -43,12 +43,30 @@
     "step": {
       "init": {
         "title": "Opciones de My Bank",
-        "description": "Quién puede modificar los datos de My Bank desde Home Assistant.",
-        "data": {
-          "admin_only": "Solo los administradores pueden modificar los datos"
-        },
-        "data_description": {
-          "admin_only": "Activado (recomendado): solo los administradores de Home Assistant pueden crear, modificar o eliminar datos y abrir justificantes de archivo; los demás usuarios siguen pudiendo leer saldos y listas. Las automatizaciones y scripts no se ven afectados."
+        "description": "Los administradores de Home Assistant siempre tienen acceso completo a My Bank. Las automatizaciones y los scripts iniciados por Home Assistant no están limitados.",
+        "sections": {
+          "users": {
+            "name": "Acceso de los demás usuarios",
+            "description": "Una línea por cada usuario de Home Assistant que no es administrador. «Sin acceso»: las tarjetas de My Bank muestran un mensaje en lugar de los datos. La lectura también abre los justificantes en archivo.",
+            "data": {
+              "default_access": "Usuarios creados más adelante"
+            },
+            "data_description": {
+              "default_access": "Nivel que se da a un usuario de Home Assistant creado después de guardar este ajuste, hasta que le elijas uno aquí."
+            }
+          },
+          "sensors": {
+            "name": "Sensores publicados",
+            "description": "El estado de un sensor lo puede leer cualquier usuario de Home Assistant, sea cual sea su acceso arriba: publica solo lo que necesites en automatizaciones o paneles. Las tarjetas de My Bank no necesitan ningún sensor.",
+            "data": {
+              "ending_sensor": "Movimientos programados que finalizan",
+              "balance_sensors": "Saldos de las cuentas"
+            },
+            "data_description": {
+              "ending_sensor": "Número y lista de los movimientos programados cuyo último vencimiento cae dentro de 30 días (para una notificación).",
+              "balance_sensors": "Un sensor por cada cuenta elegida (saldo total; saldos punteado y conciliado como atributos). Una cuenta creada más adelante no se publica hasta que se elige aquí."
+            }
+          }
         }
       }
     }
@@ -1641,6 +1659,10 @@
         }
       }
     },
+    "get_access": {
+      "name": "Consultar mi acceso",
+      "description": "Devuelve el nivel de acceso a My Bank del usuario que llama a la acción (none, read o write); siempre write para una automatización o un administrador."
+    },
     "move_account": {
       "name": "Mover movimientos de cuenta",
       "description": "Mueve todos los movimientos y programaciones de una cuenta a otra.",
@@ -1752,6 +1774,13 @@
         "never": "Nunca",
         "date": "En una fecha",
         "count": "Tras N vencimientos"
+      }
+    },
+    "access_level": {
+      "options": {
+        "none": "Sin acceso",
+        "read": "Solo lectura",
+        "write": "Lectura y escritura"
       }
     }
   }

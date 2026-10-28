@@ -42,13 +42,31 @@
   "options": {
     "step": {
       "init": {
-        "title": "My Bank-Optionen",
-        "description": "Wer die Daten von My Bank aus Home Assistant ändern darf.",
-        "data": {
-          "admin_only": "Nur Administratoren dürfen Daten ändern"
-        },
-        "data_description": {
-          "admin_only": "Aktiviert (empfohlen): Nur Administratoren von Home Assistant können Daten anlegen, ändern oder löschen und Dateibelege öffnen; andere Benutzer können Salden und Listen weiterhin lesen. Automationen und Skripte sind nicht betroffen."
+        "title": "My-Bank-Optionen",
+        "description": "Home-Assistant-Administratoren haben immer vollen Zugriff auf My Bank. Von Home Assistant gestartete Automatisierungen und Skripte sind nicht eingeschränkt.",
+        "sections": {
+          "users": {
+            "name": "Zugriff der anderen Benutzer",
+            "description": "Eine Zeile pro Home-Assistant-Benutzer, der kein Administrator ist. „Kein Zugriff“: Die My-Bank-Karten zeigen statt der Daten einen Hinweis. Lesezugriff öffnet auch die Dateibelege.",
+            "data": {
+              "default_access": "Später angelegte Benutzer"
+            },
+            "data_description": {
+              "default_access": "Stufe für einen Home-Assistant-Benutzer, der nach dem Speichern dieser Einstellung angelegt wird, bis Sie hier eine für ihn wählen."
+            }
+          },
+          "sensors": {
+            "name": "Veröffentlichte Sensoren",
+            "description": "Der Zustand eines Sensors ist für jeden Home-Assistant-Benutzer lesbar, unabhängig vom Zugriff oben: Veröffentlichen Sie nur, was Sie in Automatisierungen oder Dashboards brauchen. Die My-Bank-Karten benötigen keinen Sensor.",
+            "data": {
+              "ending_sensor": "Auslaufende Daueraufträge",
+              "balance_sensors": "Kontostände"
+            },
+            "data_description": {
+              "ending_sensor": "Anzahl und Liste der Daueraufträge, deren letzte Ausführung in die nächsten 30 Tage fällt (für eine Benachrichtigung).",
+              "balance_sensors": "Ein Sensor pro gewähltem Konto (Gesamtsaldo; abgehakter und abgeglichener Saldo als Attribute). Ein später angelegtes Konto wird erst veröffentlicht, wenn es hier gewählt wird."
+            }
+          }
         }
       }
     }
@@ -1641,6 +1659,10 @@
         }
       }
     },
+    "get_access": {
+      "name": "Eigenen Zugriff abfragen",
+      "description": "Gibt die Zugriffsstufe auf My Bank des aufrufenden Benutzers zurück (none, read oder write); für eine Automatisierung oder einen Administrator immer write."
+    },
     "move_account": {
       "name": "Kontobuchungen verschieben",
       "description": "Verschiebt alle Buchungen und Daueraufträge eines Kontos auf ein anderes.",
@@ -1752,6 +1774,13 @@
         "never": "Nie",
         "date": "An einem Datum",
         "count": "Nach N Ausführungen"
+      }
+    },
+    "access_level": {
+      "options": {
+        "none": "Kein Zugriff",
+        "read": "Nur lesen",
+        "write": "Lesen und schreiben"
       }
     }
   }

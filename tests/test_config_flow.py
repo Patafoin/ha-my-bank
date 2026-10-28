@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
+from custom_components.my_bank.access import NEW_ENTRY_OPTIONS
 from custom_components.my_bank.const import DEFAULT_URL, DOMAIN
 
 from .conftest import ACCOUNTS, API, API_URL, TOKEN, mock_schedules
@@ -27,6 +28,7 @@ async def test_user_flow_success(hass: HomeAssistant, aioclient_mock) -> None:
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {"url": API_URL, "token": TOKEN}
+    assert result["options"] == NEW_ENTRY_OPTIONS  # rien pour les non-administrateurs, aucun capteur
     assert result["result"].unique_id == API_URL
 
 
@@ -120,6 +122,7 @@ async def test_addon_discovery_creates_entry_after_confirmation(hass: HomeAssist
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {"url": API_URL, "token": TOKEN}
+    assert result["options"] == NEW_ENTRY_OPTIONS  # rien pour les non-administrateurs, aucun capteur
     assert result["result"].unique_id == API_URL
 
 

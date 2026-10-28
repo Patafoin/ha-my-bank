@@ -20,7 +20,8 @@ from homeassistant.exceptions import HomeAssistantError, Unauthorized, UnknownUs
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
 
 from .api import MyBankApiError, MyBankClient
-from .const import CONF_ADMIN_ONLY, CONF_TOKEN, DEFAULT_PAYMENT_METHODS, DEFAULT_URL, DOMAIN, MIN_API_VERSION
+from .access import READ, WRITE, allows, user_level
+from .const import CONF_TOKEN, DEFAULT_PAYMENT_METHODS, DEFAULT_URL, DOMAIN, MIN_API_VERSION
 from .coordinator import MyBankCoordinator
 from .frontend import async_register_frontend
 from .views import async_register_view
@@ -126,17 +127,21 @@ def _coordinator(hass: HomeAssistant) -> MyBankCoordinator:
     return _entry(hass).runtime_data
 
 
-async def _check_write_allowed(hass: HomeAssistant, call: ServiceCall) -> None:
-    """Option `admin_only` (par défaut) : écriture réservée aux administrateurs, comme un service admin de HA.
+async def _user_level(hass: HomeAssistant, call: ServiceCall) -> str:
+    """Niveau d'accès de l'utilisateur à l'origine de l'appel (options de l'entrée, voir access.py).
 
-    Sans utilisateur (automatisation, script lancé par HA) : toujours permis.
+    Sans utilisateur (automatisation, script lancé par HA) : accès complet.
     """
-    if not _entry(hass).options.get(CONF_ADMIN_ONLY, True) or not call.context.user_id:
-        return
+    if not call.context.user_id:
+        return WRITE
     user = await hass.auth.async_get_user(call.context.user_id)
     if user is None:
         raise UnknownUser(context=call.context, user_id=call.context.user_id)
-    if not user.is_admin:
+    return user_level(_entry(hass), user)
+
+
+async def _check_access(hass: HomeAssistant, call: ServiceCall, needed: str) -> None:
+    if not allows(await _user_level(hass, call), needed):
         raise Unauthorized(context=call.context)
 
 
@@ -417,7 +422,7 @@ def _register_services(hass: HomeAssistant) -> None:
 
     def make_write(name: str, method: str, template: str):
         async def handler(call: ServiceCall) -> ServiceResponse:
-            await _check_write_allowed(hass, call)
+            await _check_access(hass, call, WRITE)
             coordinator = _coordinator(hass)
             path, body = _split_path(template, call.data)
             if name == "create_account":
@@ -442,7 +447,7 @@ def _register_services(hass: HomeAssistant) -> None:
     def make_attachment_write(kind: str):
         # `kind` fixe le discriminant de l'API ; pas de template générique car il n'est pas un champ saisi par l'appelant.
         async def handler(call: ServiceCall) -> ServiceResponse:
-            await _check_write_allowed(hass, call)
+            await _check_access(hass, call, WRITE)
             coordinator = _coordinator(hass)
             body = dict(call.data)
             tx_id = body.pop("transaction_id")
@@ -457,6 +462,7 @@ def _register_services(hass: HomeAssistant) -> None:
 
     def make_read(template: str):
         async def handler(call: ServiceCall) -> ServiceResponse:
+            await _check_access(hass, call, READ)
             coordinator = _coordinator(hass)
             path, body = _split_path(template, call.data)
             try:
@@ -466,7 +472,11 @@ def _register_services(hass: HomeAssistant) -> None:
 
         return handler
 
-    # Écritures : contrôle des droits dans chaque appel (option `admin_only`, modifiable sans redémarrer).
+    async def get_access(call: ServiceCall) -> ServiceResponse:
+        """Niveau d'accès de l'appelant, pour que la carte affiche un message clair au lieu d'erreurs en série."""
+        return {"level": await _user_level(hass, call)}
+
+    # Contrôle des droits dans chaque appel (options de l'entrée, modifiables sans redémarrer).
     for name, schema, method, template in _WRITE_SERVICES:
         hass.services.async_register(
             DOMAIN, name, make_write(name, method, template), schema=schema, supports_response=SupportsResponse.OPTIONAL
@@ -482,3 +492,4 @@ def _register_services(hass: HomeAssistant) -> None:
         hass.services.async_register(
             DOMAIN, name, make_read(template), schema=schema, supports_response=SupportsResponse.ONLY
         )
+    hass.services.async_register(DOMAIN, "get_access", get_access, schema=vol.Schema({}), supports_response=SupportsResponse.ONLY)

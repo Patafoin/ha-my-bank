@@ -120,3 +120,48 @@ async def test_schedules_error_keeps_balances(hass: HomeAssistant, aioclient_moc
 
     assert hass.states.get("sensor.compte_courant").state == "1520.45"
     assert hass.states.get("sensor.scheduled_transactions_ending").state == "0"
+
+
+async def _setup_with_options(hass, aioclient_mock, config_entry, options, accounts=ACCOUNTS):
+    aioclient_mock.get(f"{API}/accounts", json=accounts)
+    mock_schedules(aioclient_mock)
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(config_entry, options=options)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_new_entry_publishes_no_sensor(hass: HomeAssistant, aioclient_mock, config_entry) -> None:
+    """Strict by default: a sensor's state is readable by every Home Assistant user."""
+    from custom_components.my_bank.access import NEW_ENTRY_OPTIONS
+
+    await _setup_with_options(hass, aioclient_mock, config_entry, NEW_ENTRY_OPTIONS)
+    assert hass.states.async_entity_ids("sensor") == []
+
+
+async def test_only_chosen_sensors_are_published(hass: HomeAssistant, aioclient_mock, config_entry) -> None:
+    options = {"default_access": "none", "access": {}, "ending_sensor": True, "balance_sensors": ["2"]}
+    await _setup_with_options(hass, aioclient_mock, config_entry, options)
+    assert sorted(hass.states.async_entity_ids("sensor")) == ["sensor.livret_d_epargne", "sensor.scheduled_transactions_ending"]
+    assert "iban" not in hass.states.get("sensor.livret_d_epargne").attributes  # visible de tous les utilisateurs
+
+    # un compte créé ensuite n'est pas publié sans être choisi
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{API}/accounts", json=[*ACCOUNTS, {**ACCOUNTS[0], "id": 3, "name": "Carte"}])
+    mock_schedules(aioclient_mock)
+    await config_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.carte") is None
+
+
+async def test_unchosen_sensor_is_removed(hass: HomeAssistant, aioclient_mock, loaded_entry) -> None:
+    registry = er.async_get(hass)
+    assert registry.async_get("sensor.compte_courant") is not None
+    hass.config_entries.async_update_entry(
+        loaded_entry, options={"default_access": "none", "access": {}, "ending_sensor": False, "balance_sensors": ["2"]}
+    )
+    await hass.config_entries.async_reload(loaded_entry.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get("sensor.compte_courant") is None
+    assert registry.async_get("sensor.scheduled_transactions_ending") is None
+    assert hass.states.get("sensor.livret_d_epargne").state == "5200.35"

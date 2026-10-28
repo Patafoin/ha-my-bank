@@ -188,7 +188,9 @@ Avoid setting only the class, without a category: the per-car analysis would sti
 
 ## Entities
 
-- **One sensor per account**: state = total balance (including future-dated transactions), in the account's own currency; attributes `solde_pointe` (cleared), `solde_rapproche` (reconciled), `account_id`, `kind`, `iban`, `closed`, `is_default`. Refreshed every 5 minutes and after every change.
+No sensor is created on a new installation: choose the ones to publish in the integration options (Settings → Devices & services → My Bank → Configure). The state of a sensor can be read by **every** Home Assistant user, whatever their access to My Bank, so publish only what you use in automations or dashboards; the cards don't need any sensor. An account created later is not published until you choose it.
+
+- **One sensor per account**: state = total balance (including future-dated transactions), in the account's own currency; attributes `solde_pointe` (cleared), `solde_rapproche` (reconciled), `account_id`, `kind`, `closed`, `is_default`. Refreshed every 5 minutes and after every change.
 - **Scheduled transactions ending** (`sensor.scheduled_transactions_ending` on an English installation; the entity ID follows the language of Home Assistant when the integration is added): number of scheduled transactions whose last occurrence falls within 30 days, with the list in attributes — handy for a notification automation.
 
 ## Services
@@ -221,7 +223,9 @@ The server imports the QIF and payee CSV exports of MS Comptes Bancaires — see
 
 Keep My Bank API on your local network. Never expose it to the Internet: remote access goes through Home Assistant, which already handles authentication.
 
-Only Home Assistant **administrators** can change data (write services) or open file attachments; other users can still read balances and lists. To let every user change data, untick **Only administrators can change data** in the integration options (Settings → Devices & services → My Bank → Configure). Automations and scripts are not affected.
+Access to My Bank is set **per Home Assistant user** in the integration options (Settings → Devices & services → My Bank → Configure): for each user who is not an administrator, **No access**, **Read only** or **Read and write**, plus a level for users created later. Without access, the cards show a message instead of the data; read access also opens file attachments. On a new installation, non-admin users have no access. Administrators always have full access (they can change the options anyway), and automations and scripts started by Home Assistant are not restricted.
+
+Sensors are the exception: Home Assistant gives the state of every entity to every logged-in user. See [Entities](#entities): publish only the sensors you need.
 
 ## Translations
 
