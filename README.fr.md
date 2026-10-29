@@ -143,17 +143,19 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 |---|---|
 | `custom:my-bank-balance-card` | `account_id` — les trois soldes d'un compte |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — saisie rapide, pré-remplie à partir du tiers ; bouton « Tous les champs » pour afficher les champs masqués |
-| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
+| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
+| `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — respect du budget mois par mois (réalisé / prévu en %, une ligne par type, 100 % en pointillés) ; les mois hors du budget choisi viennent d'un autre budget du même compte |
 | `custom:my-bank-balance-history-card` | `account_ids`, `period` — évolution du solde (courbe) d'un ou plusieurs comptes, même devise ; une carte = un graphique, composer plusieurs cartes pour séparer des comptes d'échelles ou de devises différentes |
-| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — montant des échéances à venir, par semaine ou par mois selon l'horizon |
+| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — opérations déjà saisies (datées après aujourd'hui) et échéances pas encore saisies (même vert / rouge, plus clair), par semaine ou par mois selon l'horizon ; recettes au-dessus de l'axe, dépenses en dessous, étiquette = solde de la période |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — dépenses par rubrique (barres), le montant le plus élevé fait 100 % |
 | `custom:my-bank-share-card` | — dépenses partagées |
+| `custom:my-bank-transactions-card` | — le volet Opérations de la carte principale seul (même code) |
 
 Toutes les cartes disposent d'un éditeur visuel.
 
 <br clear="right">
 
-**Cartes graphiques** — évolution du solde, échéances à venir, dépenses par rubrique :
+**Cartes graphiques** — évolution du solde, respect du budget, opérations et échéances à venir, dépenses par rubrique :
 
 ![Cartes graphiques](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 

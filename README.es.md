@@ -143,17 +143,19 @@ Asigna a cada instancia de la tarjeta sus propios `sections` para crear, por eje
 |---|---|
 | `custom:my-bank-balance-card` | `account_id` — los tres saldos de una cuenta |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — entrada rápida, con campos rellenados a partir del beneficiario; el botón «Todos los campos» muestra los campos ocultos |
-| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
+| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
+| `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — cumplimiento del presupuesto mes a mes (real / previsto en %, una línea por tipo, 100 % discontinuo); los meses fuera del presupuesto elegido salen de otro presupuesto de la misma cuenta |
 | `custom:my-bank-balance-history-card` | `account_ids`, `period` — historial de saldos (gráfico de líneas) de una o varias cuentas, misma moneda; una tarjeta = un gráfico, combina varias tarjetas para separar cuentas de escalas o monedas distintas |
-| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — importe de los próximos movimientos, por semana o por mes según el horizonte |
+| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — operaciones ya registradas (con fecha posterior a hoy) y vencimientos aún no registrados (mismo verde / rojo, más claro), por semana o por mes según el horizonte; ingresos por encima del eje, gastos por debajo, etiqueta = saldo del periodo |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — gastos por categoría (barras); el importe más alto equivale al 100 % |
 | `custom:my-bank-share-card` | — gastos compartidos |
+| `custom:my-bank-transactions-card` | — solo la pestaña Operaciones de la tarjeta principal (mismo código) |
 
 Todas las tarjetas tienen un editor visual.
 
 <br clear="right">
 
-**Tarjetas de gráficos** — historial de saldos, próximos movimientos y gastos por categoría:
+**Tarjetas de gráficos** — historial de saldos, cumplimiento del presupuesto, próximas operaciones y vencimientos, y gastos por categoría:
 
 ![Tarjetas de gráficos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 

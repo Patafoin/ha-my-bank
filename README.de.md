@@ -143,17 +143,19 @@ Geben Sie jeder Karteninstanz eigene `sections`, um eine Ansicht nur für die Er
 |---|---|
 | `custom:my-bank-balance-card` | `account_id` — die drei Kontostände eines Kontos |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — Schnellerfassung, vorausgefüllt anhand des Empfängers; die Schaltfläche „Alle Felder“ zeigt die ausgeblendeten Felder |
-| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
+| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
+| `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — Budgeteinhaltung Monat für Monat (Ist / Plan in %, eine Linie pro Art, 100 % gestrichelt); Monate außerhalb des gewählten Budgets stammen aus einem anderen Budget desselben Kontos |
 | `custom:my-bank-balance-history-card` | `account_ids`, `period` — Kontostandsverlauf (Linie) eines oder mehrerer Konten, gleiche Währung; eine Karte = ein Diagramm, mehrere Karten kombinieren, um Konten unterschiedlicher Größenordnung oder Währung zu trennen |
-| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — Betrag der anstehenden Ausführungen, je nach Zeitraum pro Woche oder pro Monat |
+| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — bereits erfasste Buchungen (nach heute datiert) und noch nicht erfasste Ausführungen (gleiches Grün / Rot, heller), je nach Zeitraum pro Woche oder pro Monat; Einnahmen über der Achse, Ausgaben darunter, Beschriftung = Saldo des Zeitraums |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — Ausgaben nach Kategorie (Balken), der höchste Betrag entspricht 100 % |
 | `custom:my-bank-share-card` | — geteilte Ausgaben |
+| `custom:my-bank-transactions-card` | — nur der Bereich Buchungen der Hauptkarte (gleicher Code) |
 
 Alle Karten haben einen visuellen Editor.
 
 <br clear="right">
 
-**Diagrammkarten** — Kontostandsverlauf, anstehende Ausführungen, Ausgaben nach Kategorie:
+**Diagrammkarten** — Kontostandsverlauf, Budgeteinhaltung, anstehende Buchungen und Ausführungen, Ausgaben nach Kategorie:
 
 ![Diagrammkarten](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 

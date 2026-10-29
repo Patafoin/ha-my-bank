@@ -143,17 +143,19 @@ Give each card instance its own `sections` to build an operations-only view, a s
 |---|---|
 | `custom:my-bank-balance-card` | `account_id` — the three balances of one account |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — quick entry, pre-filled from the payee; an "All fields" button shows the hidden fields |
-| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`) |
+| `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
+| `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — budget adherence month by month (actual / planned in %, one line per type, 100 % dashed); months outside the chosen budget come from another budget of the same account |
 | `custom:my-bank-balance-history-card` | `account_ids`, `period` — balance history (line chart) of one or more accounts, same currency; one card = one chart, compose several cards to separate accounts of different scale or currency |
-| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — amount of upcoming occurrences, by week or by month depending on the horizon |
+| `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — upcoming entered transactions (dated after today) and occurrences not yet entered (same green / red, lighter), by week or by month depending on the horizon; income above the axis, expenses below, label = balance of the period |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — spending by category (bars), the highest amount is 100 % |
 | `custom:my-bank-share-card` | — shared expenses |
+| `custom:my-bank-transactions-card` | — the main card's Transactions tab on its own (same code) |
 
 All cards have a visual editor.
 
 <br clear="right">
 
-**Chart cards** — balance history, upcoming occurrences, expenses by category:
+**Chart cards** — balance history, budget adherence, upcoming transactions and occurrences, expenses by category:
 
 ![Chart cards](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/chart-cards.png)
 

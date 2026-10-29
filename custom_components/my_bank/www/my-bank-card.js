@@ -70,6 +70,7 @@ const ACCOUNT_KINDS = translated({ checking: "Courant", savings: "Épargne", car
 const CATEGORY_KINDS = translated({ expense: "Dépense", income: "Recette", savings: "Épargne" });
 const KIND_TITLES = translated({ income: "Recettes", expense: "Dépenses", savings: "Épargne" });
 const COLLAPSE_KEY = "my-bank-budget-collapsed";
+const BUDGET_CARD_COLLAPSE_KEY = "my-bank-budget-card-collapsed"; // carte Budget simple
 // one : tous les 1 ; many : tous les N ({n}) ; plural : unité d'une durée.
 const UNITS = {
   day: translated({ one: "Tous les jours", many: "Tous les {n} jours", plural: "jour(s)" }),
@@ -79,7 +80,8 @@ const UNITS = {
   year: translated({ one: "Tous les ans", many: "Tous les {n} ans", plural: "an(s)" }),
 };
 const RANGES = [
-  { key: "month", get label() { return t("Mois en cours"); } },
+  { key: "month", get label() { return t("Mois en cours et à venir"); } },
+  { key: "month_strict", get label() { return t("Mois en cours strict"); } }, // borne « Au » au dernier jour du mois
   { key: "3months", get label() { return t("3 derniers mois"); } },
   { key: "12months", get label() { return t("12 derniers mois"); } },
   { key: "year", get label() { return t("Année en cours"); } },
@@ -256,6 +258,8 @@ const STYLE = `
   form.entity-form label.check-aligned .check-spacer { font-size: 12px; visibility: hidden; }
   form.entity-form label.check-aligned .check-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; font-size: 14px; }
   form.entity-form label.check-aligned .hint { flex-basis: auto; }
+  /* la case hérite sinon des 36 px des champs (+ ses marges) : la ligne dépasserait la hauteur d'un champ */
+  form.entity-form label.check-aligned .check-row input[type="checkbox"] { min-height: 0; margin: 0; }
   form.entity-form .field-help {
     background: none; border: 1px solid var(--divider-color); border-radius: 50%; cursor: pointer;
     width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 14px; color: var(--primary-color);
@@ -263,7 +267,12 @@ const STYLE = `
   }
   form.entity-form .field-help:hover { border-color: var(--primary-color); }
   form.entity-form .hint { display: none; margin: 0; }
-  form.entity-form .hint.shown { display: block; }
+  form.entity-form .hint.shown {
+    display: block; position: fixed; z-index: 10; box-sizing: border-box; padding: 8px 10px;
+    background: var(--card-background-color, #fff); color: var(--primary-text-color);
+    border: 1px solid var(--divider-color); border-radius: 6px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    font-size: 12px; line-height: 1.4; font-weight: normal; white-space: normal; text-align: left;
+  }
   form.entity-form input[readonly] { opacity: 0.55; cursor: not-allowed; background: var(--secondary-background-color); }
   tr.editing { display: none; }
   tr.form-row > td { padding: 4px 0 8px; }
@@ -457,6 +466,14 @@ const STYLE = `
 let NUMBER = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 setLanguage(null); // langue de la page en attendant `hass` (HA renseigne <html lang>)
 
+const SUB_HELP = () => t("Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.");
+
+// Dernier jour du mois en cours (borne « Au » du mois strict, solde prévisionnel fin de mois).
+function monthEndIso() {
+  const now = new Date();
+  return isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+}
+
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -469,6 +486,46 @@ function fieldHelpButtonHtml(help) {
 
 function fieldHintHtml(help) {
   return help ? `<span class="hint">${esc(help)}</span>` : "";
+}
+
+// Ouvre / ferme l'aide d'un bouton "i" en bulle flottante (position fixe, calculée sous le bouton, au-dessus
+// s'il manque de place en bas) : rien ne bouge dans le formulaire. Fermée par un clic ailleurs, Échap,
+// un défilement ou un redimensionnement ; une seule bulle ouverte à la fois.
+function closeFieldHint(hint) {
+  hint.classList.remove("shown");
+  if (hint._cleanup) hint._cleanup();
+  hint._cleanup = null;
+}
+
+function toggleFieldHint(btn) {
+  const hint = btn.closest("label").querySelector(".hint");
+  if (!hint) return;
+  const wasOpen = hint.classList.contains("shown");
+  btn.getRootNode().querySelectorAll(".hint.shown").forEach(closeFieldHint);
+  if (wasOpen) return;
+  hint.classList.add("shown");
+  const r = btn.getBoundingClientRect();
+  const width = Math.min(300, window.innerWidth - 16);
+  hint.style.width = `${width}px`;
+  hint.style.left = `${Math.max(8, Math.min(r.left - 12, window.innerWidth - width - 8))}px`;
+  const below = r.bottom + 6;
+  hint.style.top = `${below + hint.offsetHeight > window.innerHeight - 8 ? Math.max(8, r.top - 6 - hint.offsetHeight) : below}px`;
+  const onPointer = (ev) => {
+    const path = ev.composedPath();
+    if (!path.includes(hint) && !path.includes(btn)) closeFieldHint(hint);
+  };
+  const onKey = (ev) => { if (ev.key === "Escape") closeFieldHint(hint); };
+  const onMove = () => closeFieldHint(hint);
+  window.addEventListener("pointerdown", onPointer, true);
+  window.addEventListener("keydown", onKey, true);
+  window.addEventListener("scroll", onMove, true);
+  window.addEventListener("resize", onMove);
+  hint._cleanup = () => {
+    window.removeEventListener("pointerdown", onPointer, true);
+    window.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("scroll", onMove, true);
+    window.removeEventListener("resize", onMove);
+  };
 }
 
 // Amounts come from the API as decimal strings ("-14.80"); displayed in the user's number format.
@@ -873,6 +930,7 @@ class MyBankCard extends HTMLElement {
       txFiltersOpen: !!this._txFiltersOpen,
       txRecon: !!this._txRecon,
       txReconBalance: this._txReconBalance || "",
+      txReconSaved: this._txReconSaved || null,
       budgetId: this._budgetId ?? null,
       budgetView: this._budgetView || null,
       shareId: this._shareId || null,
@@ -912,6 +970,7 @@ class MyBankCard extends HTMLElement {
     this._txFiltersOpen = view.txFiltersOpen;
     this._txRecon = !!view.txRecon;
     this._txReconBalance = view.txReconBalance || "";
+    this._txReconSaved = view.txReconSaved || null;
     this._budgetId = view.budgetId ?? undefined;
     this._budgetView = view.budgetView || undefined;
     this._shareId = view.shareId || null;
@@ -1119,6 +1178,7 @@ class MyBankCard extends HTMLElement {
       if (this._txEnd) query.end = this._txEnd;
     } else {
       query.start = this._rangeStart(this._txRange);
+      if (this._txRange === "month_strict") query.end = monthEndIso();
     }
     const data = await this._call("list_account_transactions", query, true);
     this._txAll = (data && data.items) || [];
@@ -1188,9 +1248,20 @@ class MyBankCard extends HTMLElement {
     });
     // Rapprochement : filtre sur les opérations non rapprochées, et compare le solde saisi (site bancaire)
     // au solde rapproché de l'intégration pour repérer l'opération en trop ou manquante.
+    // La période affichée est mémorisée à l'entrée et rétablie à la sortie ; pendant le rapprochement,
+    // mois en cours strict (les opérations du mois suivant, déjà saisies, ne sont pas sur le relevé).
     this._bodyEl.querySelector(".tx-recon-btn").addEventListener("click", () => {
       this._txRecon = !this._txRecon;
       this._txFilters.reconciled = this._txRecon ? "no" : "";
+      if (this._txRecon) {
+        this._txReconSaved = { range: this._txRange, start: this._txStart || "", end: this._txEnd || "" };
+        this._txRange = "month_strict";
+      } else if (this._txReconSaved) {
+        this._txRange = this._txReconSaved.range;
+        this._txStart = this._txReconSaved.start;
+        this._txEnd = this._txReconSaved.end;
+        this._txReconSaved = null;
+      }
       this._renderActive(true);
     });
     const reconBox = this._bodyEl.querySelector(".tx-recon");
@@ -1219,6 +1290,12 @@ class MyBankCard extends HTMLElement {
       this._renderActive(true);
     });
     filterForm.addEventListener("submit", (ev) => ev.preventDefault());
+    filterForm.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".field-help");
+      if (!btn) return;
+      ev.preventDefault(); // dans un <label> : ne pas cocher / décocher la case
+      toggleFieldHint(btn);
+    });
     filterForm.querySelector(".f-reset").addEventListener("click", () => {
       // tous les champs du bandeau, y compris les dates (période initiale : mois en cours) et le rapprochement
       this._txFilters = { ...TX_FILTERS };
@@ -1226,6 +1303,7 @@ class MyBankCard extends HTMLElement {
       this._txStart = "";
       this._txEnd = "";
       this._txRecon = false;
+      this._txReconSaved = null;
       this._renderActive(true);
     });
     filterForm.querySelector(".f-save-default").addEventListener("click", () => {
@@ -1304,7 +1382,7 @@ class MyBankCard extends HTMLElement {
       <label>${t("Montant max.")}<input type="text" name="max" inputmode="decimal" value="${esc(f.max)}"></label>
       <label>${t("Tiers / autre compte")}<input type="text" name="payee" value="${esc(f.payee)}"></label>
       <label>${t("Rubrique")}${sel("category", tree(L.categories))}</label>
-      <label class="check"><input type="checkbox" name="sub" ${f.sub ? "checked" : ""}>${t("Sous-rubriques comprises")}</label>
+      <label class="check check-aligned"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="sub" ${f.sub ? "checked" : ""}>${t("Sous-rubriques")}${fieldHelpButtonHtml(SUB_HELP())}</span>${fieldHintHtml(SUB_HELP())}</label>
       <label>${t("Classe")}${sel("class", tree(L.classes))}</label>
       <label>${t("Mode de règlement")}${sel("method", [["", t("Tous")], ...L.methods.map((m) => [m.id, m.name])])}</label>
       <label>${t("Pointée")}${sel("pointed", yesNo)}</label>
@@ -1446,7 +1524,9 @@ class MyBankCard extends HTMLElement {
     const el = this._bodyEl.querySelector(".tx-summary");
     if (!el || !account) return;
     const b = account.balances;
-    el.innerHTML = `<span>${t("Solde prévisionnel :")} <strong>${fmtMoney(b.total, account.currency)}</strong></span>
+    const monthEnd = this._txMonthEnd && this._txMonthEnd.accountId === account.id ? this._txMonthEnd.value : null;
+    el.innerHTML = `<span>${t("Solde prévisionnel total :")} <strong>${fmtMoney(b.total, account.currency)}</strong></span>
+      <span>${t("Solde prévisionnel fin de mois :")} <strong>${monthEnd == null ? "…" : fmtMoney(monthEnd, account.currency)}</strong></span>
       <span>${t("Solde banque :")} <strong>${fmtMoney(b.pointed, account.currency)}</strong></span>
       <span>${t("Rapproché :")} <strong>${fmtMoney(b.reconciled, account.currency)}</strong></span>
       <button type="button" class="tx-refresh" title="${t("Rafraîchir la liste selon les critères sélectionnés")}">↻</button>`;
@@ -1454,9 +1534,19 @@ class MyBankCard extends HTMLElement {
 
   // Re-reads only the three balances above the list (after a state change or a delete).
   async _refreshSummary() {
-    const accounts = await this._items("list_accounts");
+    const accountId = this._txAccountId;
+    const [accounts, later] = await Promise.all([
+      this._items("list_accounts"),
+      this._items("list_account_transactions", { account_id: accountId, start: isoDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) }),
+    ]);
     this._lookups.accounts = accounts;
     this._lookups.account = new Map(accounts.map((a) => [a.id, a]));
+    const account = this._lookups.account.get(accountId);
+    // Solde prévisionnel fin de mois : solde total moins les opérations datées après le dernier jour du mois.
+    if (account) {
+      const afterCents = later.reduce((acc, tx) => acc + Math.round(Number(tx.amount) * 100), 0);
+      this._txMonthEnd = { accountId, value: (Math.round(Number(account.balances.total) * 100) - afterCents) / 100 };
+    }
     this._paintSummary(this._lookups.account.get(this._txAccountId));
     if (this._txRecon) this._paintRecon(); // le solde banque (pointé) vient de changer (pointage, rapprochement, suppression)
   }
@@ -3783,8 +3873,8 @@ class MyBankCard extends HTMLElement {
     form.addEventListener("click", (ev) => {
       const btn = ev.target.closest(".field-help");
       if (!btn) return;
-      const hint = btn.closest("label").querySelector(".hint");
-      if (hint) hint.classList.toggle("shown");
+      ev.preventDefault(); // dans un <label> : ne pas cocher / décocher la case
+      toggleFieldHint(btn);
     });
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -3929,12 +4019,39 @@ const SIMPLE_STYLE = `
   .bl.branch .bl-name { font-weight: 600; }
   .bl.kind .bl-name { font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.04em; color: var(--primary-color); }
   .bl .pbar { width: 100%; }
+  .bc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .bc-tools { display: flex; gap: 4px; margin-left: auto; }
+  .bc-tools button { min-width: 32px; min-height: 28px; padding: 0 8px; font-size: 16px; line-height: 1; }
+  table.budget-card { width: 100%; }
+  table.budget-card td.num { color: var(--primary-text-color); }
+  .bc-wrap { container-type: inline-size; }
+  table.budget-card td:first-child { white-space: nowrap; }
+  table.budget-card td { padding: 4px 6px; }
+  table.budget-card td.bar { width: 100%; min-width: 60px; }
+  /* carte étroite (smartphone) : le prévu passe sous le réalisé plutôt que de faire défiler le tableau */
+  @container (max-width: 420px) { table.budget-card td.num { white-space: normal; } table.budget-card td.num span { white-space: nowrap; } table.budget-card td.bar { min-width: 44px; } }
+  table.budget-card .pbar { width: 100%; }
+  table.budget-card tr.tree-branch td { font-size: 14px; }
+  table.budget-card button.tree-toggle { min-height: 24px; }
+  .amt-good { color: var(--success-color, #43a047); }
+  .amt-bad { color: var(--error-color, #db4437); }
   .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
   .chart-grid { stroke: var(--divider-color); stroke-width: 1; }
   .chart-tick { fill: var(--secondary-text-color); font-size: 10px; }
   .chart-label { fill: var(--primary-text-color); font-size: 11px; font-weight: 600; }
   .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; }
   .chart-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .chart-legend .dot.hollow { border-radius: 50%; border: 2px solid var(--secondary-text-color); width: 5px; height: 5px; }
+  .chart-wrap { position: relative; }
+  .chart-target { stroke: var(--secondary-text-color); stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.7; }
+  .chart-cross { stroke: var(--secondary-text-color); stroke-width: 1; opacity: 0.4; }
+  .chart-hover { fill: var(--secondary-text-color); opacity: 0.08; }
+  .chart-tip { position: absolute; top: 0; z-index: 1; pointer-events: none; background: var(--card-background-color, #fff);
+    border: 1px solid var(--divider-color); border-radius: 6px; padding: 6px 8px; font-size: 12px; line-height: 1.6;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); white-space: nowrap; }
+  .chart-tip .tt-title { font-weight: 600; }
+  .chart-tip .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .chart-note { font-size: 11px; color: var(--secondary-text-color); margin-top: 4px; }
 `;
 
 class MyBankSimpleCard extends MyBankCard {
@@ -4112,6 +4229,11 @@ class MyBankBudgetCard extends MyBankSimpleCard {
     return document.createElement("my-bank-budget-card-editor");
   }
 
+  setConfig(config) {
+    this._budgetCollapsed = null; // repli recalculé d'après la nouvelle configuration
+    super.setConfig(config);
+  }
+
   getCardSize() {
     return 6;
   }
@@ -4143,22 +4265,70 @@ class MyBankBudgetCard extends MyBankSimpleCard {
     else idx = period === "cumul" ? r.months.slice(0, current + 1).map((_, i) => i) : [current];
     const pick = (arr) => idx.reduce((acc, i) => acc + Number(arr[i]), 0).toFixed(2);
     const levels = Math.max(1, Number(this._config.levels) || 2);
-    const line = (cls, name, depth, kind, planned, actual) => `<div class="bl ${cls}" style="padding-left: ${depth * 14}px">
-        <div class="bl-head"><span class="bl-name">${esc(name)}</span><span class="bl-amt">${fmtAmount(actual)} / ${fmtMoney(planned, currency)}</span></div>
-        ${this._progressHtml(kind, planned, actual)}
-      </div>`;
+    const row = (attrs, label, kind, planned, actual) => `<tr ${attrs}>
+        <td>${label}</td>
+        <td class="bar">${this._progressHtml(kind, planned, actual)}</td>
+        <td class="num">${this._amountsHtml(kind, planned, actual, currency)}</td>
+      </tr>`;
+    let toggles = 0;
     const groups = this._byKind(r.rows)
       .map(({ kind, rows }) => {
         const visible = rows.filter((x) => x.depth < levels && (Number(pick(x.planned)) || (this._config.show_unbudgeted && Number(pick(x.actual)))));
         if (!visible.length) return "";
+        const parents = new Set(visible.map((x) => x.parent_id)); // chevron seulement si une sous-rubrique est affichée
         const tot = r.totals[kind];
-        return line("kind", KIND_TITLES[kind], 0, kind, pick(tot.planned), pick(tot.actual))
-          + visible.map((x) => line(x.has_children && x.depth < levels - 1 ? "branch" : "", x.name, x.depth, kind, pick(x.planned), pick(x.actual))).join("");
+        return row('class="kind-row"', esc(KIND_TITLES[kind]), kind, pick(tot.planned), pick(tot.actual))
+          + visible.map((x) => {
+            const toggle = parents.has(x.category_id);
+            if (toggle) toggles++;
+            return row(`data-cat="${x.category_id}" data-parent="${x.parent_id ?? ""}" class="${toggle ? "tree-branch" : ""}"`,
+              this._treeLabel(x.name, x.depth, toggle), kind, pick(x.planned), pick(x.actual));
+          }).join("");
       })
       .join("");
     const when = period === "month" ? monthLabel(month, "long") : BUDGET_PERIODS[period].toLowerCase();
     const heading = this._config.title ? "" : `<div class="bal-name">${t("Budget « {name} »", { name: esc(budget.name) })} — ${esc(when)}</div>`;
-    this._bodyEl.innerHTML = `${heading}${groups || `<div class="empty">${idx.length ? t("Rien de prévu sur la période.") : t("Le mois en cours est hors du budget.")}</div>`}`;
+    const tools = toggles ? `<div class="bc-tools"><button type="button" class="secondary b-unfold" title="${esc(t("Tout déplier"))}">+</button><button type="button" class="secondary b-fold" title="${esc(t("Tout replier"))}">−</button></div>` : "";
+    if (!groups) {
+      this._bodyEl.innerHTML = `${heading}<div class="empty">${idx.length ? t("Rien de prévu sur la période.") : t("Le mois en cours est hors du budget.")}</div>`;
+      return;
+    }
+    this._bodyEl.innerHTML = `<div class="bc-head">${heading}${tools}</div><div class="bc-wrap"><div class="table-wrap"><table class="dash-budget budget-card"><tbody>${groups}</tbody></table></div></div>`;
+    // collapse_level = N : à l'affichage, seules les rubriques des N premiers niveaux sont visibles (rubriques de
+    // niveau N et plus repliées). Le choix fait ensuite à la main tient jusqu'au rechargement de la page.
+    const foldAt = Number(this._config.collapse_level);
+    if (foldAt >= 1 && !this._budgetCollapsed) {
+      this._budgetCollapsed = new Set(r.rows.filter((x) => x.has_children && x.depth >= foldAt - 1).map((x) => x.category_id));
+    }
+    if (toggles) this._wireCollapse(this._bodyEl);
+  }
+
+  // Réalisé / prévu colorés : réalisé en vert s'il respecte le prévu, en rouge sinon ; prévu en vert aussi
+  // quand le réalisé l'égale exactement, sinon couleur du texte. Respecter = ne pas dépasser pour une dépense,
+  // l'atteindre pour une recette ou une épargne (même sens que les barres).
+  _amountsHtml(kind, planned, actual, currency) {
+    const p = Math.round(Number(planned) * 100);
+    const a = Math.round(Number(actual) * 100);
+    const ok = a === p || (kind === "expense" ? a < p : a > p);
+    return `<span class="${ok ? "amt-good" : "amt-bad"}">${fmtAmount(actual)}</span> / <span class="${a === p ? "amt-good" : ""}">${fmtMoney(planned, currency)}</span>`;
+  }
+
+  // État replié propre à cette carte (pas partagé avec le suivi de la carte principale), mémorisé dans le navigateur.
+  _collapsedCats() {
+    if (!this._budgetCollapsed) {
+      let ids = [];
+      try { ids = JSON.parse(window.localStorage.getItem(BUDGET_CARD_COLLAPSE_KEY) || "[]"); } catch (e) { /* stockage indisponible */ }
+      this._budgetCollapsed = new Set(ids);
+    }
+    return this._budgetCollapsed;
+  }
+
+  _toggleCollapsed(id) {
+    const set = this._collapsedCats();
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    if (Number(this._config.collapse_level) >= 1) return; // état initial donné par la carte : rien à mémoriser
+    try { window.localStorage.setItem(BUDGET_CARD_COLLAPSE_KEY, JSON.stringify([...set])); } catch (e) { /* idem */ }
   }
 }
 
@@ -4276,8 +4446,10 @@ class MyBankBalanceHistoryCard extends MyBankSimpleCard {
   }
 }
 
-// Charge des échéances à venir (barres), par semaine ou par mois selon l'horizon choisi. Comptes et horizon
-// réglables ; un virement entre deux comptes tous deux sélectionnés n'est compté qu'une fois.
+// À venir (barres), par semaine ou par mois selon l'horizon choisi : opérations déjà saisies datées après
+// aujourd'hui (teinte pleine), et échéances des planifications pas encore saisies (même teinte, plus claire). Recettes au-dessus de
+// l'axe, dépenses en dessous : chaque segment a la longueur de son montant, et l'étiquette donne le solde de
+// la période. Un virement entre deux comptes tous deux sélectionnés n'est compté qu'une fois (côté débit).
 class MyBankUpcomingChargeCard extends MyBankSimpleCard {
   static getStubConfig() {
     return { horizon: "8weeks" };
@@ -4317,79 +4489,126 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
     const horizon = HORIZON_DAYS[this._config.horizon] ? this._config.horizon : "8weeks";
     const days = HORIZON_DAYS[horizon];
     const all = ids.length === accounts.length;
-    const lists = await Promise.all((all ? [null] : ids).map((id) =>
-      this._items("list_upcoming_occurrences", id ? { days, account_id: id } : { days })
-    ));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const last = new Date(today); last.setDate(last.getDate() + days);
+    const [lists, txLists] = await Promise.all([
+      Promise.all((all ? [null] : ids).map((id) => this._items("list_upcoming_occurrences", id ? { days, account_id: id } : { days }))),
+      Promise.all((all ? [null] : ids).map((id) => this._futureTransactions(id, isoDate(tomorrow), isoDate(last)))),
+    ]);
+    const entries = [];
     const seen = new Set();
-    const occurrences = [];
     for (const list of lists) for (const o of list) {
       const key = `${o.schedule_id}:${o.rank}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      occurrences.push(o);
+      // Montant vu du compte source : un virement reçu par un compte sélectionné depuis un compte qui ne l'est pas
+      // est une rentrée.
+      const amount = ids.includes(o.account_id) ? Number(o.amount) : -Number(o.amount);
+      entries.push({ type: "occ", date: o.date, amount });
     }
-    const buckets = this._buildBuckets(HORIZON_BUCKET[horizon], days, occurrences);
-    const heading = this._config.title ? "" : `<div class="bal-name">${t("Échéances à venir")} — ${esc(UPCOMING_HORIZONS[horizon])}</div>`;
+    for (const list of txLists) for (const tx of list) {
+      if (tx.transfer_account_id != null && ids.includes(tx.transfer_account_id) && Number(tx.amount) > 0) continue; // l'autre jambe est comptée
+      entries.push({ type: "ops", date: tx.date, amount: Number(tx.amount) });
+    }
+    const buckets = this._buildBuckets(HORIZON_BUCKET[horizon], days, entries);
+    const heading = this._config.title ? "" : `<div class="bal-name">${t("Opérations et échéances à venir")} — ${esc(UPCOMING_HORIZONS[horizon])}</div>`;
     this._bodyEl.innerHTML = `${heading}<div class="chart-wrap"></div>`;
     this._paintBarChart(this._bodyEl.querySelector(".chart-wrap"), buckets, currency);
   }
 
-  _buildBuckets(unit, days, occurrences) {
+  // Opérations datées entre start et end (comprises) d'un compte, ou de tous (accountId null), page par page.
+  async _futureTransactions(accountId, start, end) {
+    const out = [];
+    for (let offset = 0; ;) {
+      const query = { start, end, order: "asc", limit: 1000, offset };
+      if (accountId) query.account_id = accountId;
+      const res = await this._call("search_transactions", query, true);
+      const items = (res && res.items) || [];
+      out.push(...items);
+      offset += items.length;
+      if (items.length < 1000 || offset >= ((res && res.total) || 0)) return out;
+    }
+  }
+
+  _buildBuckets(unit, days, entries) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const buckets = [];
+    const empty = () => ({ ops: { pos: 0, neg: 0 }, occ: { pos: 0, neg: 0 } });
     if (unit === "week") {
       for (let i = 0; i < Math.ceil(days / 7); i++) {
         const from = new Date(today); from.setDate(from.getDate() + i * 7);
         const to = new Date(today); to.setDate(to.getDate() + i * 7 + 6);
-        buckets.push({ label: axisDate(isoDate(from)), from: isoDate(from), to: isoDate(to), total: 0 });
+        buckets.push({ label: axisDate(isoDate(from)), from: isoDate(from), to: isoDate(to), ...empty() });
       }
     } else {
       for (let i = 0; i < Math.ceil(days / 30.4); i++) {
         const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
         const ym = isoDate(d).slice(0, 7);
-        buckets.push({ label: monthLabel(ym, "short"), from: `${ym}-01`, to: isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)), total: 0 });
+        buckets.push({ label: monthLabel(ym, "short"), month: ym, from: `${ym}-01`, to: isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)), ...empty() });
       }
     }
-    occurrences.forEach((o) => {
-      const b = buckets.find((x) => o.date >= x.from && o.date <= x.to);
-      // Somme signée (dépense négative, recette positive) : une rentrée ne s'ajoute pas à une charge,
-      // elle la compense — sans ça, une semaine avec salaire + loyer affichait leur somme, pas leur solde.
-      if (b) b.total += Number(o.amount);
+    // Échéances en retard (avant aujourd'hui) : hors des barres, comme avant.
+    entries.forEach((e) => {
+      const b = buckets.find((x) => e.date >= x.from && e.date <= x.to);
+      if (!b) return;
+      if (e.amount >= 0) b[e.type].pos += e.amount;
+      else b[e.type].neg -= e.amount;
     });
+    buckets.forEach((b) => (b.total = b.ops.pos + b.occ.pos - b.ops.neg - b.occ.neg));
     return buckets;
   }
 
   _paintBarChart(host, buckets, currency) {
-    const W = 560, H = 190, pad = { l: 8, r: 8, t: 22, b: 24 };
+    // Recette en vert, dépense en rouge ; une échéance pas encore saisie prend la même couleur, en plus clair.
+    const FILL = { pos: "var(--success-color, #43a047)", neg: "var(--error-color, #db4437)" };
+    const OPACITY = { ops: 1, occ: 0.4 };
+    const swatch = (type) => ["pos", "neg"].map((sign) => `<span class="dot" style="background:${FILL[sign]};opacity:${OPACITY[type]}"></span>`).join("");
+    const W = 560, H = 210, pad = { l: 8, r: 8, t: 22, b: 24 };
     const avail = H - pad.t - pad.b;
-    const maxPos = Math.max(0, ...buckets.map((b) => b.total));
-    const maxNeg = Math.max(0, ...buckets.map((b) => -b.total));
-    // Axe du zéro placé selon la part de recettes et de dépenses (tout en bas s'il n'y a que des dépenses,
-    // comme avant ; au milieu si les deux cohabitent) ; chaque sens garde sa propre marge de 15 %.
+    const maxPos = Math.max(0, ...buckets.map((b) => b.ops.pos + b.occ.pos));
+    const maxNeg = Math.max(0, ...buckets.map((b) => b.ops.neg + b.occ.neg));
+    // Axe du zéro placé selon la part de recettes et de dépenses ; chaque sens garde une marge de 15 %
+    // pour l'étiquette du solde.
     const span = (maxPos + maxNeg) * 1.15 || 1;
     const scale = avail / span;
-    const zeroY = maxPos + maxNeg ? pad.t + avail * ((maxPos * 1.15) / span) : H - pad.b;
-    const bw = ((W - pad.l - pad.r) / buckets.length) * 0.6;
-    const x = (i) => pad.l + (i + 0.5) * ((W - pad.l - pad.r) / buckets.length);
+    const zeroY = maxPos + maxNeg ? pad.t + avail * ((maxPos * (maxNeg ? 1.075 : 1.15)) / span) : H - pad.b;
+    const slot = (W - pad.l - pad.r) / buckets.length;
+    const bw = slot * 0.6;
+    const x = (i) => pad.l + (i + 0.5) * slot;
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
     svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: zeroY, y2: zeroY, class: "chart-grid" }));
+    const cross = svgEl("rect", { x: 0, y: pad.t - 18, width: slot, height: H - pad.t + 18, class: "chart-hover", visibility: "hidden" });
+    svg.appendChild(cross);
+    // Segments empilés depuis l'axe : opérations saisies contre l'axe, échéances au-delà, 2 px d'écart entre eux.
+    const stack = (i, dir, parts) => {
+      const sign = dir > 0 ? "pos" : "neg";
+      let offset = 0;
+      parts.forEach(([type, amount]) => {
+        const h = amount * scale;
+        if (h <= 0) return;
+        const gap = offset ? 2 : 0;
+        const len = Math.max(1, h - gap);
+        const y = dir > 0 ? zeroY - offset - h : zeroY + offset + gap;
+        svg.appendChild(svgEl("rect", { x: x(i) - bw / 2, y, width: bw, height: len, rx: 2, fill: FILL[sign], "fill-opacity": OPACITY[type] }));
+        offset += h;
+      });
+      return offset;
+    };
     buckets.forEach((b, i) => {
-      const h = Math.abs(b.total) * scale;
-      const top = b.total >= 0 ? zeroY - h : zeroY;
-      const color = b.total > 0 ? "var(--success-color, #43a047)" : "var(--error-color, #db4437)";
-      const r = svgEl("rect", { x: x(i) - bw / 2, y: top, width: bw, height: Math.max(0, h), rx: 2, fill: color, opacity: "0.65" });
-      svg.appendChild(r);
+      const up = stack(i, 1, [["ops", b.ops.pos], ["occ", b.occ.pos]]);
+      const down = stack(i, -1, [["ops", b.ops.neg], ["occ", b.occ.neg]]);
       const lbl = svgEl("text", { x: x(i), y: H - 8, class: "chart-tick", "text-anchor": "middle" });
       lbl.textContent = b.label;
       svg.appendChild(lbl);
-      if (b.total) {
-        // Étiquette toujours visible (pas seulement au survol) : la carte vise d'abord un tableau de bord
-        // tactile, sans pointeur pour déclencher une infobulle. Au-dessus de la barre si positive, en
-        // dessous si négative (la barre descend alors sous l'axe du zéro).
+      if (up || down) {
+        // Solde de la période, toujours visible (tableau de bord tactile) : au-dessus des recettes s'il est positif,
+        // sous les dépenses s'il est négatif.
         const amt = svgEl("text", {
           x: x(i),
-          y: b.total >= 0 ? Math.max(top - 4, pad.t - 6) : Math.min(top + h + 12, H - pad.b + 6),
+          y: b.total >= 0 ? Math.max(zeroY - up - 4, pad.t - 6) : Math.min(zeroY + down + 12, H - pad.b + 6),
           class: "chart-label",
           "text-anchor": "middle",
         });
@@ -4399,6 +4618,44 @@ class MyBankUpcomingChargeCard extends MyBankSimpleCard {
     });
     host.innerHTML = "";
     host.appendChild(svg);
+    const tip = document.createElement("div");
+    tip.className = "chart-tip";
+    tip.hidden = true;
+    host.appendChild(tip);
+    const money = (v) => fmtMoney(v, currency);
+    const part = (p) => [p.pos ? `+${money(p.pos)}` : "", p.neg ? `−${money(p.neg)}` : ""].filter(Boolean).join(" · ") || "—";
+    const show = (i) => {
+      const b = buckets[i];
+      cross.setAttribute("x", pad.l + i * slot);
+      cross.setAttribute("visibility", "visible");
+      const title = b.month ? monthLabel(b.month, "long") : `${frDate(b.from)} – ${frDate(b.to)}`;
+      tip.innerHTML = `<div class="tt-title">${esc(title)}</div>
+        <div>${swatch("ops")}${t("Opérations saisies")} : ${part(b.ops)}</div>
+        <div>${swatch("occ")}${t("Échéances pas encore saisies")} : ${part(b.occ)}</div>
+        <div>${t("Solde de la période")} : <strong>${b.total > 0 ? "+" : ""}${money(b.total)}</strong></div>`;
+      const left = (x(i) / W) * 100;
+      tip.style.left = left > 50 ? "" : `calc(${left}% + ${bw / 2 / W * 100}% + 6px)`;
+      tip.style.right = left > 50 ? `calc(${100 - left}% + ${bw / 2 / W * 100}% + 6px)` : "";
+      tip.hidden = false;
+    };
+    buckets.forEach((_, i) => {
+      const hit = svgEl("rect", { x: pad.l + i * slot, y: 0, width: slot, height: H, fill: "transparent" });
+      hit.addEventListener("pointerenter", () => show(i));
+      hit.addEventListener("click", () => show(i));
+      svg.appendChild(hit);
+    });
+    svg.addEventListener("pointerleave", () => {
+      tip.hidden = true;
+      cross.setAttribute("visibility", "hidden");
+    });
+    const legend = document.createElement("div");
+    legend.className = "chart-legend";
+    legend.innerHTML = `<span>${swatch("ops")}${t("Opérations saisies")}</span><span>${swatch("occ")}${t("Échéances pas encore saisies")}</span>`;
+    host.appendChild(legend);
+    const note = document.createElement("div");
+    note.className = "chart-note";
+    note.textContent = t("Recettes (vert) au-dessus de l'axe, dépenses (rouge) en dessous ; teinte claire = échéance pas encore saisie. Le montant affiché est le solde de la période.");
+    host.appendChild(note);
   }
 }
 
@@ -4495,6 +4752,208 @@ class MyBankCategorySpendingCard extends MyBankSimpleCard {
   }
 }
 
+// Respect d'un budget mois par mois (une ligne par type) : réalisé / prévu en %, ligne pointillée sur 100 %.
+// Les mois que le budget suivi ne couvre pas sont pris dans un autre budget du même compte (archivé compris :
+// budgets annuels successifs), sinon laissés vides. Le mois en cours, encore incomplet, a un point creux.
+const TREND_KINDS = ["income", "expense", "savings"]; // ordre fixe : une couleur par type, quels que soient les types affichés
+const BUDGET_TREND_PERIODS = translated({ "12months": "12 derniers mois", "6months": "6 derniers mois", year: "Année en cours", last_year: "Année précédente", budget: "Durée du budget (jusqu'au mois en cours)" });
+
+function addMonths(ym, n) {
+  const [y, m] = ym.split("-").map(Number);
+  return isoDate(new Date(y, m - 1 + n, 1)).slice(0, 7);
+}
+
+function monthRange(from, to) {
+  const out = [];
+  for (let m = from; m <= to && out.length < 120; m = addMonths(m, 1)) out.push(m);
+  return out;
+}
+
+class MyBankBudgetTrendCard extends MyBankSimpleCard {
+  static getStubConfig() {
+    return { period: "12months" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("my-bank-budget-trend-card-editor");
+  }
+
+  getCardSize() {
+    return 5;
+  }
+
+  set hass(hass) {
+    super.hass = hass;
+    if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
+  }
+
+  async _renderCard() {
+    await this._ensureLookups();
+    const current = isoDate(new Date()).slice(0, 7);
+    const budgets = await this._items("list_budgets");
+    const covers = (b, m) => b.start_month.slice(0, 7) <= m && b.end_month.slice(0, 7) >= m;
+    const wanted = Number(this._config.budget_id);
+    const budget = budgets.find((b) => b.id === wanted)
+      || (this._config.budget_id ? null : budgets.find((b) => !b.archived && covers(b, current)));
+    if (!budget) {
+      this._bodyEl.innerHTML = `<div class="empty">${this._config.budget_id ? t("Budget introuvable.") : t("Aucun budget ne couvre le mois en cours.")}</div>`;
+      return;
+    }
+    const period = BUDGET_TREND_PERIODS[this._config.period] ? this._config.period : "12months";
+    const months = this._trendMonths(period, budget, current);
+    // Budget suivi d'abord, puis les autres budgets du compte : non archivés, puis du plus récent au plus ancien.
+    const others = budgets
+      .filter((b) => b.id !== budget.id && b.account_id === budget.account_id)
+      .sort((a, b) => Number(a.archived) - Number(b.archived) || b.start_month.localeCompare(a.start_month));
+    const owners = months.map((m) => [budget, ...others].find((b) => covers(b, m)) || null);
+    const needed = [...new Set(owners.filter(Boolean))];
+    const reports = new Map(await Promise.all(needed.map(async (b) => [b.id, await this._call("get_budget_report", { budget_id: b.id }, true)])));
+    const wantedKinds = Array.isArray(this._config.kinds) && this._config.kinds.length ? this._config.kinds : TREND_KINDS;
+    const series = TREND_KINDS.filter((k) => wantedKinds.includes(k)).map((kind) => ({
+      kind,
+      name: KIND_TITLES[kind],
+      points: months.map((m, i) => {
+        const r = owners[i] && reports.get(owners[i].id);
+        const j = r ? r.months.indexOf(m) : -1;
+        if (j < 0) return null;
+        const planned = Number(r.totals[kind].planned[j]);
+        const actual = Number(r.totals[kind].actual[j]);
+        return { planned, actual, pct: planned ? (actual / planned) * 100 : null };
+      }),
+    }));
+    const heading = this._config.title ? "" : `<div class="bal-name">${t("Respect du budget « {name} »", { name: esc(budget.name) })} — ${esc(BUDGET_TREND_PERIODS[period])}</div>`;
+    if (!series.some((s) => s.points.some((p) => p && p.pct != null))) {
+      this._bodyEl.innerHTML = `${heading}<div class="empty">${t("Rien de prévu sur la période.")}</div>`;
+      return;
+    }
+    this._bodyEl.innerHTML = `${heading}<div class="chart-wrap"></div>`;
+    this._paintTrendChart(this._bodyEl.querySelector(".chart-wrap"), months, series, current, this._currency(budget.account_id));
+  }
+
+  _trendMonths(period, budget, current) {
+    const year = Number(current.slice(0, 4));
+    if (period === "6months") return monthRange(addMonths(current, -5), current);
+    if (period === "year") return monthRange(`${year}-01`, current);
+    if (period === "last_year") return monthRange(`${year - 1}-01`, `${year - 1}-12`);
+    if (period === "budget") {
+      const start = budget.start_month.slice(0, 7), end = budget.end_month.slice(0, 7);
+      // budget pas encore commencé : tous ses mois (vides), plutôt qu'aucun
+      return monthRange(start, start > current || end < current ? end : current);
+    }
+    return monthRange(addMonths(current, -11), current);
+  }
+
+  _paintTrendChart(host, months, series, current, currency) {
+    const colors = seriesColors(this._hass);
+    const color = (s) => colors[TREND_KINDS.indexOf(s.kind)];
+    const W = 560, H = 250, pad = { l: 38, r: 44, t: 10, b: 22 };
+    const n = months.length;
+    const values = series.flatMap((s) => s.points.filter((p) => p && p.pct != null).map((p) => p.pct));
+    // Échelle de 0 (ou moins, si un réalisé est négatif) à au moins 150 %, bornée à [-100 %, 300 %] :
+    // un mois à 900 % écraserait tous les autres ; il est dessiné en butée, sa vraie valeur dans l'infobulle.
+    const rawHi = Math.min(300, Math.max(150, ...values));
+    const rawLo = Math.max(-100, Math.min(0, ...values));
+    const step = rawHi - rawLo > 250 ? 100 : 50;
+    const hi = Math.ceil(rawHi / step) * step, lo = Math.floor(rawLo / step) * step;
+    const x = (i) => pad.l + (n === 1 ? 0.5 : i / (n - 1)) * (W - pad.l - pad.r);
+    const y = (v) => pad.t + ((hi - Math.max(lo, Math.min(hi, v))) / (hi - lo)) * (H - pad.t - pad.b);
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
+    for (let v = lo; v <= hi; v += step) {
+      svg.appendChild(svgEl("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: v === 100 ? "chart-target" : "chart-grid" }));
+      const tick = svgEl("text", { x: pad.l - 6, y: y(v) + 3, class: "chart-tick", "text-anchor": "end" });
+      tick.textContent = `${v} %`;
+      svg.appendChild(tick);
+    }
+    const thin = n > 12; // au-delà d'un an, un mois sur deux étiqueté
+    months.forEach((m, i) => {
+      if (thin && i % 2) return;
+      const lbl = svgEl("text", { x: x(i), y: H - 6, class: "chart-tick", "text-anchor": "middle" });
+      const [yy, mm] = m.split("-").map(Number);
+      lbl.textContent = i === 0 || mm === 1 ? monthLabel(m, "short") : new Date(yy, mm - 1, 1).toLocaleDateString(LOCALE, { month: "short" });
+      svg.appendChild(lbl);
+    });
+    const cross = svgEl("line", { x1: 0, x2: 0, y1: pad.t, y2: H - pad.b, class: "chart-cross", visibility: "hidden" });
+    svg.appendChild(cross);
+    const ends = [];
+    series.forEach((s) => {
+      const c = color(s);
+      // Ligne coupée sur les mois sans prévu ou sans budget.
+      let d = "", open = false;
+      s.points.forEach((p, i) => {
+        if (!p || p.pct == null) { open = false; return; }
+        d += `${open ? "L" : "M"}${x(i)},${y(p.pct)} `;
+        open = true;
+      });
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: c, "stroke-width": 2, "stroke-linejoin": "round" }));
+      s.points.forEach((p, i) => {
+        if (!p || p.pct == null) return;
+        const inProgress = months[i] === current;
+        svg.appendChild(svgEl("circle", {
+          cx: x(i), cy: y(p.pct), r: 4,
+          fill: inProgress ? "var(--card-background-color, #fff)" : c,
+          stroke: inProgress ? c : "var(--card-background-color, #fff)",
+          "stroke-width": inProgress ? 2 : 1.5,
+        }));
+      });
+      const last = s.points.reduce((acc, p, i) => (p && p.pct != null ? i : acc), -1);
+      if (last >= 0) ends.push({ x: x(last), y: y(s.points[last].pct), text: `${Math.round(s.points[last].pct)} %` });
+    });
+    // Étiquettes de fin de ligne écartées verticalement quand deux valeurs finales sont proches.
+    ends.sort((a, b) => a.y - b.y).reduce((prevY, e) => {
+      const ly = Math.max(e.y, prevY);
+      const lbl = svgEl("text", { x: e.x + 8, y: ly + 3, class: "chart-label" });
+      lbl.textContent = e.text;
+      svg.appendChild(lbl);
+      return ly + 13;
+    }, -Infinity);
+    host.innerHTML = "";
+    host.appendChild(svg);
+    const tip = document.createElement("div");
+    tip.className = "chart-tip";
+    tip.hidden = true;
+    host.appendChild(tip);
+    // Survol (ou toucher) d'une colonne de mois : repère vertical et détail des trois types.
+    const show = (i) => {
+      cross.setAttribute("x1", x(i));
+      cross.setAttribute("x2", x(i));
+      cross.setAttribute("visibility", "visible");
+      const rows = series.map((s) => {
+        const p = s.points[i];
+        const value = !p ? `<span class="muted">${t("aucun budget")}</span>`
+          : p.pct == null ? `<span class="muted">${t("rien de prévu")}</span>`
+          : `<strong>${Math.round(p.pct)} %</strong> <span class="muted">${fmtAmount(p.actual)} / ${fmtMoney(p.planned, currency)}</span>`;
+        return `<div><span class="dot" style="background:${color(s)}"></span>${esc(s.name)} : ${value}</div>`;
+      }).join("");
+      tip.innerHTML = `<div class="tt-title">${esc(monthLabel(months[i], "long"))}${months[i] === current ? ` (${t("en cours")})` : ""}</div>${rows}`;
+      const left = (x(i) / W) * 100;
+      tip.style.left = left > 55 ? "" : `calc(${left}% + 10px)`;
+      tip.style.right = left > 55 ? `calc(${100 - left}% + 10px)` : "";
+      tip.hidden = false;
+    };
+    const hide = () => {
+      tip.hidden = true;
+      cross.setAttribute("visibility", "hidden");
+    };
+    const colW = n === 1 ? W - pad.l - pad.r : (W - pad.l - pad.r) / (n - 1);
+    months.forEach((_, i) => {
+      const hit = svgEl("rect", { x: x(i) - colW / 2, y: 0, width: colW, height: H, fill: "transparent" });
+      hit.addEventListener("pointerenter", () => show(i));
+      hit.addEventListener("click", () => show(i));
+      svg.appendChild(hit);
+    });
+    svg.addEventListener("pointerleave", hide);
+    const legend = document.createElement("div");
+    legend.className = "chart-legend";
+    legend.innerHTML = series.map((s) => `<span><span class="dot" style="background:${color(s)}"></span>${esc(s.name)}</span>`).join("")
+      + (months.includes(current) ? `<span><span class="dot hollow"></span>${t("mois en cours")}</span>` : "");
+    host.appendChild(legend);
+    const note = document.createElement("div");
+    note.className = "chart-note";
+    note.textContent = t("Dépenses : sous 100 %, le budget est tenu. Recettes et épargne : à 100 % ou plus, l'objectif est atteint.");
+    host.appendChild(note);
+  }
+}
+
 // Comptes partagés seuls (tableau de bord smartphone) : la carte principale réduite au volet « Partages »,
 // avec le bouton Retour entre la liste et un compte ; sans le bandeau des planifications.
 class MyBankShareCard extends MyBankCard {
@@ -4509,6 +4968,23 @@ class MyBankShareCard extends MyBankCard {
 
   static getConfigElement() {
     return document.createElement("my-bank-share-card-editor");
+  }
+}
+
+// Opérations seules : la carte principale réduite au volet « Opérations » (même code, aucune copie : toute
+// évolution du volet vaut pour les deux cartes) ; sans onglets ni bandeau des planifications.
+class MyBankTransactionsCard extends MyBankCard {
+  setConfig(config) {
+    this._noAlerts = true;
+    super.setConfig({ ...(config || {}), sections: ["transactions"] });
+  }
+
+  static getStubConfig() {
+    return {};
+  }
+
+  static getConfigElement() {
+    return document.createElement("my-bank-transactions-card-editor");
   }
 }
 
@@ -4650,6 +5126,13 @@ class MyBankShareCardEditor extends MyBankSimpleEditor {
   }
 }
 
+class MyBankTransactionsCardEditor extends MyBankSimpleEditor {
+  _render() {
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+    this.shadowRoot.innerHTML = `<p style="color: var(--secondary-text-color); font-size: 13px;">${t("Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.")}</p>`;
+  }
+}
+
 class MyBankBudgetCardEditor extends MyBankSimpleEditor {
   async _loadOptions() {
     const budgets = await this._items("list_budgets");
@@ -4662,7 +5145,21 @@ class MyBankBudgetCardEditor extends MyBankSimpleEditor {
       { key: "budget_id", label: t("Budget"), type: "select", number: true, empty: t("Celui qui couvre le mois en cours") },
       { key: "period", label: t("Période"), type: "select", options: Object.entries(BUDGET_PERIODS).map(([id, name]) => ({ id, name })) },
       { key: "levels", label: t("Niveaux de rubriques affichés (1 = rubriques racines)"), type: "number", min: 1 },
+      { key: "collapse_level", label: t("Replié à l'affichage au niveau (1 = rubriques racines seules ; vide = dernier état choisi)"), type: "number", min: 1 },
       { key: "show_unbudgeted", label: t("Afficher aussi les rubriques hors budget (réalisé sans prévu)"), type: "bool" },
+    ];
+  }
+}
+
+// Même liste de budgets que la carte Budget ; période propre au suivi mois par mois, types à cocher.
+class MyBankBudgetTrendCardEditor extends MyBankBudgetCardEditor {
+  _fields() {
+    return [
+      { key: "title", label: t("Titre (facultatif)") },
+      { key: "budget_id", label: t("Budget"), type: "select", number: true, empty: t("Celui qui couvre le mois en cours") },
+      { key: "period", label: t("Période"), type: "select", options: Object.entries(BUDGET_TREND_PERIODS).map(([id, name]) => ({ id, name })) },
+      { key: "kinds", label: t("Types affichés"), type: "checks", options: TREND_KINDS.map((k) => ({ key: k, label: KIND_TITLES[k] })),
+        help: t("Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.") },
     ];
   }
 }
@@ -4731,6 +5228,22 @@ class MyBankCategorySpendingCardEditor extends MyBankSimpleEditor {
 // @@I18N-BEGIN@@ — généré par i18n/gen.py depuis i18n/dict.json (clé : texte français de la carte)
 const I18N = {
   en: {
+    "Mois en cours et à venir": "Current month and upcoming",
+    "Mois en cours strict": "Current month only",
+    "Solde prévisionnel total :": "Total projected balance:",
+    "Solde prévisionnel fin de mois :": "Projected end-of-month balance:",
+    "Sous-rubriques": "Subcategories",
+    "Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.": "With a category selected: checked, the list also shows the transactions of its subcategories, at every level; unchecked, only those attached directly to the category. The total only counts the share of these categories in split transactions.",
+    "Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.": "No settings: the card shows the main card's “Transactions” tab.",
+    "My Bank — opérations": "My Bank — transactions",
+    "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie.": "The main card's Transactions tab on its own: list, filters, clearing, reconciliation, entry.",
+    "Opérations et échéances à venir": "Upcoming transactions and occurrences",
+    "Opérations saisies": "Entered transactions",
+    "Échéances pas encore saisies": "Occurrences not yet entered",
+    "Solde de la période": "Balance for the period",
+    "Recettes (vert) au-dessus de l'axe, dépenses (rouge) en dessous ; teinte claire = échéance pas encore saisie. Le montant affiché est le solde de la période.": "Income (green) above the axis, expenses (red) below; light shade = occurrence not yet entered. The amount shown is the balance for the period.",
+    "Opérations déjà saisies et échéances pas encore saisies à venir, par semaine ou par mois, comptes et horizon réglables.": "Upcoming entered transactions and not-yet-entered occurrences, by week or by month; accounts and horizon configurable.",
+    "Replié à l'affichage au niveau (1 = rubriques racines seules ; vide = dernier état choisi)": "Collapsed on display at level (1 = root categories only; empty = last state chosen)",
     " · encore {n} échéances": " · {n} left",
     "(a payé {paid}, le moins du groupe)": "(paid {paid}, the least in the group)",
     "(archivé)": "(archived)",
@@ -4901,7 +5414,6 @@ const I18N = {
     "Moins de champs": "Fewer fields",
     "Mois en cours": "Current month",
     "Montant": "Amount",
-    "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables.": "Amount of upcoming occurrences per week or month, adjustable accounts and horizon.",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Invalid amount (enter a positive amount; the type gives the direction).",
     "Montant invalide (saisir un montant positif).": "Invalid amount (enter a positive amount).",
     "Montant invalide : « {value} »": "Invalid amount: “{value}”",
@@ -5019,11 +5531,9 @@ const I18N = {
     "Solde initial": "Opening balance",
     "Solde prévisionnel": "Projected balance",
     "Solde prévisionnel (toutes opérations)": "Projected balance (all transactions)",
-    "Solde prévisionnel :": "Projected balance:",
     "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte.": "Projected, bank (cleared) and reconciled balance of an account.",
     "Solde prévu (recettes − dépenses + épargne)": "Planned balance (income − expenses + savings)",
     "Solde prévu (recettes − dépenses − épargne)": "Planned balance (income − expenses − savings)",
-    "Sous-rubriques comprises": "Including subcategories",
     "Suivi": "Tracking",
     "Supprimer": "Delete",
     "Supprimer ce compte ?": "Delete this account?",
@@ -5216,8 +5726,36 @@ const I18N = {
     "L'opération Pharmacie Lenoir est seulement pointée : elle apparaît sur le site de la banque, mais la coche de rapprochement n'y est pas encore disponible.": "The Lenoir Pharmacy transaction is only cleared: it appears on the bank's website, but the reconciliation tick isn't available there yet.",
     "L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.": "The Corner Café transaction needs clearing since it appears on the bank's website. It can also be reconciled in My Bank once it's ticked on the website, as the tick is available there.",
     "L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.": "The Bakery transaction needs neither clearing nor reconciling: it isn't on the bank's website yet, so it's not in the bank balance — but it already counts in the projected balance.",
+    "Année précédente": "Previous year",
+    "Durée du budget (jusqu'au mois en cours)": "Budget duration (up to the current month)",
+    "Respect du budget « {name} »": "Budget adherence “{name}”",
+    "aucun budget": "no budget",
+    "rien de prévu": "nothing planned",
+    "en cours": "in progress",
+    "mois en cours": "current month",
+    "Dépenses : sous 100 %, le budget est tenu. Recettes et épargne : à 100 % ou plus, l'objectif est atteint.": "Expenses: below 100 %, the budget is kept. Income and savings: at 100 % or more, the target is reached.",
+    "Types affichés": "Types shown",
+    "Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.": "All checked by default. Months outside the chosen budget are taken from another budget of the same account, if there is one.",
+    "My Bank — respect du budget": "My Bank — budget adherence",
+    "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Actual / planned in %, month by month, for a budget's income, expenses and savings, with 100 % as a dashed line.",
   },
   de: {
+    "Mois en cours et à venir": "Aktueller Monat und künftige",
+    "Mois en cours strict": "Nur aktueller Monat",
+    "Solde prévisionnel total :": "Voraussichtlicher Gesamtsaldo:",
+    "Solde prévisionnel fin de mois :": "Voraussichtlicher Saldo zum Monatsende:",
+    "Sous-rubriques": "Unterkategorien",
+    "Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.": "Bei gewählter Kategorie: angehakt zeigt die Liste auch die Buchungen ihrer Unterkategorien auf allen Ebenen; nicht angehakt nur die direkt der Kategorie zugeordneten. Die Summe zählt bei aufgeteilten Buchungen nur den Anteil dieser Kategorien.",
+    "Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.": "Keine Einstellungen: Die Karte zeigt den Bereich „Buchungen“ der Hauptkarte.",
+    "My Bank — opérations": "My Bank — Buchungen",
+    "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie.": "Nur der Bereich Buchungen der Hauptkarte: Liste, Filter, Abhaken, Abstimmung, Erfassung.",
+    "Opérations et échéances à venir": "Anstehende Buchungen und Ausführungen",
+    "Opérations saisies": "Erfasste Buchungen",
+    "Échéances pas encore saisies": "Noch nicht erfasste Ausführungen",
+    "Solde de la période": "Saldo des Zeitraums",
+    "Recettes (vert) au-dessus de l'axe, dépenses (rouge) en dessous ; teinte claire = échéance pas encore saisie. Le montant affiché est le solde de la période.": "Einnahmen (grün) über der Achse, Ausgaben (rot) darunter; heller Farbton = noch nicht erfasste Ausführung. Der angezeigte Betrag ist der Saldo des Zeitraums.",
+    "Opérations déjà saisies et échéances pas encore saisies à venir, par semaine ou par mois, comptes et horizon réglables.": "Anstehende erfasste Buchungen und noch nicht erfasste Ausführungen, pro Woche oder Monat; Konten und Zeitraum einstellbar.",
+    "Replié à l'affichage au niveau (1 = rubriques racines seules ; vide = dernier état choisi)": "Beim Anzeigen eingeklappt auf Ebene (1 = nur Hauptkategorien; leer = zuletzt gewählter Zustand)",
     " · encore {n} échéances": " · noch {n}",
     "(a payé {paid}, le moins du groupe)": "(hat {paid} bezahlt, am wenigsten in der Gruppe)",
     "(archivé)": "(archiviert)",
@@ -5388,7 +5926,6 @@ const I18N = {
     "Moins de champs": "Weniger Felder",
     "Mois en cours": "Aktueller Monat",
     "Montant": "Betrag",
-    "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables.": "Betrag der anstehenden Ausführungen pro Woche oder Monat, einstellbare Konten und Zeithorizont.",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Ungültiger Betrag (positiven Betrag eingeben; die Art bestimmt die Richtung).",
     "Montant invalide (saisir un montant positif).": "Ungültiger Betrag (positiven Betrag eingeben).",
     "Montant invalide : « {value} »": "Ungültiger Betrag: „{value}“",
@@ -5506,11 +6043,9 @@ const I18N = {
     "Solde initial": "Anfangssaldo",
     "Solde prévisionnel": "Voraussichtlicher Saldo",
     "Solde prévisionnel (toutes opérations)": "Voraussichtlicher Saldo (alle Buchungen)",
-    "Solde prévisionnel :": "Voraussichtlicher Saldo:",
     "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte.": "Voraussichtlicher Saldo, Banksaldo (abgeglichen) und abgestimmter Saldo eines Kontos.",
     "Solde prévu (recettes − dépenses + épargne)": "Geplanter Saldo (Einnahmen − Ausgaben + Sparen)",
     "Solde prévu (recettes − dépenses − épargne)": "Geplanter Saldo (Einnahmen − Ausgaben − Sparen)",
-    "Sous-rubriques comprises": "Inkl. Unterkategorien",
     "Suivi": "Auswertung",
     "Supprimer": "Löschen",
     "Supprimer ce compte ?": "Dieses Konto löschen?",
@@ -5703,8 +6238,36 @@ const I18N = {
     "L'opération Pharmacie Lenoir est seulement pointée : elle apparaît sur le site de la banque, mais la coche de rapprochement n'y est pas encore disponible.": "Die Buchung Apotheke Lenoir ist nur abgeglichen: sie erscheint auf der Website der Bank, aber das Abstimmungshäkchen ist dort noch nicht verfügbar.",
     "L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.": "Die Buchung Eck-Café muss abgeglichen werden, da sie auf der Website der Bank erscheint. Sie kann in My Bank auch abgestimmt werden, sobald sie auf der Website abgehakt wird, da das Häkchen dort verfügbar ist.",
     "L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.": "Die Buchung Bäckerei muss weder abgeglichen noch abgestimmt werden: sie steht noch nicht auf der Website der Bank, also nicht im Banksaldo — zählt aber schon im voraussichtlichen Saldo.",
+    "Année précédente": "Vorjahr",
+    "Durée du budget (jusqu'au mois en cours)": "Budgetlaufzeit (bis zum aktuellen Monat)",
+    "Respect du budget « {name} »": "Budgeteinhaltung „{name}“",
+    "aucun budget": "kein Budget",
+    "rien de prévu": "nichts geplant",
+    "en cours": "laufend",
+    "mois en cours": "aktueller Monat",
+    "Dépenses : sous 100 %, le budget est tenu. Recettes et épargne : à 100 % ou plus, l'objectif est atteint.": "Ausgaben: unter 100 % ist das Budget eingehalten. Einnahmen und Sparen: ab 100 % ist das Ziel erreicht.",
+    "Types affichés": "Angezeigte Arten",
+    "Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.": "Standardmäßig alle ausgewählt. Monate außerhalb des gewählten Budgets werden aus einem anderen Budget desselben Kontos übernommen, falls vorhanden.",
+    "My Bank — respect du budget": "My Bank — Budgeteinhaltung",
+    "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Ist / Plan in %, Monat für Monat, für Einnahmen, Ausgaben und Sparen eines Budgets, 100 % gestrichelt.",
   },
   es: {
+    "Mois en cours et à venir": "Mes actual y próximos",
+    "Mois en cours strict": "Solo mes actual",
+    "Solde prévisionnel total :": "Saldo previsto total:",
+    "Solde prévisionnel fin de mois :": "Saldo previsto a fin de mes:",
+    "Sous-rubriques": "Subcategorías",
+    "Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.": "Con una categoría elegida: marcada, la lista muestra también las operaciones de sus subcategorías, en todos los niveles; sin marcar, solo las asignadas directamente a la categoría. El total solo cuenta la parte de estas categorías en las operaciones desglosadas.",
+    "Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.": "Sin ajustes: la tarjeta muestra la pestaña «Operaciones» de la tarjeta principal.",
+    "My Bank — opérations": "My Bank — operaciones",
+    "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie.": "Solo la pestaña Operaciones de la tarjeta principal: lista, criterios, marcado, conciliación, registro.",
+    "Opérations et échéances à venir": "Operaciones y vencimientos próximos",
+    "Opérations saisies": "Operaciones registradas",
+    "Échéances pas encore saisies": "Vencimientos aún no registrados",
+    "Solde de la période": "Saldo del periodo",
+    "Recettes (vert) au-dessus de l'axe, dépenses (rouge) en dessous ; teinte claire = échéance pas encore saisie. Le montant affiché est le solde de la période.": "Ingresos (verde) por encima del eje, gastos (rojo) por debajo; tono claro = vencimiento aún no registrado. El importe mostrado es el saldo del periodo.",
+    "Opérations déjà saisies et échéances pas encore saisies à venir, par semaine ou par mois, comptes et horizon réglables.": "Operaciones ya registradas y vencimientos aún no registrados próximos, por semana o por mes; cuentas y horizonte configurables.",
+    "Replié à l'affichage au niveau (1 = rubriques racines seules ; vide = dernier état choisi)": "Contraído al mostrar en el nivel (1 = solo categorías raíz; vacío = último estado elegido)",
     " · encore {n} échéances": "· {n} pendientes",
     "(a payé {paid}, le moins du groupe)": "(quien menos ha pagado: {paid})",
     "(archivé)": "(archivado)",
@@ -5875,7 +6438,6 @@ const I18N = {
     "Moins de champs": "Menos campos",
     "Mois en cours": "Mes actual",
     "Montant": "Importe",
-    "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables.": "Importe de los próximos vencimientos por semana o por mes; cuentas y horizonte configurables.",
     "Montant invalide (saisir un montant positif ; le type indique le sens).": "Importe no válido (introduce un importe positivo; el tipo indica el sentido).",
     "Montant invalide (saisir un montant positif).": "Importe no válido (introduce un importe positivo).",
     "Montant invalide : « {value} »": "Importe no válido: «{value}»",
@@ -5993,11 +6555,9 @@ const I18N = {
     "Solde initial": "Saldo inicial",
     "Solde prévisionnel": "Saldo previsto",
     "Solde prévisionnel (toutes opérations)": "Saldo previsto (todas las operaciones)",
-    "Solde prévisionnel :": "Saldo previsto:",
     "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte.": "Saldo previsto, saldo bancario liquidado y saldo conciliado de una cuenta.",
     "Solde prévu (recettes − dépenses + épargne)": "Saldo previsto (ingresos − gastos + ahorro)",
     "Solde prévu (recettes − dépenses − épargne)": "Saldo previsto (ingresos − gastos − ahorro)",
-    "Sous-rubriques comprises": "Incluye subcategorías",
     "Suivi": "Seguimiento",
     "Supprimer": "Eliminar",
     "Supprimer ce compte ?": "¿Eliminar esta cuenta?",
@@ -6189,7 +6749,19 @@ const I18N = {
     "L'opération Salaire est pointée car elle apparaît sur le site de la banque et compte dans le solde ; elle est rapprochée parce qu'elle y a été cochée comme telle.": "La operación Sueldo está liquidada porque aparece en el sitio web del banco y cuenta para el saldo; está conciliada porque allí también se ha marcado como tal.",
     "L'opération Pharmacie Lenoir est seulement pointée : elle apparaît sur le site de la banque, mais la coche de rapprochement n'y est pas encore disponible.": "La operación Farmacia Lenoir solo está liquidada: aparece en el sitio web del banco, pero la opción para conciliarla aún no está disponible.",
     "L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.": "La operación Café de la Esquina debe marcarse como liquidada porque aparece en el sitio web del banco. También se podrá conciliar en My Bank en cuanto se marque en la web, donde esa opción está disponible.",
-    "L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.": "La operación Panadería no debe marcarse como liquidada ni conciliarse: todavía no aparece en el sitio web del banco, así que no figura en el saldo bancario, aunque ya cuenta para el saldo previsto."
+    "L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.": "La operación Panadería no debe marcarse como liquidada ni conciliarse: todavía no aparece en el sitio web del banco, así que no figura en el saldo bancario, aunque ya cuenta para el saldo previsto.",
+    "Année précédente": "Año anterior",
+    "Durée du budget (jusqu'au mois en cours)": "Duración del presupuesto (hasta el mes actual)",
+    "Respect du budget « {name} »": "Cumplimiento del presupuesto «{name}»",
+    "aucun budget": "sin presupuesto",
+    "rien de prévu": "nada previsto",
+    "en cours": "en curso",
+    "mois en cours": "mes actual",
+    "Dépenses : sous 100 %, le budget est tenu. Recettes et épargne : à 100 % ou plus, l'objectif est atteint.": "Gastos: por debajo del 100 %, se cumple el presupuesto. Ingresos y ahorro: al 100 % o más, se alcanza el objetivo.",
+    "Types affichés": "Tipos mostrados",
+    "Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.": "Todos marcados por defecto. Los meses fuera del presupuesto elegido se toman de otro presupuesto de la misma cuenta, si lo hay.",
+    "My Bank — respect du budget": "My Bank — cumplimiento del presupuesto",
+    "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Real / previsto en %, mes a mes, de los ingresos, gastos y ahorro de un presupuesto, con el 100 % en línea discontinua.",
   },
 };
 // @@I18N-END@@
@@ -6197,6 +6769,8 @@ customElements.define("my-bank-card", MyBankCard);
 customElements.define("my-bank-card-editor", MyBankCardEditor);
 customElements.define("my-bank-share-card", MyBankShareCard);
 customElements.define("my-bank-share-card-editor", MyBankShareCardEditor);
+customElements.define("my-bank-transactions-card", MyBankTransactionsCard);
+customElements.define("my-bank-transactions-card-editor", MyBankTransactionsCardEditor);
 customElements.define("my-bank-entry-card", MyBankEntryCard);
 customElements.define("my-bank-entry-card-editor", MyBankEntryCardEditor);
 customElements.define("my-bank-balance-card", MyBankBalanceCard);
@@ -6209,17 +6783,21 @@ customElements.define("my-bank-upcoming-charge-card", MyBankUpcomingChargeCard);
 customElements.define("my-bank-upcoming-charge-card-editor", MyBankUpcomingChargeCardEditor);
 customElements.define("my-bank-category-spending-card", MyBankCategorySpendingCard);
 customElements.define("my-bank-category-spending-card-editor", MyBankCategorySpendingCardEditor);
+customElements.define("my-bank-budget-trend-card", MyBankBudgetTrendCard);
+customElements.define("my-bank-budget-trend-card-editor", MyBankBudgetTrendCardEditor);
 
 window.customCards = window.customCards || [];
 // Sélecteur de cartes : textes traduits à l'affichage du sélecteur (getters).
 const pickerCard = (type, name, description) => ({ type, get name() { return t(name); }, get description() { return t(description); } });
 window.customCards.push(
   pickerCard("my-bank-card", "My Bank", "Comptes, opérations (pointage, ventilation, virements), échéancier, budgets, rubriques, classes et tiers — via My Bank API."),
+  pickerCard("my-bank-transactions-card", "My Bank — opérations", "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie."),
   pickerCard("my-bank-entry-card", "My Bank — saisie rapide", "Saisie d'opérations : compte par défaut et champs affichés réglables, pré-remplissage par le tiers."),
   pickerCard("my-bank-balance-card", "My Bank — soldes d'un compte", "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte."),
   pickerCard("my-bank-share-card", "My Bank — comptes partagés", "Dépenses communes d'un groupe : qui paie la prochaine, qui doit combien à qui à la clôture."),
   pickerCard("my-bank-budget-card", "My Bank — budget", "Réalisé / prévu et barres de réalisation par rubrique, niveaux réglables."),
   pickerCard("my-bank-balance-history-card", "My Bank — évolution du solde", "Historique du solde d'un ou plusieurs comptes (ligne), période réglable."),
-  pickerCard("my-bank-upcoming-charge-card", "My Bank — échéances à venir", "Montant des échéances à venir par semaine ou par mois, comptes et horizon réglables."),
+  pickerCard("my-bank-upcoming-charge-card", "My Bank — échéances à venir", "Opérations déjà saisies et échéances pas encore saisies à venir, par semaine ou par mois, comptes et horizon réglables."),
   pickerCard("my-bank-category-spending-card", "My Bank — dépenses par rubrique", "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie."),
+  pickerCard("my-bank-budget-trend-card", "My Bank — respect du budget", "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés."),
 );
