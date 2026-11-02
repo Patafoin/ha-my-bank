@@ -819,6 +819,32 @@
         }
       }
     },
+    "categorize_transactions": {
+      "name": "Categorizar varios movimientos",
+      "description": "Cambia la categoría, la clase y/o el beneficiario de varios movimientos a la vez; solo se cambian los campos indicados, incluso en movimientos conciliados (ninguno de estos campos afecta a un saldo). Los movimientos con desglose mantienen su desglose y solo reciben el beneficiario.",
+      "fields": {
+        "ids": {
+          "name": "Movimientos",
+          "description": "Lista de ID de movimientos."
+        },
+        "category_id": {
+          "name": "Categoría",
+          "description": "ID de categoría asignado a cada movimiento (vacío para quitarla)."
+        },
+        "class_id": {
+          "name": "Clase",
+          "description": "ID de clase asignado a cada movimiento (vacío para quitarla)."
+        },
+        "payee_id": {
+          "name": "Beneficiario",
+          "description": "ID de beneficiario asignado a cada movimiento (vacío para quitarlo)."
+        },
+        "payee_name": {
+          "name": "Nombre del beneficiario",
+          "description": "Beneficiario por nombre; se crea si no existe."
+        }
+      }
+    },
     "delete_transaction_attachment": {
       "name": "Quitar el justificante de un movimiento",
       "description": "Quita el justificante (enlace o archivo) de un movimiento, si tiene uno.",

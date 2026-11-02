@@ -819,6 +819,32 @@
         }
       }
     },
+    "categorize_transactions": {
+      "name": "Catégoriser plusieurs opérations",
+      "description": "Change la rubrique, la classe et/ou le tiers de plusieurs opérations d'un coup ; seuls les champs renseignés sont modifiés, y compris sur des opérations rapprochées (aucun de ces champs n'affecte un solde). Les opérations ventilées gardent leur ventilation et ne reçoivent que le tiers.",
+      "fields": {
+        "ids": {
+          "name": "Opérations",
+          "description": "Liste d'identifiants d'opérations."
+        },
+        "category_id": {
+          "name": "Rubrique",
+          "description": "Identifiant de rubrique donné à chaque opération (vide pour la retirer)."
+        },
+        "class_id": {
+          "name": "Classe",
+          "description": "Identifiant de classe donné à chaque opération (vide pour la retirer)."
+        },
+        "payee_id": {
+          "name": "Tiers",
+          "description": "Identifiant de tiers donné à chaque opération (vide pour le retirer)."
+        },
+        "payee_name": {
+          "name": "Nom du tiers",
+          "description": "Tiers par son nom, créé s'il n'existe pas."
+        }
+      }
+    },
     "delete_transaction_attachment": {
       "name": "Retirer le justificatif d'une opération",
       "description": "Retire le justificatif (lien ou fichier) d'une opération, s'il y en a un.",

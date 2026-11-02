@@ -204,6 +204,18 @@ _TX_FIELDS = {
     vol.Optional("splits"): [_SPLIT],
 }
 
+# Modification en masse de la rubrique, la classe et/ou le tiers (décision 026) : contrairement à
+# `update_transaction`, aucun champ n'est requis au-delà de `ids` — absent = inchangé, null = vidé.
+_BULK_CATEGORIZE = vol.Schema(
+    {
+        vol.Required("ids"): [_ID],
+        vol.Optional("category_id"): _OPT_ID,
+        vol.Optional("class_id"): _OPT_ID,
+        vol.Optional("payee_id"): _OPT_ID,
+        vol.Optional("payee_name"): cv.string,
+    }
+)
+
 _SCHEDULE_FIELDS = {
     vol.Optional("label"): cv.string,
     vol.Optional("mode"): vol.In(["periodic", "installments"]),
@@ -269,6 +281,7 @@ _WRITE_SERVICES: list[tuple[str, vol.Schema, str, str]] = [
     ("delete_transaction", vol.Schema({vol.Required("transaction_id"): _ID}), "DELETE", "transactions/{transaction_id}"),
     ("set_transaction_state", vol.Schema({vol.Required("transaction_id"): _ID, vol.Required("state"): _STATE}), "PATCH", "transactions/{transaction_id}/state"),
     ("set_transactions_state", vol.Schema({vol.Required("ids"): [_ID], vol.Required("state"): _STATE}), "POST", "transactions/state"),
+    ("categorize_transactions", _BULK_CATEGORIZE, "POST", "transactions/categorize"),
     ("delete_transaction_attachment", vol.Schema({vol.Required("transaction_id"): _ID}), "DELETE", "transactions/{transaction_id}/attachment"),
     (
         "create_transfer",

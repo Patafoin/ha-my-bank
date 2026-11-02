@@ -123,6 +123,16 @@ async def test_state_and_transfer_and_delete(hass, aioclient_mock, loaded_entry)
     assert _last(aioclient_mock)[:2] == ("DELETE", f"{API}/transactions/5")
 
 
+async def test_categorize_transactions(hass, aioclient_mock, loaded_entry):
+    aioclient_mock.post(f"{API}/transactions/categorize", json={"updated": [{"id": 5}, {"id": 6}], "skipped_split_ids": []})
+
+    result = await _call(hass, "categorize_transactions", {"ids": [5, 6], "category_id": 3}, return_response=True)
+
+    assert result == {"updated": [{"id": 5}, {"id": 6}], "skipped_split_ids": []}
+    assert _last(aioclient_mock)[:2] == ("POST", f"{API}/transactions/categorize")
+    assert _last(aioclient_mock)[2] == {"ids": [5, 6], "category_id": 3}
+
+
 async def test_invalid_state_rejected_before_any_call(hass, aioclient_mock, loaded_entry):
     calls = len(aioclient_mock.mock_calls)
     with pytest.raises(Exception):

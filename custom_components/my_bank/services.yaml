@@ -730,6 +730,33 @@ set_transactions_state:
           - '1'
           - '2'
           translation_key: transaction_state
+categorize_transactions:
+  fields:
+    ids:
+      required: true
+      selector:
+        object: {}
+      example: '[1, 2]'
+    category_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    class_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    payee_id:
+      required: false
+      selector:
+        number:
+          mode: box
+    payee_name:
+      required: false
+      selector:
+        text: {}
+      example: Supermarché
 delete_transaction_attachment:
   fields:
     transaction_id:

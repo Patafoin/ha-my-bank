@@ -819,6 +819,32 @@
         }
       }
     },
+    "categorize_transactions": {
+      "name": "Mehrere Buchungen kategorisieren",
+      "description": "Ändert Rubrik, Klasse und/oder Zahlungsempfänger mehrerer Buchungen auf einmal; nur die angegebenen Felder werden geändert, auch bei abgestimmten Buchungen (keines dieser Felder wirkt sich auf einen Saldo aus). Aufgeteilte Buchungen behalten ihre Aufteilung und erhalten nur den Zahlungsempfänger.",
+      "fields": {
+        "ids": {
+          "name": "Buchungen",
+          "description": "Liste von Buchungs-IDs."
+        },
+        "category_id": {
+          "name": "Rubrik",
+          "description": "Rubrik-ID für alle Buchungen (leer, um sie zu entfernen)."
+        },
+        "class_id": {
+          "name": "Klasse",
+          "description": "Klassen-ID für alle Buchungen (leer, um sie zu entfernen)."
+        },
+        "payee_id": {
+          "name": "Zahlungsempfänger",
+          "description": "Zahlungsempfänger-ID für alle Buchungen (leer, um sie zu entfernen)."
+        },
+        "payee_name": {
+          "name": "Name des Zahlungsempfängers",
+          "description": "Zahlungsempfänger nach Namen, wird angelegt, falls er nicht existiert."
+        }
+      }
+    },
     "delete_transaction_attachment": {
       "name": "Beleg einer Buchung entfernen",
       "description": "Entfernt den Beleg (Link oder Datei) einer Buchung, falls vorhanden.",

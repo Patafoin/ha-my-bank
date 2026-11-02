@@ -819,6 +819,32 @@
         }
       }
     },
+    "categorize_transactions": {
+      "name": "Categorize several transactions",
+      "description": "Changes the category, class and/or payee of several transactions at once; only the fields given are changed, including for reconciled transactions (none of these fields affects a balance). Split transactions keep their own split and are only given the payee.",
+      "fields": {
+        "ids": {
+          "name": "Transactions",
+          "description": "List of transaction ids."
+        },
+        "category_id": {
+          "name": "Category",
+          "description": "Category id given to every transaction (null clears it)."
+        },
+        "class_id": {
+          "name": "Class",
+          "description": "Class id given to every transaction (null clears it)."
+        },
+        "payee_id": {
+          "name": "Payee",
+          "description": "Payee id given to every transaction (null clears it)."
+        },
+        "payee_name": {
+          "name": "Payee name",
+          "description": "Payee by name, created if it does not exist."
+        }
+      }
+    },
     "delete_transaction_attachment": {
       "name": "Delete transaction attachment",
       "description": "Removes the attachment (link or file) of a transaction, if any.",

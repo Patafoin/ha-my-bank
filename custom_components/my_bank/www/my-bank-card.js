@@ -338,6 +338,19 @@ const STYLE = `
   .tx-recon .recon-diff { font-size: 14px; font-weight: 600; }
   .tx-recon .recon-ok { color: var(--success-color, #43a047); }
   .tx-row.recon-match { border-left: 4px solid var(--warning-color, #ffa600); background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12); }
+  .tx-select-toggle.active { background: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .tx-select-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px 12px;
+    background: var(--secondary-background-color); border-radius: 8px;
+  }
+  .tx-select-bar[hidden] { display: none; }
+  .tx-select-bar .tx-select-count { font-size: 13px; color: var(--secondary-text-color); margin-right: auto; }
+  .tx-select-bar .tx-bulk-edit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .tx-row.selectable { display: flex; align-items: center; gap: 8px; }
+  .tx-row.selectable .tx-main { flex: 1; min-width: 0; }
+  .tx-select-box { display: flex; align-items: center; flex-shrink: 0; }
+  .tx-select-box input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
+  .tx-row.selected { background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.1); }
   .help-layout { display: flex; gap: 20px; align-items: flex-start; }
   .help-menu { display: flex; flex-direction: column; gap: 2px; flex: 0 0 180px; }
   .help-menu button {
@@ -1140,7 +1153,11 @@ class MyBankCard extends HTMLElement {
       .filter(Boolean)
       .map(esc)
       .join(" · ");
-    return `<div class="tx-row ${tx.date > today ? "future" : ""}" data-id="${tx.id}">
+    const checkbox = this._txSelectMode
+      ? `<label class="tx-select-box"><input type="checkbox" class="tx-select" ${this._txSelected.has(tx.id) ? "checked" : ""}></label>`
+      : "";
+    return `<div class="tx-row ${tx.date > today ? "future" : ""} ${this._txSelectMode ? "selectable" : ""} ${this._txSelected.has(tx.id) ? "selected" : ""}" data-id="${tx.id}">
+      ${checkbox}
       <div class="tx-main">
         <div class="tx-info">
           <div class="tx-desc">${esc(this._txTitle(tx))}</div>
@@ -1172,6 +1189,7 @@ class MyBankCard extends HTMLElement {
     if (!accounts.some((a) => a.id === this._txAccountId)) this._txAccountId = this._pickAccountId(accounts);
     this._txRange = this._txRange || "month";
     this._txFilters = this._txFilters || this._loadDefaultTxFilters();
+    this._txSelected = this._txSelected || new Set();
     const query = { account_id: this._txAccountId, order: "desc" };
     if (this._txRange === "custom") {
       if (this._txStart) query.start = this._txStart;
@@ -1191,9 +1209,16 @@ class MyBankCard extends HTMLElement {
         <select class="tx-range">${RANGES.map((r) => `<option value="${r.key}" ${r.key === this._txRange ? "selected" : ""}>${esc(r.label)}</option>`).join("")}</select>
         <button class="secondary tx-filter-btn"></button>
         <button class="secondary tx-recon-btn ${this._txRecon ? "active" : ""}">${t("Rapprochement")}</button>
+        <button class="secondary tx-select-toggle ${this._txSelectMode ? "active" : ""}">${t("Sélection multiple")}</button>
         <button class="add">+ ${t("Ajouter")}</button>
       </div>
       <div class="tx-filters" ${this._txFiltersOpen ? "" : "hidden"}>${this._txFiltersHtml(query)}</div>
+      <div class="tx-select-bar" ${this._txSelectMode ? "" : "hidden"}>
+        <span class="tx-select-count"></span>
+        <button type="button" class="secondary tx-select-all">${t("Tout sélectionner")}</button>
+        <button type="button" class="secondary tx-select-none">${t("Tout désélectionner")}</button>
+        <button type="button" class="tx-bulk-edit" disabled>${t("Modifier la sélection…")}</button>
+      </div>
       <div class="tx-recon" ${this._txRecon ? "" : "hidden"}>
         <label>${t("Solde du site bancaire")}<input type="text" inputmode="decimal" name="reconBalance" value="${esc(this._txReconBalance || "")}"></label>
         <span class="recon-diff"></span>
@@ -1270,6 +1295,31 @@ class MyBankCard extends HTMLElement {
       this._paintRecon();
       this._navCommit(true);
     });
+    // Sélection multiple : case à cocher devant chaque opération, Maj+clic coche toute une plage
+    // (voir le gestionnaire de clic de la liste), panneau de modification en masse (décision 026).
+    this._bodyEl.querySelector(".tx-select-toggle").addEventListener("click", () => {
+      closeForms();
+      this._txSelectMode = !this._txSelectMode;
+      if (!this._txSelectMode) {
+        this._txSelected.clear();
+        this._txLastClickedId = null;
+      }
+      this._renderActive(true);
+    });
+    const selectBar = this._bodyEl.querySelector(".tx-select-bar");
+    selectBar.querySelector(".tx-select-all").addEventListener("click", () => {
+      this._txVisibleItems().forEach((tx) => this._txSelected.add(tx.id));
+      this._paintTxSelection();
+    });
+    selectBar.querySelector(".tx-select-none").addEventListener("click", () => {
+      this._txSelected.clear();
+      this._paintTxSelection();
+    });
+    selectBar.querySelector(".tx-bulk-edit").addEventListener("click", () => {
+      if (!this._txSelected.size) return;
+      closeForms();
+      this._showBulkEditForm(formContainer, [...this._txSelected].sort((a, b) => a - b), closeForms);
+    });
     const filterForm = filtersBox.querySelector("form");
     const readFilters = () => {
       const f = this._txFilters;
@@ -1320,6 +1370,26 @@ class MyBankCard extends HTMLElement {
       this._showTransactionForm(formContainer, null);
     });
     list.addEventListener("click", (ev) => {
+      const checkbox = ev.target.closest(".tx-select");
+      if (checkbox) {
+        const id = Number(checkbox.closest(".tx-row").dataset.id);
+        // Maj+clic : coche toute la plage entre la dernière case cochée hors Maj et celle-ci
+        // (comme un gestionnaire de fichiers), quel que soit l'état précédent des cases intermédiaires.
+        const ids = [...list.querySelectorAll(".tx-row[data-id]")].map((r) => Number(r.dataset.id));
+        if (ev.shiftKey && this._txLastClickedId != null && ids.includes(this._txLastClickedId)) {
+          const i = ids.indexOf(this._txLastClickedId);
+          const j = ids.indexOf(id);
+          const [a, b] = i < j ? [i, j] : [j, i];
+          ids.slice(a, b + 1).forEach((rid) => this._txSelected.add(rid));
+        } else if (checkbox.checked) {
+          this._txSelected.add(id);
+        } else {
+          this._txSelected.delete(id);
+        }
+        this._txLastClickedId = id;
+        this._paintTxSelection();
+        return;
+      }
       const btn = ev.target.closest("button");
       const row = ev.target.closest(".tx-row");
       if (!btn || !row) return;
@@ -1454,10 +1524,17 @@ class MyBankCard extends HTMLElement {
     return true;
   }
 
+  // Opérations affichées compte tenu des critères actifs (liste complète sinon) : ce que « Tout
+  // sélectionner » doit cocher, et ce que la liste doit peindre.
+  _txVisibleItems() {
+    const f = this._txFilters;
+    return this._txFilterCount() ? this._txAll.filter((tx) => this._txMatches(tx, f)) : this._txAll;
+  }
+
   _paintTxList() {
     const f = this._txFilters;
+    const items = this._txVisibleItems();
     const active = this._txFilterCount();
-    const items = active ? this._txAll.filter((tx) => this._txMatches(tx, f)) : this._txAll;
     let lastMonth = null;
     const rowsHtml = items
       .map((tx) => {
@@ -1490,6 +1567,31 @@ class MyBankCard extends HTMLElement {
         + (catIds ? ` ${t("(part de la rubrique)")}` : "")
       : "");
     if (this._txRecon) this._paintRecon(); // la liste vient d'être redessinée : la mise en évidence doit l'être aussi
+    this._paintTxSelectionBar(); // ids sélectionnés filtrés hors liste visible : le compteur en tient compte
+  }
+
+  // Sélection multiple : synchronise les cases et le surlignage des lignes avec `_txSelected`
+  // (après une case cochée/décochée, une plage Maj+clic, ou « tout sélectionner »/« tout désélectionner »).
+  _paintTxSelection() {
+    const list = this._bodyEl.querySelector(".tx-list");
+    if (list) {
+      list.querySelectorAll(".tx-row[data-id]").forEach((row) => {
+        const id = Number(row.dataset.id);
+        const checked = this._txSelected.has(id);
+        row.classList.toggle("selected", checked);
+        const cb = row.querySelector(".tx-select");
+        if (cb) cb.checked = checked;
+      });
+    }
+    this._paintTxSelectionBar();
+  }
+
+  _paintTxSelectionBar() {
+    const bar = this._bodyEl.querySelector(".tx-select-bar");
+    if (!bar) return;
+    const n = this._txSelected.size;
+    bar.querySelector(".tx-select-count").textContent = n === 1 ? t("1 opération sélectionnée") : t("{n} opérations sélectionnées", { n });
+    bar.querySelector(".tx-bulk-edit").disabled = n === 0;
   }
 
   // Rapprochement : écart entre le solde saisi (site bancaire) et le solde banque (pointé) de l'intégration ;
@@ -1945,6 +2047,70 @@ class MyBankCard extends HTMLElement {
         container.innerHTML = "";
         this._lookups = null; // un tiers a pu être créé
         this._renderActive(true); // sur place : la liste ne remonte pas en haut
+      } catch (err) {
+        submit.disabled = false;
+        alert(errMsg(err));
+      }
+    });
+  }
+
+  // Panneau de modification en masse (décision 026) : rubrique, classe et tiers seulement — les seuls
+  // champs qu'une opération rapprochée n'interdit pas de changer, puisqu'aucun des trois n'affecte un
+  // solde. Rubrique et classe ont un état « ne pas modifier » distinct de « vider » (les opérations
+  // sélectionnées n'ont pas forcément la même valeur au départ) ; le tiers se laisse vide pour ne pas
+  // le toucher, avec une case à part pour le vider explicitement.
+  _showBulkEditForm(container, ids, onClose) {
+    const L = this._lookups;
+    const KEEP = "__keep__";
+    const treeSelect = (name, list) => {
+      const options = [[KEEP, t("Ne pas modifier")], ["", t("— Aucune —")], ...list.filter((c) => c.active).map((c) => [c.id, `${"  ".repeat(c.depth)}${c.name}`])];
+      return `<select name="${name}">${options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
+    };
+    container.innerHTML = `
+      <form class="entity-form tx-bulk-form">
+        <label>${t("Rubrique")}${treeSelect("category_id", L.categories)}</label>
+        <label>${t("Classe")}${treeSelect("class_id", L.classes)}</label>
+        <label class="tiers-field f-payee full">${t("Tiers|champ")}
+          <input type="text" name="payee" placeholder="${t("Ne pas modifier")}" autocomplete="off">
+          <div class="tiers-suggestions" style="display: none;"></div>
+        </label>
+        <label class="check full"><input type="checkbox" name="clear_payee">${t("Vider le tiers (laisser le champ ci-dessus vide)")}</label>
+        <div class="form-actions">
+          <button type="submit">${t("Appliquer à {n} opération(s)", { n: ids.length })}</button>
+          <button type="button" class="cancel">${t("Annuler")}</button>
+        </div>
+      </form>
+    `;
+    const form = container.querySelector("form");
+    const $ = (sel) => form.querySelector(sel);
+    this._payeeAutocomplete($('[name="payee"]'), $(".tiers-suggestions"), () => {});
+    $(".cancel").addEventListener("click", () => (onClose ? onClose() : (container.innerHTML = "")));
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const payload = { ids };
+      const catVal = $('[name="category_id"]').value;
+      if (catVal !== KEEP) payload.category_id = catVal ? Number(catVal) : null;
+      const clsVal = $('[name="class_id"]').value;
+      if (clsVal !== KEEP) payload.class_id = clsVal ? Number(clsVal) : null;
+      const payeeName = $('[name="payee"]').value.trim();
+      if (payeeName) payload.payee_name = payeeName;
+      else if ($('[name="clear_payee"]').checked) payload.payee_id = null;
+      if (Object.keys(payload).length === 1) {
+        alert(t("Choisir au moins un champ à modifier (rubrique, classe ou tiers)."));
+        return;
+      }
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      try {
+        const res = await this._call("categorize_transactions", payload, true);
+        const skipped = (res && res.skipped_split_ids) || [];
+        this._txSelected.clear();
+        this._txSelectMode = false;
+        if (onClose) onClose();
+        await this._renderActive(true);
+        if (skipped.length) {
+          alert(t("{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).", { n: skipped.length }));
+        }
       } catch (err) {
         submit.disabled = false;
         alert(errMsg(err));
@@ -5482,6 +5648,18 @@ const I18N = {
     "Rapproché": "Reconciled",
     "Rapproché :": "Reconciled:",
     "Rapprochée": "Reconciled",
+    "Sélection multiple": "Multi-select",
+    "Tout sélectionner": "Select all",
+    "Tout désélectionner": "Deselect all",
+    "Modifier la sélection…": "Edit selection…",
+    "1 opération sélectionnée": "1 transaction selected",
+    "{n} opérations sélectionnées": "{n} transactions selected",
+    "Ne pas modifier": "Leave unchanged",
+    "— Aucune —": "— None —",
+    "Vider le tiers (laisser le champ ci-dessus vide)": "Clear the payee (leave the field above empty)",
+    "Appliquer à {n} opération(s)": "Apply to {n} transaction(s)",
+    "Choisir au moins un champ à modifier (rubrique, classe ou tiers).": "Choose at least one field to change (category, class, or payee).",
+    "{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).": "{n} split transaction(s) skipped for category/class (the payee was still applied).",
     "Recette": "Income",
     "Recette de {amount} enregistrée{who} ({account}, {date}).": "Income of {amount} saved{who} ({account}, {date}).",
     "Recettes": "Income",
@@ -5994,6 +6172,18 @@ const I18N = {
     "Rapproché": "Abgestimmt",
     "Rapproché :": "Abgestimmt:",
     "Rapprochée": "Abgestimmt",
+    "Sélection multiple": "Mehrfachauswahl",
+    "Tout sélectionner": "Alle auswählen",
+    "Tout désélectionner": "Alle abwählen",
+    "Modifier la sélection…": "Auswahl bearbeiten…",
+    "1 opération sélectionnée": "1 Buchung ausgewählt",
+    "{n} opérations sélectionnées": "{n} Buchungen ausgewählt",
+    "Ne pas modifier": "Nicht ändern",
+    "— Aucune —": "— Keine —",
+    "Vider le tiers (laisser le champ ci-dessus vide)": "Zahlungsempfänger leeren (das Feld oben leer lassen)",
+    "Appliquer à {n} opération(s)": "Auf {n} Buchung(en) anwenden",
+    "Choisir au moins un champ à modifier (rubrique, classe ou tiers).": "Mindestens ein zu änderndes Feld wählen (Rubrik, Klasse oder Zahlungsempfänger).",
+    "{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).": "{n} aufgeteilte Buchung(en) für Rubrik/Klasse übersprungen (der Zahlungsempfänger wurde trotzdem angewendet).",
     "Recette": "Einnahme",
     "Recette de {amount} enregistrée{who} ({account}, {date}).": "Einnahme über {amount} gespeichert{who} ({account}, {date}).",
     "Recettes": "Einnahmen",
@@ -6506,6 +6696,18 @@ const I18N = {
     "Rapproché": "Conciliado",
     "Rapproché :": "Conciliado:",
     "Rapprochée": "Conciliada",
+    "Sélection multiple": "Selección múltiple",
+    "Tout sélectionner": "Seleccionar todo",
+    "Tout désélectionner": "Deseleccionar todo",
+    "Modifier la sélection…": "Modificar la selección…",
+    "1 opération sélectionnée": "1 movimiento seleccionado",
+    "{n} opérations sélectionnées": "{n} movimientos seleccionados",
+    "Ne pas modifier": "No modificar",
+    "— Aucune —": "— Ninguna —",
+    "Vider le tiers (laisser le champ ci-dessus vide)": "Vaciar el beneficiario (dejar el campo anterior vacío)",
+    "Appliquer à {n} opération(s)": "Aplicar a {n} movimiento(s)",
+    "Choisir au moins un champ à modifier (rubrique, classe ou tiers).": "Elegir al menos un campo a modificar (categoría, clase o beneficiario).",
+    "{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).": "{n} movimiento(s) con desglose omitido(s) para categoría/clase (el beneficiario se aplicó de todos modos).",
     "Recette": "Ingreso",
     "Recette de {amount} enregistrée{who} ({account}, {date}).": "Ingreso de {amount} guardado{who} ({account}, {date}).",
     "Recettes": "Ingreso",
