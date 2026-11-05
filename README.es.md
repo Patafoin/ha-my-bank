@@ -2,7 +2,7 @@
 
 🇬🇧 [Leer en inglés](https://github.com/Patafoin/ha-my-bank/blob/main/README.md) · 🇫🇷 [Leer en francés](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md) · 🇩🇪 [Leer en alemán](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md)
 
-[![Insignia de HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![Marketplace (HACS)](https://img.shields.io/badge/Marketplace%20%28HACS%29-default-41BDF5.svg)](https://hacs.xyz/)
 [![Validación](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
 [![Pruebas](https://github.com/Patafoin/ha-my-bank/actions/workflows/tests.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/tests.yml)
 
@@ -21,13 +21,13 @@ My Bank consta de dos partes:
 | Parte | Qué es | Cómo se instala |
 |---|---|---|
 | **My Bank API** | El servidor: almacena tus datos en una base de datos SQLite local, calcula saldos y presupuestos, genera movimientos programados y crea una copia de seguridad cada noche | **Aplicación** de Home Assistant (antes, *complemento*; Home Assistant OS / Supervised) o un contenedor **Docker** |
-| **My Bank** (este repositorio) | La integración y sus tarjetas Lovelace: sensores, servicios e interfaz de usuario | **HACS** |
+| **My Bank** (este repositorio) | La integración y sus tarjetas Lovelace: sensores, servicios e interfaz de usuario | **Marketplace (HACS)** |
 
 La integración es un cliente ligero: todas las reglas (saldos, bloqueo de movimientos conciliados, cálculos de presupuestos…) están en el servidor. Tus datos nunca salen de tu red.
 
 ## Requisitos
 
-- Home Assistant **2026.2 o posterior** y [HACS](https://hacs.xyz/) para instalar la integración. Probado en 2026.2.3 y 2026.10.0.
+- Home Assistant **2026.2 o posterior** y [Marketplace (HACS)](https://hacs.xyz/) para instalar la integración. Probado en 2026.2.3 y 2026.10.0.
 - Para el servidor, puedes usar:
   - **Home Assistant OS** o una instalación **Supervised**, en un sistema de 64 bits (amd64 o aarch64, por ejemplo, Raspberry Pi 4/5 con la imagen de 64 bits), para usar la aplicación; probado en Home Assistant OS 18.3;
   - o **Docker** en cualquier equipo de 64 bits de tu red (amd64 o arm64), para instalaciones de Home Assistant Container / Core.
@@ -85,9 +85,11 @@ Consulta el [README de My Bank API](https://github.com/Patafoin/my-bank-api) par
 
 ### 2. La integración
 
-[![Abre este repositorio en HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Patafoin&repository=ha-my-bank&category=integration)
+[![Abre este repositorio en el Marketplace (HACS).](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Patafoin&repository=ha-my-bank&category=integration)
 
-En HACS: ⋮ → **Repositorios personalizados** → `https://github.com/Patafoin/ha-my-bank`, tipo **Integración**. Descarga **My Bank** y reinicia Home Assistant.
+Ajustes → **Marketplace**, busca **My Bank** y selecciona **Instalar**. Antes de Home Assistant 2026.11, haz la misma búsqueda en **HACS**, descarga **My Bank** y reinicia Home Assistant.
+
+Si la búsqueda no lo encuentra, añade el repositorio por su enlace: en el Marketplace, añadir desde un enlace → `https://github.com/Patafoin/ha-my-bank`; en HACS, ⋮ → **Repositorios personalizados** → la misma URL, tipo **Integración**.
 
 ### 3. Conéctalos
 
@@ -215,7 +217,7 @@ Las tarjetas, los diálogos de configuración y los servicios siguen el idioma d
 
 ## Actualización
 
-Actualiza la integración con HACS y el servidor desde Ajustes → Aplicaciones (o con `docker compose pull`). Si el servidor es demasiado antiguo para la integración, Home Assistant muestra un aviso de reparación.
+Actualiza la integración con el Marketplace (HACS) y el servidor desde Ajustes → Aplicaciones (o con `docker compose pull`). Si el servidor es demasiado antiguo para la integración, Home Assistant muestra un aviso de reparación.
 
 ## Importar desde MS Comptes Bancaires
 

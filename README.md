@@ -2,7 +2,7 @@
 
 🇫🇷 [Lire en français](https://github.com/Patafoin/ha-my-bank/blob/main/README.fr.md) · 🇩🇪 [Auf Deutsch lesen](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md) · 🇪🇸 [Leer en español](https://github.com/Patafoin/ha-my-bank/blob/main/README.es.md)
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![Marketplace (HACS)](https://img.shields.io/badge/Marketplace%20%28HACS%29-default-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
 [![Tests](https://github.com/Patafoin/ha-my-bank/actions/workflows/tests.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/tests.yml)
 
@@ -21,13 +21,13 @@ My Bank comes in two parts:
 | Part | What it is | How to install |
 |---|---|---|
 | **My Bank API** | The server: stores your data in a local SQLite database, computes balances and budgets, generates scheduled transactions, backs itself up every night | Home Assistant **app** (formerly *add-on*; Home Assistant OS / Supervised), or a **Docker** container |
-| **My Bank** (this repository) | The integration and its Lovelace cards: sensors, services, and the user interface | **HACS** |
+| **My Bank** (this repository) | The integration and its Lovelace cards: sensors, services, and the user interface | **Marketplace (HACS)** |
 
 The integration is a thin client: every rule (balances, locking of reconciled transactions, budget computations…) lives in the server. Your data never leaves your network.
 
 ## Requirements
 
-- Home Assistant **2026.2 or later**, and [HACS](https://hacs.xyz/) to install the integration. Tested on 2026.2.3 and 2026.10.0.
+- Home Assistant **2026.2 or later**, and [Marketplace (HACS)](https://hacs.xyz/) to install the integration. Tested on 2026.2.3 and 2026.10.0.
 - For the server, either:
   - **Home Assistant OS** or a **Supervised** installation, on a 64-bit system (amd64 or aarch64, e.g. Raspberry Pi 4/5 with the 64-bit image), to use the app — tested on Home Assistant OS 18.3;
   - or **Docker** on any 64-bit machine of your network (amd64 or arm64), for Home Assistant Container / Core installations.
@@ -85,9 +85,11 @@ See the [My Bank API README](https://github.com/Patafoin/my-bank-api) for all se
 
 ### 2. The integration
 
-[![Open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Patafoin&repository=ha-my-bank&category=integration)
+[![Open this repository in the Marketplace (HACS).](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Patafoin&repository=ha-my-bank&category=integration)
 
-In HACS: ⋮ → **Custom repositories** → `https://github.com/Patafoin/ha-my-bank`, type **Integration**. Download **My Bank**, then restart Home Assistant.
+Settings → **Marketplace**, search for **My Bank** and select **Install**. Before Home Assistant 2026.11, do the same search in **HACS**, download **My Bank**, then restart Home Assistant.
+
+If the search does not find it, add the repository by its link: in the Marketplace, **Add from link** → `https://github.com/Patafoin/ha-my-bank`; in HACS, ⋮ → **Custom repositories** → the same URL, type **Integration**.
 
 ### 3. Connect them
 
@@ -215,7 +217,7 @@ The integration UI (setup, services and repairs) and cards follow the Home Assis
 
 ## Updating
 
-Update the integration with HACS and the server from Settings → Apps (or `docker compose pull`). If the server is older than the integration needs, Home Assistant raises a repair issue telling you so.
+Update the integration with the Marketplace (HACS) and the server from Settings → Apps (or `docker compose pull`). If the server is older than the integration needs, Home Assistant raises a repair issue telling you so.
 
 ## Importing from MS Comptes Bancaires
 

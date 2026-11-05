@@ -2,7 +2,7 @@
 
 🇬🇧 [Read in English](https://github.com/Patafoin/ha-my-bank/blob/main/README.md) · 🇩🇪 [Auf Deutsch lesen](https://github.com/Patafoin/ha-my-bank/blob/main/README.de.md) · 🇪🇸 [Leer en español](https://github.com/Patafoin/ha-my-bank/blob/main/README.es.md)
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![Marketplace (HACS)](https://img.shields.io/badge/Marketplace%20%28HACS%29-default-41BDF5.svg)](https://hacs.xyz/)
 [![Validate](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/validate.yml)
 [![Tests](https://github.com/Patafoin/ha-my-bank/actions/workflows/tests.yml/badge.svg)](https://github.com/Patafoin/ha-my-bank/actions/workflows/tests.yml)
 
@@ -21,13 +21,13 @@ My Bank se compose de deux parties :
 | Partie | Ce que c'est | Installation |
 |---|---|---|
 | **My Bank API** | Le serveur : stocke vos données dans une base SQLite locale, calcule les soldes et les budgets, génère les opérations planifiées, se sauvegarde chaque nuit | **Application** Home Assistant (anciennement *add-on* ou module complémentaire ; Home Assistant OS / Supervised), ou conteneur **Docker** |
-| **My Bank** (ce dépôt) | L'intégration et ses cartes Lovelace : capteurs, services et interface utilisateur | **HACS** |
+| **My Bank** (ce dépôt) | L'intégration et ses cartes Lovelace : capteurs, services et interface utilisateur | **Marketplace (HACS)** |
 
 L'intégration est un client léger : toutes les règles (soldes, verrouillage des opérations rapprochées, calculs de budget…) sont dans le serveur. Vos données ne quittent jamais votre réseau.
 
 ## Prérequis
 
-- Home Assistant **2026.2 ou plus récent**, et [HACS](https://hacs.xyz/) pour installer l'intégration. Testé sur 2026.2.3 et 2026.10.0.
+- Home Assistant **2026.2 ou plus récent**, et [Marketplace (HACS)](https://hacs.xyz/) pour installer l'intégration. Testé sur 2026.2.3 et 2026.10.0.
 - Pour le serveur, au choix :
   - **Home Assistant OS** ou une installation **Supervised**, sur un système 64 bits (amd64 ou aarch64, par ex. Raspberry Pi 4/5 avec l'image 64 bits), pour utiliser l'application — testé sur Home Assistant OS 18.3 ;
   - ou **Docker** sur n'importe quelle machine 64 bits de votre réseau (amd64 ou arm64), pour les installations Home Assistant Container / Core.
@@ -85,9 +85,11 @@ Tous les réglages sont décrits dans le [README de My Bank API](https://github.
 
 ### 2. L'intégration
 
-[![Ouvrir ce dépôt dans HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Patafoin&repository=ha-my-bank&category=integration)
+[![Ouvrir ce dépôt dans la Marketplace (HACS).](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Patafoin&repository=ha-my-bank&category=integration)
 
-Dans HACS : ⋮ → **Dépôts personnalisés** → `https://github.com/Patafoin/ha-my-bank`, type **Intégration**. Téléchargez **My Bank**, puis redémarrez Home Assistant.
+Paramètres → **Marketplace**, cherchez **My Bank** et sélectionnez **Installer**. Avant Home Assistant 2026.11, faites la même recherche dans **HACS**, téléchargez **My Bank**, puis redémarrez Home Assistant.
+
+Si la recherche ne le trouve pas, ajoutez le dépôt par son lien : dans la Marketplace, ajout depuis un lien → `https://github.com/Patafoin/ha-my-bank` ; dans HACS, ⋮ → **Dépôts personnalisés** → la même URL, type **Intégration**.
 
 ### 3. Les relier
 
@@ -215,7 +217,7 @@ L'interface de l'intégration (configuration, services et réparations) et les c
 
 ## Mise à jour
 
-Mettez à jour l'intégration avec HACS et le serveur depuis Paramètres → Applications (ou `docker compose pull`). Si le serveur est trop ancien pour l'intégration, Home Assistant le signale par une notification de réparation.
+Mettez à jour l'intégration avec la Marketplace (HACS) et le serveur depuis Paramètres → Applications (ou `docker compose pull`). Si le serveur est trop ancien pour l'intégration, Home Assistant le signale par une notification de réparation.
 
 ## Import depuis MS Comptes Bancaires
 
