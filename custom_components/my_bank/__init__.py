@@ -7,6 +7,7 @@ automation) can read and write every kind of object.
 """
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 import re
 from typing import Any
@@ -18,10 +19,19 @@ from homeassistant.const import CONF_URL, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, Unauthorized, UnknownUser
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
+from homeassistant.util import dt as dt_util
 
 from .api import MyBankApiError, MyBankClient
 from .access import READ, WRITE, allows, user_level
-from .const import CONF_TOKEN, DEFAULT_PAYMENT_METHODS, DEFAULT_URL, DOMAIN, MIN_API_VERSION
+from .const import (
+    CONF_DUE_WARNING_DAYS,
+    CONF_TOKEN,
+    DEFAULT_DUE_WARNING_DAYS,
+    DEFAULT_PAYMENT_METHODS,
+    DEFAULT_URL,
+    DOMAIN,
+    MIN_API_VERSION,
+)
 from .coordinator import MyBankCoordinator
 from .frontend import async_register_frontend
 from .views import async_register_view
@@ -199,6 +209,7 @@ _TX_FIELDS = {
     vol.Optional("label"): _TEXT,
     vol.Optional("notes"): _TEXT,
     vol.Optional("state"): _STATE,
+    vol.Optional("due_date"): vol.Any(None, _DATE),
     vol.Optional("category_id"): _OPT_ID,
     vol.Optional("class_id"): _OPT_ID,
     vol.Optional("splits"): [_SPLIT],
@@ -235,6 +246,7 @@ _SCHEDULE_FIELDS = {
     vol.Optional("notes"): _TEXT,
     vol.Optional("auto"): cv.boolean,
     vol.Optional("lead_days"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+    vol.Optional("due_days"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=0, max=365))),
     vol.Optional("generate_from"): _DATE,
     vol.Optional("active"): cv.boolean,
 }
@@ -380,6 +392,7 @@ _READ_SERVICES: list[tuple[str, vol.Schema, str]] = [
                 vol.Optional("include_subcategories"): cv.boolean,
                 vol.Optional("class_id"): _ID,
                 vol.Optional("q"): cv.string,
+                vol.Optional("due_before"): _DATE,
                 vol.Optional("order"): vol.In(["asc", "desc"]),
                 vol.Optional("limit"): vol.All(vol.Coerce(int), vol.Range(min=1, max=1000)),
                 vol.Optional("offset"): vol.All(vol.Coerce(int), vol.Range(min=0)),
@@ -485,6 +498,34 @@ def _register_services(hass: HomeAssistant) -> None:
 
         return handler
 
+    async def list_due_transactions(call: ServiceCall) -> ServiceResponse:
+        """Unpaid transactions (not pointed) whose due date has passed or falls within the warning window (decision 027).
+
+        The window is an option of the entry, so the cards can't compute it themselves: `status` is
+        `overdue` (due date passed, red) or `soon` (due today or within `warning_days`, orange).
+        """
+        await _check_access(hass, call, READ)
+        entry = _entry(hass)
+        days = int(entry.options.get(CONF_DUE_WARNING_DAYS, DEFAULT_DUE_WARNING_DAYS))
+        today = dt_util.now().date()
+        params: dict[str, Any] = {
+            "state": [0],
+            "due_before": (today + timedelta(days=days)).isoformat(),
+            "order": "asc",
+            "limit": 1000,
+        }
+        if "account_id" in call.data:
+            params["account_id"] = call.data["account_id"]
+        try:
+            page = await entry.runtime_data.client.get("transactions", params=_query(params))
+        except MyBankApiError as err:
+            raise HomeAssistantError(str(err)) from err
+        items = [
+            {**tx, "status": "overdue" if tx["due_date"] < today.isoformat() else "soon"}
+            for tx in sorted(page["items"], key=lambda tx: (tx["due_date"], tx["date"], tx["id"]))
+        ]
+        return {"today": today.isoformat(), "warning_days": days, "items": items}
+
     async def get_access(call: ServiceCall) -> ServiceResponse:
         """Niveau d'accès de l'appelant, pour que la carte affiche un message clair au lieu d'erreurs en série."""
         return {"level": await _user_level(hass, call)}
@@ -505,4 +546,11 @@ def _register_services(hass: HomeAssistant) -> None:
         hass.services.async_register(
             DOMAIN, name, make_read(template), schema=schema, supports_response=SupportsResponse.ONLY
         )
+    hass.services.async_register(
+        DOMAIN,
+        "list_due_transactions",
+        list_due_transactions,
+        schema=vol.Schema({vol.Optional("account_id"): _ID}),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(DOMAIN, "get_access", get_access, schema=vol.Schema({}), supports_response=SupportsResponse.ONLY)

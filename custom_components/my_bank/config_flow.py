@@ -11,6 +11,9 @@ from homeassistant.const import CONF_URL
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -20,7 +23,18 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .access import LEVELS, NEW_ENTRY_OPTIONS, published_accounts, publishes_ending, user_level
 from .api import MyBankApiError, MyBankAuthError, MyBankClient
-from .const import CONF_ACCESS, CONF_ADMIN_ONLY, CONF_BALANCE_SENSORS, CONF_DEFAULT_ACCESS, CONF_ENDING_SENSOR, CONF_TOKEN, DEFAULT_URL, DOMAIN
+from .const import (
+    CONF_ACCESS,
+    CONF_ADMIN_ONLY,
+    CONF_BALANCE_SENSORS,
+    CONF_DEFAULT_ACCESS,
+    CONF_DUE_WARNING_DAYS,
+    CONF_ENDING_SENSOR,
+    CONF_TOKEN,
+    DEFAULT_DUE_WARNING_DAYS,
+    DEFAULT_URL,
+    DOMAIN,
+)
 
 
 def _schema(url: str) -> vol.Schema:
@@ -107,7 +121,7 @@ _LEVEL_SELECTOR = SelectSelector(
 
 
 class MyBankOptionsFlow(OptionsFlowWithReload):
-    """Access level of each non-admin Home Assistant user, and the sensors to publish.
+    """Access level of each non-admin Home Assistant user, the sensors to publish, and the due date warning.
 
     One drop-down per user, labelled with the user's name (no translation exists for it: the key is shown).
     Reloaded on save, so that the sensors follow; the access levels are read on each call anyway.
@@ -130,12 +144,14 @@ class MyBankOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             access_input = user_input["users"]
             sensors_input = user_input["sensors"]
+            due_input = user_input["due"]
             return self.async_create_entry(
                 data={
                     CONF_DEFAULT_ACCESS: access_input[CONF_DEFAULT_ACCESS],
                     CONF_ACCESS: {user.id: access_input[label] for label, user in fields.items()},
                     CONF_ENDING_SENSOR: sensors_input[CONF_ENDING_SENSOR],
                     CONF_BALANCE_SENSORS: sorted(sensors_input[CONF_BALANCE_SENSORS], key=int),
+                    CONF_DUE_WARNING_DAYS: int(due_input[CONF_DUE_WARNING_DAYS]),
                 }
             )
 
@@ -160,12 +176,18 @@ class MyBankOptionsFlow(OptionsFlowWithReload):
                 )
             ),
         }
+        due_schema = {
+            vol.Required(
+                CONF_DUE_WARNING_DAYS, default=entry.options.get(CONF_DUE_WARNING_DAYS, DEFAULT_DUE_WARNING_DAYS)
+            ): NumberSelector(NumberSelectorConfig(min=0, max=90, step=1, mode=NumberSelectorMode.BOX)),
+        }
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Required("users"): section(vol.Schema(users_schema), {"collapsed": False}),
                     vol.Required("sensors"): section(vol.Schema(sensors_schema), {"collapsed": False}),
+                    vol.Required("due"): section(vol.Schema(due_schema), {"collapsed": False}),
                 }
             ),
         )

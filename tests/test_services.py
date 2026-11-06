@@ -381,18 +381,69 @@ async def test_options_flow_lists_non_admin_users_and_accounts(hass, loaded_entr
     result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
     assert result["type"] == "form" and result["step_id"] == "init"
     # Entrée antérieure à 0.16.0 : les réglages affichés reproduisent le comportement d'avant
-    defaults = result["data_schema"]({"users": {}, "sensors": {}})
+    defaults = result["data_schema"]({"users": {}, "sensors": {}, "due": {}})
     assert defaults["users"] == {"default_access": "read", "Alice": "read"}  # pas les administrateurs
     assert defaults["sensors"] == {"ending_sensor": True, "balance_sensors": ["1", "2"]}
+    assert defaults["due"] == {"due_warning_days": 7}
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {"users": {"default_access": "none", "Alice": "read"}, "sensors": {"ending_sensor": False, "balance_sensors": ["2"]}},
+        {
+            "users": {"default_access": "none", "Alice": "read"},
+            "sensors": {"ending_sensor": False, "balance_sensors": ["2"]},
+            "due": {"due_warning_days": 3},
+        },
     )
     await hass.async_block_till_done()
     assert result["type"] == "create_entry"
-    assert loaded_entry.options == _options(access={hass_read_only_user.id: "read"}, balance_sensors=["2"])
+    assert loaded_entry.options == _options(access={hass_read_only_user.id: "read"}, balance_sensors=["2"], due_warning_days=3)
     # rechargée : seuls les capteurs choisis restent
     assert hass.states.get("sensor.livret_d_epargne") is not None
     assert hass.states.get("sensor.compte_courant") is None
     assert hass.states.get("sensor.scheduled_transactions_ending") is None
+
+
+async def test_create_transaction_and_schedule_pass_due_fields(hass, aioclient_mock, loaded_entry):
+    aioclient_mock.patch(f"{API}/transactions/5", json={"id": 5})
+    await _call(hass, "update_transaction", {"transaction_id": 5, "due_date": None})
+    assert _last(aioclient_mock)[2] == {"due_date": None}
+    await _call(hass, "update_transaction", {"transaction_id": 5, "due_date": "2026-11-20"})
+    assert _last(aioclient_mock)[2] == {"due_date": "2026-11-20"}
+    aioclient_mock.patch(f"{API}/schedules/4", json={"id": 4})
+    await _call(hass, "update_schedule", {"schedule_id": 4, "due_days": "0"})
+    assert _last(aioclient_mock)[2] == {"due_days": 0}
+    with pytest.raises(Exception):
+        await _call(hass, "update_schedule", {"schedule_id": 4, "due_days": -1})
+
+
+async def test_list_due_transactions_flags_overdue_and_soon(hass, aioclient_mock, loaded_entry, freezer):
+    freezer.move_to("2026-11-06 12:00:00")
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "due_warning_days": 5})
+    tx = {"account_id": 1, "state": 0, "amount": "-10.00", "date": "2026-10-01"}
+    aioclient_mock.get(
+        f"{API}/transactions",
+        json={"total": 3, "items": [
+            {**tx, "id": 3, "due_date": "2026-11-11"},
+            {**tx, "id": 1, "due_date": "2026-11-05"},
+            {**tx, "id": 2, "due_date": "2026-11-06"},
+        ]},
+    )
+    result = await _call(hass, "list_due_transactions", {"account_id": 1}, return_response=True)
+    assert result["today"] == "2026-11-06" and result["warning_days"] == 5
+    assert [(t["id"], t["status"]) for t in result["items"]] == [(1, "overdue"), (2, "soon"), (3, "soon")]
+    method, url, _body = _last(aioclient_mock)
+    assert method == "GET" and url.startswith(f"{API}/transactions?")
+    assert "state=0" in url and "due_before=2026-11-11" in url and "account_id=1" in url
+
+
+async def test_list_due_transactions_default_window_and_access(hass, aioclient_mock, loaded_entry, hass_read_only_user, freezer):
+    from homeassistant.exceptions import Unauthorized
+
+    freezer.move_to("2026-11-06 12:00:00")
+    aioclient_mock.get(f"{API}/transactions", json={"total": 0, "items": []})
+    result = await _call(hass, "list_due_transactions", {}, return_response=True)
+    assert result == {"today": "2026-11-06", "warning_days": 7, "items": []}
+    assert "due_before=2026-11-13" in _last(aioclient_mock)[1]
+    hass.config_entries.async_update_entry(loaded_entry, options=_options(access={hass_read_only_user.id: "none"}))
+    with pytest.raises(Unauthorized):
+        await _as_user(hass, hass_read_only_user, "list_due_transactions", {}, return_response=True)

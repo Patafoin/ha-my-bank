@@ -4,3 +4,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+
+# Sauvegardes locales avant modification (cp fichier fichier.bak-AAAAMMJJ)
+*.bak-*

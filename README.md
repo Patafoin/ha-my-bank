@@ -111,7 +111,7 @@ If the cards don't show up in the picker after installing or updating, force-rel
 | Tab (`sections` key) | Content |
 |---|---|
 | `dashboard` | Balances of every account, budget of the current month |
-| `transactions` | Transactions of an account with running balance; filters (savable as default); add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click; a reconciliation helper highlights the transaction that explains a balance gap; attach a receipt (a link, or a file kept by the server) to a transaction, opened in one click (📎) |
+| `transactions` | Transactions of an account with running balance; filters (savable as default); add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click; a reconciliation helper highlights the transaction that explains a balance gap; attach a receipt (a link, or a file kept by the server) to a transaction, opened in one click (📎); an optional payment due date, with unpaid transactions flagged in red and those due soon in orange — see [Payment due dates](#payment-due-dates) |
 | `accounts` | Accounts (checking, savings, card, cash…), currency, opening balance, closing, one default account |
 | `categories` / `tags` | Category tree (income / expense / savings) and classes, a second axis for analysis — see [Categories and classes](#categories-and-classes) |
 | `payees` | Payees with default category |
@@ -129,6 +129,16 @@ sections:        # optional: omit to show every tab
 
 Give each card instance its own `sections` to build an operations-only view, a settings view, etc.
 
+The balances in the banner of the Transactions tab can be chosen, ordered and highlighted (visual editor, or `balances` / `balances_emphasis`). Keys: `total` (projected), `month_end` (projected end of month), `with_budget` (end of month plus what remains of the current month's budget), `pointed` (bank, cleared), `reconciled`.
+
+```yaml
+balances:            # optional: shown balances, in this order (default: all five)
+  - month_end
+  - pointed
+balances_emphasis:   # optional: highlighted balances
+  - month_end
+```
+
 | Transactions | Budgets |
 |---|---|
 | ![Transactions](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-transactions.png) | ![Budgets](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-budgets.png) |
@@ -143,7 +153,7 @@ Give each card instance its own `sections` to build an operations-only view, a s
 
 | Card | Options |
 |---|---|
-| `custom:my-bank-balance-card` | `account_id` — the three balances of one account |
+| `custom:my-bank-balance-card` | `account_id`, `balances`, `balances_emphasis` — the balances of one account (default: projected in large, bank, reconciled), same keys as the main card |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — quick entry, pre-filled from the payee; an "All fields" button shows the hidden fields |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
 | `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — budget adherence month by month (actual / planned in %, one line per type, 100 % dashed); months outside the chosen budget come from another budget of the same account |
@@ -151,7 +161,7 @@ Give each card instance its own `sections` to build an operations-only view, a s
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — upcoming entered transactions (dated after today) and occurrences not yet entered (same green / red, lighter), by week or by month depending on the horizon; income above the axis, expenses below, label = balance of the period |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — spending by category (bars), the highest amount is 100 % |
 | `custom:my-bank-share-card` | — shared expenses |
-| `custom:my-bank-transactions-card` | — the main card's Transactions tab on its own (same code) |
+| `custom:my-bank-transactions-card` | `balances`, `balances_emphasis` — the main card's Transactions tab on its own (same code) |
 
 All cards have a visual editor.
 
@@ -190,6 +200,17 @@ Avoid setting only the class, without a category: the per-car analysis would sti
 
 **In short**: always set the category. Add a class when you want to follow an object, a project or a person across several categories. In a split transaction, each line has its own category and its own class.
 
+## Payment due dates
+
+A transaction can have an optional **payment due date** (empty by default: nothing changes for it). A scheduled transaction can set one on every transaction it generates, as a number of days after the transaction date (0 = the same day; empty = no due date).
+
+Until it is cleared (☑), a transaction with a due date is flagged:
+
+- in **orange** from a few days before its due date — how many is set in the integration options (Settings → Devices & services → My Bank → Configure, **Payment due dates**, 7 days by default);
+- in **red**, as unpaid, once the due date has passed.
+
+The warnings show on the balance card and the dashboard tiles (count and total per account), and in the Transactions tab: a banner lists the account's transactions to pay, even outside the period shown, each with a button to clear it, and the rows get a coloured badge. `my_bank.list_due_transactions` returns the same list for automations (e.g. a reminder notification). Requires My Bank API 0.10.0.
+
 ## Entities
 
 No sensor is created on a new installation: choose the ones to publish in the integration options (Settings → Devices & services → My Bank → Configure). The state of a sensor can be read by **every** Home Assistant user, whatever their access to My Bank, so publish only what you use in automations or dashboards; the cards don't need any sensor. An account created later is not published until you choose it.
@@ -199,7 +220,7 @@ No sensor is created on a new installation: choose the ones to publish in the in
 
 ## Services
 
-Every object can be created, modified or deleted from automations and scripts: `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (50+ services, see **Developer tools → Actions**). Read services (`list_accounts`, `search_transactions`, `get_budget_report`…) return data with `response_variable`.
+Every object can be created, modified or deleted from automations and scripts: `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (50+ services, see **Developer tools → Actions**). Read services (`list_accounts`, `search_transactions`, `list_due_transactions`, `get_budget_report`…) return data with `response_variable`.
 
 ```yaml
 action: my_bank.create_transaction

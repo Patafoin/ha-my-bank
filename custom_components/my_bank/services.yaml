@@ -605,6 +605,10 @@ create_transaction:
           - '1'
           - '2'
           translation_key: transaction_state
+    due_date:
+      required: false
+      selector:
+        date: {}
     category_id:
       required: false
       selector:
@@ -676,6 +680,10 @@ update_transaction:
           - '1'
           - '2'
           translation_key: transaction_state
+    due_date:
+      required: false
+      selector:
+        date: {}
     category_id:
       required: false
       selector:
@@ -967,6 +975,10 @@ search_transactions:
       selector:
         number:
           mode: box
+    due_before:
+      required: false
+      selector:
+        date: {}
 create_schedule:
   fields:
     account_id:
@@ -1070,6 +1082,13 @@ create_schedule:
       required: false
       selector:
         number:
+          mode: box
+    due_days:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 365
           mode: box
     generate_from:
       required: false
@@ -1187,6 +1206,13 @@ update_schedule:
       required: false
       selector:
         number:
+          mode: box
+    due_days:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 365
           mode: box
     generate_from:
       required: false
@@ -1377,6 +1403,13 @@ list_upcoming_occurrences:
       selector:
         number:
           mode: box
+    account_id:
+      required: false
+      selector:
+        number:
+          mode: box
+list_due_transactions:
+  fields:
     account_id:
       required: false
       selector:

@@ -66,6 +66,16 @@
               "ending_sensor": "Número y lista de los movimientos programados cuyo último vencimiento cae dentro de 30 días (para una notificación).",
               "balance_sensors": "Un sensor por cada cuenta elegida (saldo total; saldos punteado y conciliado como atributos). Una cuenta creada más adelante no se publica hasta que se elige aquí."
             }
+          },
+          "due": {
+            "name": "Fechas límite de pago",
+            "description": "Un movimiento puede tener una fecha límite de pago (vacía por defecto). Mientras no esté liquidado, se marca en rojo en las tarjetas una vez pasada su fecha límite.",
+            "data": {
+              "due_warning_days": "Avisar con estos días de antelación"
+            },
+            "data_description": {
+              "due_warning_days": "Un movimiento no pagado se marca en naranja desde estos días antes de su fecha límite (0 = solo el mismo día)."
+            }
           }
         }
       }
@@ -705,6 +715,10 @@
           "name": "Estado",
           "description": "Sin liquidar, liquidado o conciliado."
         },
+        "due_date": {
+          "name": "Fecha límite de pago",
+          "description": "Fecha límite de pago (AAAA-MM-DD); vacía = ninguna. Pasada sin que el movimiento esté liquidado, se marca como impagado."
+        },
         "category_id": {
           "name": "Categoría",
           "description": "ID de la categoría, si no hay desglose."
@@ -766,6 +780,10 @@
         "state": {
           "name": "Estado",
           "description": "Sin liquidar, liquidado o conciliado."
+        },
+        "due_date": {
+          "name": "Fecha límite de pago",
+          "description": "Fecha límite de pago (AAAA-MM-DD); vacía = ninguna. Pasada sin que el movimiento esté liquidado, se marca como impagado."
         },
         "category_id": {
           "name": "Categoría",
@@ -1047,6 +1065,10 @@
           "name": "Texto",
           "description": "Texto que se buscará."
         },
+        "due_before": {
+          "name": "Vence como tarde el",
+          "description": "Solo los movimientos con una fecha límite de pago igual o anterior a esta fecha (AAAA-MM-DD)."
+        },
         "order": {
           "name": "Orden",
           "description": "Orden por fecha."
@@ -1141,6 +1163,10 @@
           "name": "Días de antelación",
           "description": "Registrar el movimiento este número de días antes de su fecha."
         },
+        "due_days": {
+          "name": "Fecha límite (días después)",
+          "description": "Cada movimiento generado recibe como fecha límite su fecha + estos días (0 = el mismo día); vacío = sin fecha límite."
+        },
         "generate_from": {
           "name": "Generar a partir de",
           "description": "No registrar nada automáticamente antes de esta fecha (predeterminada: hoy)."
@@ -1234,6 +1260,10 @@
         "lead_days": {
           "name": "Días de antelación",
           "description": "Registrar el movimiento este número de días antes de su fecha."
+        },
+        "due_days": {
+          "name": "Fecha límite (días después)",
+          "description": "Cada movimiento generado recibe como fecha límite su fecha + estos días (0 = el mismo día); vacío = sin fecha límite."
         },
         "generate_from": {
           "name": "Generar a partir de",
@@ -1451,6 +1481,16 @@
           "name": "Horizonte (días)",
           "description": "Número de días de antelación."
         },
+        "account_id": {
+          "name": "Cuenta",
+          "description": "ID de la cuenta."
+        }
+      }
+    },
+    "list_due_transactions": {
+      "name": "Listar movimientos por pagar",
+      "description": "Movimientos no pagados (sin liquidar) cuya fecha límite de pago ha pasado (vencidos) o cae dentro de los días de aviso fijados en las opciones (pronto).",
+      "fields": {
         "account_id": {
           "name": "Cuenta",
           "description": "ID de la cuenta."

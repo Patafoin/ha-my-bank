@@ -111,7 +111,7 @@ Wenn die Karten nach einer Installation oder einem Update nicht in der Auswahl e
 | Reiter (Schlüssel `sections`) | Inhalt |
 |---|---|
 | `dashboard` | Kontostände aller Konten, Budget des laufenden Monats |
-| `transactions` | Buchungen eines Kontos mit laufendem Kontostand; Filter (als Standard speicherbar); Hinzufügen, Bearbeiten, Aufteilen, Umbuchen; Abgleichen (☐/☑) und Abstimmen (🔓/🔒) mit einem Klick; eine Abstimmungshilfe hebt die Buchung hervor, die eine Saldodifferenz erklärt; einen Beleg (Link oder vom Server gespeicherte Datei) mit einer Buchung verknüpfen, mit einem Klick zu öffnen (📎) |
+| `transactions` | Buchungen eines Kontos mit laufendem Kontostand; Filter (als Standard speicherbar); Hinzufügen, Bearbeiten, Aufteilen, Umbuchen; Abgleichen (☐/☑) und Abstimmen (🔓/🔒) mit einem Klick; eine Abstimmungshilfe hebt die Buchung hervor, die eine Saldodifferenz erklärt; einen Beleg (Link oder vom Server gespeicherte Datei) mit einer Buchung verknüpfen, mit einem Klick zu öffnen (📎); eine optionale Zahlungsfrist, unbezahlte Buchungen rot und bald fällige orange markiert — siehe [Zahlungsfristen](#zahlungsfristen) |
 | `accounts` | Konten (Girokonto, Sparkonto, Karte, Bargeld…), Währung, Anfangssaldo, Schließung, ein Standardkonto |
 | `categories` / `tags` | Kategorienbaum (Einnahmen / Ausgaben / Sparen) und Klassen, eine zweite Achse für Auswertungen — siehe [Kategorien und Klassen](#kategorien-und-klassen) |
 | `payees` | Empfänger mit Standardkategorie |
@@ -129,6 +129,16 @@ sections:        # optional: ohne diesen Schlüssel werden alle Reiter angezeigt
 
 Geben Sie jeder Karteninstanz eigene `sections`, um eine Ansicht nur für die Erfassung, eine Ansicht für die Einstellungen usw. zusammenzustellen.
 
+Die Salden im Banner des Bereichs Buchungen lassen sich auswählen, ordnen und hervorheben (visueller Editor oder `balances` / `balances_emphasis`). Schlüssel: `total` (voraussichtlich), `month_end` (voraussichtlich zum Monatsende), `with_budget` (Monatsende plus das noch offene Budget des laufenden Monats), `pointed` (Bank, abgeglichen), `reconciled` (abgestimmt).
+
+```yaml
+balances:            # optional: angezeigte Salden, in dieser Reihenfolge (Standard: alle fünf)
+  - month_end
+  - pointed
+balances_emphasis:   # optional: hervorgehobene Salden
+  - month_end
+```
+
 | Buchungen | Budgets |
 |---|---|
 | ![Buchungen](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-transactions.png) | ![Budgets](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/de/card-budgets.png) |
@@ -143,7 +153,7 @@ Geben Sie jeder Karteninstanz eigene `sections`, um eine Ansicht nur für die Er
 
 | Karte | Optionen |
 |---|---|
-| `custom:my-bank-balance-card` | `account_id` — die drei Kontostände eines Kontos |
+| `custom:my-bank-balance-card` | `account_id`, `balances`, `balances_emphasis` — die Salden eines Kontos (Standard: voraussichtlich groß, Bank, abgestimmt), gleiche Schlüssel wie die Hauptkarte |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — Schnellerfassung, vorausgefüllt anhand des Empfängers; die Schaltfläche „Alle Felder“ zeigt die ausgeblendeten Felder |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
 | `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — Budgeteinhaltung Monat für Monat (Ist / Plan in %, eine Linie pro Art, 100 % gestrichelt); Monate außerhalb des gewählten Budgets stammen aus einem anderen Budget desselben Kontos |
@@ -151,7 +161,7 @@ Geben Sie jeder Karteninstanz eigene `sections`, um eine Ansicht nur für die Er
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — bereits erfasste Buchungen (nach heute datiert) und noch nicht erfasste Ausführungen (gleiches Grün / Rot, heller), je nach Zeitraum pro Woche oder pro Monat; Einnahmen über der Achse, Ausgaben darunter, Beschriftung = Saldo des Zeitraums |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — Ausgaben nach Kategorie (Balken), der höchste Betrag entspricht 100 % |
 | `custom:my-bank-share-card` | — geteilte Ausgaben |
-| `custom:my-bank-transactions-card` | — nur der Bereich Buchungen der Hauptkarte (gleicher Code) |
+| `custom:my-bank-transactions-card` | `balances`, `balances_emphasis` — nur der Bereich Buchungen der Hauptkarte (gleicher Code) |
 
 Alle Karten haben einen visuellen Editor.
 
@@ -190,6 +200,17 @@ Vermeiden Sie es, nur die Klasse ohne Kategorie zu setzen: Die Auswertung pro Fa
 
 **Kurz gesagt**: Setzen Sie immer die Kategorie. Fügen Sie eine Klasse hinzu, wenn Sie einen Gegenstand, ein Projekt oder eine Person über mehrere Kategorien hinweg verfolgen möchten. In einer aufgeteilten Buchung hat jede Zeile ihre eigene Kategorie und ihre eigene Klasse.
 
+## Zahlungsfristen
+
+Eine Buchung kann eine optionale **Zahlungsfrist** haben (standardmäßig leer: dann ändert sich nichts). Eine geplante Buchung kann bei jeder erzeugten Buchung eine setzen, als Anzahl Tage nach dem Buchungsdatum (0 = am selben Tag; leer = keine Zahlungsfrist).
+
+Solange sie nicht abgeglichen ist (☑), wird eine Buchung mit Zahlungsfrist markiert:
+
+- **orange** einige Tage vor ihrer Zahlungsfrist — wie viele, legen die Optionen der Integration fest (Einstellungen → Geräte & Dienste → My Bank → Konfigurieren, **Zahlungsfristen**, standardmäßig 7 Tage);
+- **rot**, als unbezahlt, sobald die Frist abgelaufen ist.
+
+Die Warnungen erscheinen auf der Saldokarte und den Kacheln der Übersicht (Anzahl und Summe pro Konto) sowie im Tab Buchungen: ein Banner listet die zu zahlenden Buchungen des Kontos, auch außerhalb des angezeigten Zeitraums, jede mit einer Schaltfläche zum Abgleichen, und die Zeilen erhalten ein farbiges Abzeichen. `my_bank.list_due_transactions` liefert dieselbe Liste für Automatisierungen (z. B. eine Erinnerungsbenachrichtigung). Erfordert My Bank API 0.10.0.
+
 ## Entitäten
 
 Bei einer neuen Installation wird kein Sensor angelegt: Wählen Sie die zu veröffentlichenden in den Optionen der Integration (Einstellungen → Geräte & Dienste → My Bank → Konfigurieren). Der Zustand eines Sensors ist für **jeden** Home-Assistant-Benutzer lesbar, unabhängig von seinem Zugriff auf My Bank: Veröffentlichen Sie nur, was Sie in Automatisierungen oder Dashboards nutzen; die Karten benötigen keinen Sensor. Ein später angelegtes Konto wird erst veröffentlicht, wenn Sie es wählen.
@@ -199,7 +220,7 @@ Bei einer neuen Installation wird kein Sensor angelegt: Wählen Sie die zu verö
 
 ## Dienste
 
-Jedes Objekt kann aus Automatisierungen und Skripten heraus erstellt, geändert oder gelöscht werden: `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (über 50 Dienste, siehe **Entwicklerwerkzeuge → Aktionen**). Die Lesedienste (`list_accounts`, `search_transactions`, `get_budget_report`…) geben Daten über `response_variable` zurück.
+Jedes Objekt kann aus Automatisierungen und Skripten heraus erstellt, geändert oder gelöscht werden: `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (über 50 Dienste, siehe **Entwicklerwerkzeuge → Aktionen**). Die Lesedienste (`list_accounts`, `search_transactions`, `list_due_transactions`, `get_budget_report`…) geben Daten über `response_variable` zurück.
 
 ```yaml
 action: my_bank.create_transaction

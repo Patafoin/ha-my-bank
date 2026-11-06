@@ -12,8 +12,8 @@ CONF_DEFAULT_ACCESS = "default_access"
 CONF_ENDING_SENSOR = "ending_sensor"
 CONF_BALANCE_SENSORS = "balance_sensors"
 DEFAULT_URL = "http://127.0.0.1:9931"
-MIN_API_VERSION = "0.8.0"  # oldest My Bank API this version of the integration works with: create/update_account
-# now always send `is_default` (0.7.0+) and `currency` (0.8.0+), which an older API's strict schema would reject
+MIN_API_VERSION = "0.10.0"  # oldest My Bank API this version of the integration works with: the card always sends
+# `due_date` (0.10.0+) on a transaction and `due_days` on a schedule, which an older API's strict schema would reject
 
 # Payment methods created by My Bank API in a new database, renamed in the language of Home Assistant on a fresh
 # install (no account yet). Keys are the names the server creates.
@@ -25,3 +25,7 @@ DEFAULT_PAYMENT_METHODS = {
     "Versement": {"en": "Deposit", "de": "Einzahlung"},
 }
 TERM_DAYS = 30  # warn when the last occurrence of a schedule falls within this many days (same as the card)
+# Payment due dates (decision 027): an unpaid transaction (not pointed) is flagged in orange from this many days before
+# its due date, in red once the due date has passed. Option of the entry.
+CONF_DUE_WARNING_DAYS = "due_warning_days"
+DEFAULT_DUE_WARNING_DAYS = 7

@@ -111,7 +111,7 @@ Si les cartes n'apparaissent pas dans le sélecteur après une installation ou u
 | Onglet (clé `sections`) | Contenu |
 |---|---|
 | `dashboard` | Soldes de tous les comptes, budget du mois en cours |
-| `transactions` | Opérations d'un compte avec solde progressif ; filtres (enregistrables par défaut) ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic ; une aide au rapprochement surligne l'opération qui explique un écart de solde ; lier un justificatif (lien ou fichier conservé par le serveur) à une opération, ouvert en un clic (📎) |
+| `transactions` | Opérations d'un compte avec solde progressif ; filtres (enregistrables par défaut) ; ajout, modification, ventilation, virement ; pointage (☐/☑) et rapprochement (🔓/🔒) en un clic ; une aide au rapprochement surligne l'opération qui explique un écart de solde ; lier un justificatif (lien ou fichier conservé par le serveur) à une opération, ouvert en un clic (📎) ; une date limite de paiement facultative, les opérations impayées signalées en rouge et celles à payer bientôt en orange — voir [Dates limites de paiement](#dates-limites-de-paiement) |
 | `accounts` | Comptes (courant, épargne, carte, espèces…), devise, solde initial, clôture, un compte par défaut |
 | `categories` / `tags` | Arborescence des rubriques (recettes / dépenses / épargne) et classes, un second axe d'analyse — voir [Rubriques et classes](#rubriques-et-classes) |
 | `payees` | Tiers avec catégorie par défaut |
@@ -129,6 +129,16 @@ sections:        # facultatif : sans cette clé, tous les onglets sont affichés
 
 Donnez à chaque instance de la carte ses propres `sections` pour composer une vue dédiée à la saisie, une vue de paramétrage, etc.
 
+Les soldes du bandeau du volet Opérations se choisissent, se rangent et se mettent en emphase (éditeur visuel, ou `balances` / `balances_emphasis`). Clés : `total` (prévisionnel), `month_end` (prévisionnel fin de mois), `with_budget` (fin de mois plus ce qui reste du budget du mois en cours), `pointed` (banque, pointé), `reconciled` (rapproché).
+
+```yaml
+balances:            # facultatif : soldes affichés, dans cet ordre (par défaut : les cinq)
+  - month_end
+  - pointed
+balances_emphasis:   # facultatif : soldes mis en emphase
+  - month_end
+```
+
 | Opérations | Budgets |
 |---|---|
 | ![Opérations](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-transactions.png) | ![Budgets](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/fr/card-budgets.png) |
@@ -143,7 +153,7 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 
 | Carte | Options |
 |---|---|
-| `custom:my-bank-balance-card` | `account_id` — les trois soldes d'un compte |
+| `custom:my-bank-balance-card` | `account_id`, `balances`, `balances_emphasis` — les soldes d'un compte (par défaut : prévisionnel en grand, banque, rapproché), mêmes clés que la carte principale |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — saisie rapide, pré-remplie à partir du tiers ; bouton « Tous les champs » pour afficher les champs masqués |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
 | `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — respect du budget mois par mois (réalisé / prévu en %, une ligne par type, 100 % en pointillés) ; les mois hors du budget choisi viennent d'un autre budget du même compte |
@@ -151,7 +161,7 @@ Donnez à chaque instance de la carte ses propres `sections` pour composer une v
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — opérations déjà saisies (datées après aujourd'hui) et échéances pas encore saisies (même vert / rouge, plus clair), par semaine ou par mois selon l'horizon ; recettes au-dessus de l'axe, dépenses en dessous, étiquette = solde de la période |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — dépenses par rubrique (barres), le montant le plus élevé fait 100 % |
 | `custom:my-bank-share-card` | — dépenses partagées |
-| `custom:my-bank-transactions-card` | — le volet Opérations de la carte principale seul (même code) |
+| `custom:my-bank-transactions-card` | `balances`, `balances_emphasis` — le volet Opérations de la carte principale seul (même code) |
 
 Toutes les cartes disposent d'un éditeur visuel.
 
@@ -190,6 +200,17 @@ Une opération sans rubrique n'apparaît dans aucun de ces suivis.
 
 **En résumé** : renseignez toujours la rubrique. Ajoutez une classe quand vous voulez suivre un objet, un projet ou une personne à travers plusieurs rubriques. Dans une opération ventilée, chaque ligne a sa propre rubrique et sa propre classe.
 
+## Dates limites de paiement
+
+Une opération peut avoir une **date limite de paiement** facultative (vide par défaut : rien ne change pour elle). Une planification peut en poser une sur chaque opération qu'elle génère, en nombre de jours après la date de l'opération (0 = le jour même ; vide = pas de date limite).
+
+Tant qu'elle n'est pas pointée (☑), une opération avec une date limite est signalée :
+
+- en **orange** quelques jours avant sa date limite — combien, c'est réglé dans les options de l'intégration (Paramètres → Appareils et services → My Bank → Configurer, **Dates limites de paiement**, 7 jours par défaut) ;
+- en **rouge**, comme impayée, une fois la date limite dépassée.
+
+Les alertes apparaissent sur la carte des soldes et les tuiles du tableau de bord (nombre et total par compte), et dans l'onglet Opérations : un bandeau liste les opérations à payer du compte, même hors de la période affichée, chacune avec un bouton pour la pointer, et les lignes portent un badge de couleur. `my_bank.list_due_transactions` renvoie la même liste aux automatisations (par exemple pour une notification de rappel). Nécessite My Bank API 0.10.0.
+
 ## Entités
 
 Aucun capteur n'est créé sur une nouvelle installation : choisissez ceux à publier dans les options de l'intégration (Paramètres → Appareils et services → My Bank → Configurer). L'état d'un capteur est lisible par **tous** les utilisateurs de Home Assistant, quel que soit leur accès à My Bank : ne publiez que ce dont vous vous servez dans des automatisations ou des tableaux de bord ; les cartes n'ont besoin d'aucun capteur. Un compte créé plus tard n'est publié qu'une fois choisi.
@@ -199,7 +220,7 @@ Aucun capteur n'est créé sur une nouvelle installation : choisissez ceux à pu
 
 ## Services
 
-Chaque objet peut être créé, modifié ou supprimé depuis les automatisations et les scripts : `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (plus de 50 services, voir **Outils de développement → Actions**). Les services de lecture (`list_accounts`, `search_transactions`, `get_budget_report`…) renvoient des données via `response_variable`.
+Chaque objet peut être créé, modifié ou supprimé depuis les automatisations et les scripts : `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (plus de 50 services, voir **Outils de développement → Actions**). Les services de lecture (`list_accounts`, `search_transactions`, `list_due_transactions`, `get_budget_report`…) renvoient des données via `response_variable`.
 
 ```yaml
 action: my_bank.create_transaction

@@ -91,6 +91,7 @@ const MAX_INSTALLMENTS = 400; // limite de l'API pour un échéancier (plus de 3
 const STEP_MONTHS = { month: 1, quarter: 3, year: 12 };
 const TERM_DAYS = 30; // prévenir quand la dernière échéance d'une planification tombe dans ce délai (= « À venir (30 jours) »)
 const TERM_DISMISS_KEY = "my-bank-term-dismissed";
+const DUE_BANNER_MAX = 5; // opérations à payer listées dans le bandeau du volet Opérations
 const TERM_REFRESH_MS = 5 * 60 * 1000;
 const NAV_KEY = "myBankCard"; // clé de la carte dans history.state (bouton Retour du navigateur)
 
@@ -106,6 +107,50 @@ function myBankAccess(hass) {
       .then((res) => (res && res.response && res.response.level) || "write", () => { ACCESS.delete(conn); return "write"; }));
   }
   return ACCESS.get(conn);
+}
+
+// Opérations à payer (décision 027) : non pointées, date limite dépassée (« overdue », rouge) ou dans le délai
+// d'alerte réglé dans les options de l'intégration (« soon », orange). Lues une fois pour toutes les cartes de la
+// connexion, relues après toute écriture d'une carte ou au bout de DUE_REFRESH_MS. null si le service est indisponible.
+const DUE = new WeakMap();
+const DUE_REFRESH_MS = 5 * 60 * 1000;
+function myBankDue(hass) {
+  const conn = hass.connection;
+  const cached = DUE.get(conn);
+  if (cached && Date.now() - cached.at < DUE_REFRESH_MS) return cached.promise;
+  const promise = conn
+    .sendMessagePromise({ type: "call_service", domain: "my_bank", service: "list_due_transactions", service_data: {}, return_response: true })
+    .then((res) => (res && res.response) || null, () => { DUE.delete(conn); return null; });
+  DUE.set(conn, { at: Date.now(), promise });
+  return promise;
+}
+
+// Statut d'une opération d'après sa date limite : "overdue", "soon" ou null (pas de date limite, pointée, ou lointaine).
+function dueStatus(tx, due) {
+  if (!due || !tx.due_date || tx.state >= 1) return null;
+  if (tx.due_date < due.today) return "overdue";
+  const [y, m, d] = due.today.split("-").map(Number);
+  return tx.due_date <= isoDate(new Date(y, m - 1, d + due.warning_days)) ? "soon" : null;
+}
+
+// Résumé des opérations à payer d'un compte (carte Soldes, tuiles du tableau de bord) : une ligne rouge pour les
+// impayées, une orange pour celles à payer bientôt ; montants signés, comme dans la liste des opérations.
+function dueSummaryHtml(due, accountId, currency) {
+  if (!due) return "";
+  const own = due.items.filter((x) => x.account_id === accountId);
+  const lines = ["overdue", "soon"].map((status) => {
+    const list = own.filter((x) => x.status === status);
+    if (!list.length) return "";
+    const total = list.reduce((sum, x) => sum + Math.round(Number(x.amount) * 100), 0) / 100;
+    const vars = { n: list.length, amount: fmtMoney(total, currency), days: due.warning_days };
+    const text = status === "overdue"
+      ? t("{n} opération(s) impayée(s), date limite dépassée : {amount}", vars)
+      : due.warning_days === 0
+        ? t("{n} opération(s) à payer aujourd'hui : {amount}", vars)
+        : t("{n} opération(s) à payer dans les {days} jours : {amount}", vars);
+    return `<div class="due-alert ${status}"><span>${status === "overdue" ? "⚠" : "⏰"} ${text}</span></div>`;
+  }).join("");
+  return lines && `<div class="due-sum">${lines}</div>`;
 }
 
 // Prévient les cartes de la page qu'une donnée a changé (la carte de solde ne lit plus de capteur).
@@ -199,6 +244,21 @@ const STYLE = `
   .term-alert span { flex: 1 1 220px; padding: 6px 0; }
   .term-alert button { background: none; border: none; cursor: pointer; min-width: 44px; min-height: 44px; font-size: 14px; color: var(--primary-color); }
   .term-alert button.term-hide { color: var(--secondary-text-color); font-size: 16px; }
+  .due-alert {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 8px; padding: 2px 4px 2px 12px;
+    border-radius: 4px; font-size: 14px;
+  }
+  .due-alert span { flex: 1 1 220px; padding: 6px 0; }
+  .due-sum { margin-top: 8px; }
+  .due-sum .due-alert:last-child { margin-bottom: 0; }
+  .due-alert.overdue { border-left: 4px solid var(--error-color, #db4437); background: rgba(var(--rgb-error-color, 219, 68, 55), 0.15); }
+  .due-alert.soon { border-left: 4px solid var(--warning-color, #ffa600); background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.15); }
+  .due-alert button { background: none; border: none; cursor: pointer; min-height: 44px; font-size: 14px; color: var(--primary-color); }
+  .due-badge { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 9px; font-size: 11px; line-height: 18px; color: #fff; vertical-align: 1px; }
+  .due-badge.overdue { background: var(--error-color, #db4437); }
+  .due-badge.soon { background: var(--warning-color, #ffa600); }
+  .tx-row.due-overdue { border-left: 4px solid var(--error-color, #db4437); }
+  .tx-row.due-soon { border-left: 4px solid var(--warning-color, #ffa600); }
   form.entity-form .f-off { display: none !important; }
   .ok-msg { margin-bottom: 8px; padding: 10px 12px; border-radius: 4px; font-size: 14px;
     border-left: 4px solid var(--success-color, #43a047); background: rgba(var(--rgb-success-color, 67, 160, 71), 0.15); }
@@ -291,10 +351,12 @@ const STYLE = `
   .balance-line.main strong { font-size: 16px; }
   .tx-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
   .tx-summary {
-    display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--secondary-text-color);
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; font-size: 13px; color: var(--secondary-text-color);
     margin-bottom: 8px; padding: 8px 12px; background: var(--secondary-background-color); border-radius: 8px;
   }
   .tx-summary strong { color: var(--primary-text-color); }
+  .tx-summary .emph { font-size: 15px; color: var(--primary-text-color); }
+  .tx-summary .emph strong { font-size: 18px; color: var(--primary-color); }
   .tx-summary .tx-refresh {
     margin-left: auto; background: none; border: 1px solid var(--divider-color); border-radius: 50%;
     cursor: pointer; width: 39px; height: 39px; padding: 0; font-size: 21px; line-height: 36px;
@@ -308,6 +370,7 @@ const STYLE = `
   }
   .tx-row { border-bottom: 1px solid var(--divider-color); padding: 8px 4px; }
   .tx-row.future { opacity: 0.75; }
+  .tx-row.alt { background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.05); } /* une ligne sur deux, pour se repérer */
   .tx-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .tx-info { flex: 1 1 160px; min-width: 0; }
   .tx-desc { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -643,6 +706,101 @@ function errMsg(err) {
   return (err && (err.message || err.error || (err.body && err.body.message))) || String(err);
 }
 
+// Soldes affichables (bandeau du volet Opérations, carte Soldes). Config : `balances` = soldes affichés, dans
+// l'ordre ; `balances_emphasis` = ceux mis en emphase. `summary` : libellé dans le bandeau des opérations.
+const BALANCE_DEFS = [
+  ["total", "Solde prévisionnel", "Solde prévisionnel total :"],
+  ["month_end", "Solde prévisionnel fin de mois", "Solde prévisionnel fin de mois :"],
+  ["with_budget", "Solde (budget inclus)", "Solde (budget inclus) :"],
+  ["pointed", "Solde banque (pointé)", "Solde banque :"],
+  ["reconciled", "Rapproché", "Rapproché :"],
+].map(([key, label, summary]) => ({ key, get label() { return t(label); }, get summary() { return t(summary); } }));
+const WITH_BUDGET_HELP = "Solde prévisionnel fin de mois, plus ce qui reste à réaliser du budget du mois en cours (prévu non encore réalisé, rubrique par rubrique ; les dépassements sont déjà dans le solde)";
+// Réglage absent : le bandeau des opérations montre tout, la carte Soldes ses trois soldes historiques.
+const SUMMARY_BALANCES = { balances: BALANCE_DEFS.map((d) => d.key), emphasis: [] };
+const CARD_BALANCES = { balances: ["total", "pointed", "reconciled"], emphasis: ["total"] };
+
+// Soldes à afficher d'après la config, dans l'ordre choisi, chacun marqué s'il est en emphase.
+function balanceLayout(config, defaults) {
+  const keys = BALANCE_DEFS.map((d) => d.key);
+  const shown = Array.isArray(config.balances) ? config.balances.filter((k, i, all) => keys.includes(k) && all.indexOf(k) === i) : defaults.balances;
+  const emphasis = new Set(Array.isArray(config.balances_emphasis) ? config.balances_emphasis : defaults.emphasis);
+  return shown.map((k) => ({ def: BALANCE_DEFS.find((d) => d.key === k), emphasis: emphasis.has(k) }));
+}
+
+// Valeurs des soldes d'un compte : ceux du service, plus ceux calculés par la carte (null tant qu'inconnus).
+// `adj` : ajustements lus par _balanceAdjustments pour ce compte, ou null.
+function balanceValues(account, adj) {
+  const b = account.balances || {};
+  const cents = (v) => Math.round(Number(v) * 100);
+  const monthEnd = adj && adj.afterCents != null ? cents(b.total) - adj.afterCents : null;
+  return {
+    total: b.total,
+    pointed: b.pointed,
+    reconciled: b.reconciled,
+    month_end: monthEnd == null ? null : monthEnd / 100,
+    with_budget: monthEnd == null || adj.remainingCents == null ? null : (monthEnd + adj.remainingCents) / 100,
+  };
+}
+
+// Éditeur des soldes (carte principale, carte Opérations, carte Soldes) : une ligne par solde avec une case
+// « affiché », des flèches d'ordre et une case « emphase ». Les soldes masqués sont listés après les autres.
+function balancesEditorHtml(config, defaults) {
+  const layout = balanceLayout(config, defaults);
+  const hidden = BALANCE_DEFS.filter((d) => !layout.some((x) => x.def === d)).map((def) => ({ def, emphasis: false, hidden: true }));
+  const rows = [...layout, ...hidden].map((x) => `<div class="bal-row" data-bal-key="${x.def.key}">
+      <label class="bal-show"><input type="checkbox" data-bal ${x.hidden ? "" : "checked"}>${esc(x.def.label)}</label>
+      <label class="bal-emph" title="${esc(t("Mettre ce solde en avant (plus grand)"))}"><input type="checkbox" data-bal-emph ${x.emphasis ? "checked" : ""}>${t("Emphase")}</label>
+      <button type="button" data-move="up" title="${esc(t("Monter"))}">↑</button>
+      <button type="button" data-move="down" title="${esc(t("Descendre"))}">↓</button>
+    </div>`).join("");
+  return `<style>
+      .bal-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+      .bal-row label { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0; font-size: 14px; color: var(--primary-text-color); }
+      .bal-row .bal-show { flex: 1; }
+      .bal-row .bal-emph { font-size: 13px; color: var(--secondary-text-color); }
+      .bal-row button { min-width: 32px; min-height: 28px; padding: 0 8px; font-size: 15px; line-height: 1; cursor: pointer; }
+      .bal-row.off .bal-show { color: var(--secondary-text-color); }
+    </style><div class="bal-rows">${rows}</div>`;
+}
+
+// État des commandes : emphase et flèches inactives sur un solde masqué, flèches inactives aux extrémités.
+function syncBalancesEditor(root) {
+  const rows = [...root.querySelectorAll(".bal-row")];
+  rows.forEach((row, i) => {
+    const on = row.querySelector("[data-bal]").checked;
+    row.classList.toggle("off", !on);
+    row.querySelector("[data-bal-emph]").disabled = !on;
+    row.querySelector('[data-move="up"]').disabled = !on || i === 0;
+    row.querySelector('[data-move="down"]').disabled = !on || i === rows.length - 1;
+  });
+}
+
+// Branche l'éditeur des soldes ; `emit` est appelé après un déplacement (les cases passent par l'écouteur de l'éditeur).
+function wireBalancesEditor(root, emit) {
+  syncBalancesEditor(root);
+  root.querySelectorAll(".bal-row input").forEach((el) => el.addEventListener("change", () => syncBalancesEditor(root)));
+  root.querySelectorAll(".bal-row button").forEach((btn) => btn.addEventListener("click", () => {
+    const row = btn.closest(".bal-row");
+    if (btn.dataset.move === "up" && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+    if (btn.dataset.move === "down" && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+    syncBalancesEditor(root);
+    emit();
+  }));
+}
+
+// Reporte l'éditeur des soldes dans la config ; une valeur égale au réglage par défaut est retirée.
+function readBalancesEditor(root, config, defaults) {
+  const rows = [...root.querySelectorAll(".bal-row")].filter((row) => row.querySelector("[data-bal]").checked);
+  if (!root.querySelector(".bal-row")) return;
+  const balances = rows.map((row) => row.dataset.balKey);
+  const emphasis = rows.filter((row) => row.querySelector("[data-bal-emph]").checked).map((row) => row.dataset.balKey);
+  if (balances.join() === defaults.balances.join()) delete config.balances;
+  else config.balances = balances;
+  if ([...emphasis].sort().join() === [...defaults.emphasis].sort().join()) delete config.balances_emphasis;
+  else config.balances_emphasis = emphasis;
+}
+
 class MyBankCard extends HTMLElement {
   setConfig(config) {
     config = config || {};
@@ -719,7 +877,10 @@ class MyBankCard extends HTMLElement {
       service_data: data || {},
       return_response: !!wantResponse,
     });
-    if (!/^(list|get|search)_/.test(service)) notifyChange();
+    if (!/^(list|get|search)_/.test(service)) {
+      DUE.delete(this._hass.connection); // une écriture a pu changer une date limite ou un pointage
+      notifyChange();
+    }
     return wantResponse ? res && res.response : res;
   }
 
@@ -1047,7 +1208,8 @@ class MyBankCard extends HTMLElement {
   // --- Tableau de bord ---------------------------------------------------------------------------
 
   async _renderDashboard() {
-    const accounts = (await this._items("list_accounts")).filter((a) => !a.closed);
+    const [all, due] = await Promise.all([this._items("list_accounts"), myBankDue(this._hass)]);
+    const accounts = all.filter((a) => !a.closed);
     const accountById = new Map(accounts.map((a) => [a.id, a]));
     const tiles = accounts
       .map((a) => `<div class="balance-tile">
@@ -1055,6 +1217,7 @@ class MyBankCard extends HTMLElement {
           <div class="balance-line main"><span>${t("Solde")}</span><strong>${fmtMoney(a.balances.total, a.currency)}</strong></div>
           <div class="balance-line"><span>${t("Pointé")}</span><strong>${fmtMoney(a.balances.pointed, a.currency)}</strong></div>
           <div class="balance-line"><span>${t("Rapproché")}</span><strong>${fmtMoney(a.balances.reconciled, a.currency)}</strong></div>
+          ${dueSummaryHtml(due, a.id, a.currency)}
         </div>`)
       .join("");
     this._bodyEl.innerHTML = `<div class="dashboard-grid">${tiles || `<div class="empty">${t("Aucun compte.")}</div>`}</div>`;
@@ -1145,22 +1308,27 @@ class MyBankCard extends HTMLElement {
     return p ? p.name : "";
   }
 
-  _txRowHtml(tx) {
+  _txRowHtml(tx, alt = false) {
     const today = isoDate(new Date());
     const credit = Number(tx.amount) > 0;
     const method = this._lookups.method.get(tx.payment_method_id);
-    const sub = [frDate(tx.date), this._txCounterpart(tx), this._categoryLabel(tx), method ? method.name : ""]
+    const due = dueStatus(tx, this._due);
+    const dueText = tx.due_date ? t("limite le {date}", { date: frDate(tx.due_date) }) : "";
+    const sub = [frDate(tx.date), this._txCounterpart(tx), this._categoryLabel(tx), method ? method.name : "", dueText]
       .filter(Boolean)
       .map(esc)
       .join(" · ");
+    const badge = due
+      ? `<span class="due-badge ${due}">${due === "overdue" ? t("Impayée") : t("À payer")}</span>`
+      : "";
     const checkbox = this._txSelectMode
       ? `<label class="tx-select-box"><input type="checkbox" class="tx-select" ${this._txSelected.has(tx.id) ? "checked" : ""}></label>`
       : "";
-    return `<div class="tx-row ${tx.date > today ? "future" : ""} ${this._txSelectMode ? "selectable" : ""} ${this._txSelected.has(tx.id) ? "selected" : ""}" data-id="${tx.id}">
+    return `<div class="tx-row ${alt ? "alt" : ""} ${tx.date > today ? "future" : ""} ${due ? `due-${due}` : ""} ${this._txSelectMode ? "selectable" : ""} ${this._txSelected.has(tx.id) ? "selected" : ""}" data-id="${tx.id}">
       ${checkbox}
       <div class="tx-main">
         <div class="tx-info">
-          <div class="tx-desc">${esc(this._txTitle(tx))}</div>
+          <div class="tx-desc">${badge}${esc(this._txTitle(tx))}</div>
           <div class="tx-sub">${sub}</div>
         </div>
         <div class="tx-right">
@@ -1177,6 +1345,27 @@ class MyBankCard extends HTMLElement {
         </div>
       </div>
     </div>`;
+  }
+
+  // Bandeau du volet Opérations : une ligne par opération à payer du compte (les DUE_BANNER_MAX premières, impayées
+  // d'abord), même hors de la période affichée, avec un bouton pour la pointer.
+  _dueBannerHtml(accountId) {
+    if (!this._due) return "";
+    const own = this._due.items
+      .filter((x) => x.account_id === accountId)
+      .sort((a, b) => (a.status === b.status ? 0 : a.status === "overdue" ? -1 : 1));
+    const lines = own.slice(0, DUE_BANNER_MAX).map((x) => {
+      const vars = { label: esc(this._txTitle(x)), amount: fmtMoney(x.amount, this._currency(x.account_id)), date: esc(frDate(x.due_date)), when: esc(daysFromToday(x.due_date)) };
+      const text = x.status === "overdue"
+        ? t("Impayée : « {label} » ({amount}), date limite le {date} ({when})", vars)
+        : t("À payer : « {label} » ({amount}), date limite le {date} ({when})", vars);
+      return `<div class="due-alert ${x.status}" data-id="${x.id}">
+          <span>${x.status === "overdue" ? "⚠" : "⏰"} ${text}</span>
+          <button type="button" class="due-point" title="${esc(t("Marquer l'opération comme pointée (payée)"))}">☑ ${t("Pointer")}</button>
+        </div>`;
+    });
+    if (own.length > DUE_BANNER_MAX) lines.push(`<div class="muted">${t("… et {n} autre(s)", { n: own.length - DUE_BANNER_MAX })}</div>`);
+    return lines.join("");
   }
 
   async _renderTransactions() {
@@ -1198,7 +1387,8 @@ class MyBankCard extends HTMLElement {
       query.start = this._rangeStart(this._txRange);
       if (this._txRange === "month_strict") query.end = monthEndIso();
     }
-    const data = await this._call("list_account_transactions", query, true);
+    const [data, due] = await Promise.all([this._call("list_account_transactions", query, true), myBankDue(this._hass)]);
+    this._due = due;
     this._txAll = (data && data.items) || [];
     this._txItems = new Map(this._txAll.map((x) => [x.id, x]));
 
@@ -1223,6 +1413,7 @@ class MyBankCard extends HTMLElement {
         <label>${t("Solde du site bancaire")}<input type="text" inputmode="decimal" name="reconBalance" value="${esc(this._txReconBalance || "")}"></label>
         <span class="recon-diff"></span>
       </div>
+      <div class="tx-due">${this._dueBannerHtml(this._txAccountId)}</div>
       <div class="tx-summary"></div>
       <div class="tx-count"></div>
       <div class="form-container"></div>
@@ -1239,6 +1430,19 @@ class MyBankCard extends HTMLElement {
     // tout seuls quand on modifie une opération par ailleurs, il faut donc pouvoir les relire à la demande.
     this._bodyEl.querySelector(".tx-summary").addEventListener("click", (ev) => {
       if (ev.target.closest(".tx-refresh")) this._renderActive(true);
+    });
+    // Bandeau des opérations à payer : « Pointer » la marque payée, où qu'elle soit (hors de la période affichée comprise).
+    this._bodyEl.querySelector(".tx-due").addEventListener("click", async (ev) => {
+      const btn = ev.target.closest(".due-point");
+      if (!btn) return;
+      btn.disabled = true;
+      try {
+        await this._call("set_transaction_state", { transaction_id: Number(btn.closest(".due-alert").dataset.id), state: 1 }, false);
+        this._renderActive(true);
+      } catch (err) {
+        btn.disabled = false;
+        alert(errMsg(err));
+      }
     });
     // Un seul formulaire ouvert à la fois : en haut (ajout) ou à la place de la ligne (modification).
     const closeForms = () => {
@@ -1536,15 +1740,17 @@ class MyBankCard extends HTMLElement {
     const items = this._txVisibleItems();
     const active = this._txFilterCount();
     let lastMonth = null;
+    let rank = 0; // alternance repartie de zéro à chaque mois : la 1re ligne sous un séparateur est toujours claire
     const rowsHtml = items
       .map((tx) => {
         const month = tx.date.slice(0, 7);
         let sep = "";
         if (month !== lastMonth) {
           lastMonth = month;
+          rank = 0;
           sep = `<div class="month-sep">${esc(monthLabel(month, "long"))}</div>`;
         }
-        return sep + this._txRowHtml(tx);
+        return sep + this._txRowHtml(tx, rank++ % 2 === 1);
       })
       .join("");
     const empty = active ? t("Aucune opération ne correspond aux critères.") : t("Aucune opération sur cette période.");
@@ -1625,30 +1831,65 @@ class MyBankCard extends HTMLElement {
   _paintSummary(account) {
     const el = this._bodyEl.querySelector(".tx-summary");
     if (!el || !account) return;
-    const b = account.balances;
-    const monthEnd = this._txMonthEnd && this._txMonthEnd.accountId === account.id ? this._txMonthEnd.value : null;
-    el.innerHTML = `<span>${t("Solde prévisionnel total :")} <strong>${fmtMoney(b.total, account.currency)}</strong></span>
-      <span>${t("Solde prévisionnel fin de mois :")} <strong>${monthEnd == null ? "…" : fmtMoney(monthEnd, account.currency)}</strong></span>
-      <span>${t("Solde banque :")} <strong>${fmtMoney(b.pointed, account.currency)}</strong></span>
-      <span>${t("Rapproché :")} <strong>${fmtMoney(b.reconciled, account.currency)}</strong></span>
+    const adj = this._txAdj && this._txAdj.accountId === account.id ? this._txAdj : null;
+    const values = balanceValues(account, adj);
+    const items = balanceLayout(this._config, SUMMARY_BALANCES).map(({ def, emphasis }) => {
+      const v = values[def.key];
+      // budget inclus : rien tant qu'il n'est pas calculé, ni sans budget en cours sur le compte
+      if (def.key === "with_budget" && v == null) return "";
+      const title = def.key === "with_budget" ? ` title="${esc(t(WITH_BUDGET_HELP))}"` : "";
+      return `<span class="${emphasis ? "emph" : ""}"${title}>${def.summary} <strong>${v == null ? "…" : fmtMoney(v, account.currency)}</strong></span>`;
+    });
+    el.innerHTML = `${items.join("")}
       <button type="button" class="tx-refresh" title="${t("Rafraîchir la liste selon les critères sélectionnés")}">↻</button>`;
   }
 
-  // Re-reads only the three balances above the list (after a state change or a delete).
+  // Soldes calculés par la carte, seulement si l'un d'eux est affiché (`keys`). afterCents : total des opérations
+  // datées après le dernier jour du mois (fin de mois = total − afterCents). remainingCents : ce qui reste à réaliser
+  // du budget du mois en cours (budget inclus = fin de mois + remainingCents), null sans budget en cours.
+  async _balanceAdjustments(accountId, keys) {
+    const out = { accountId, afterCents: null, remainingCents: null };
+    if (!keys.has("month_end") && !keys.has("with_budget")) return out;
+    const now = new Date();
+    const month = isoDate(now).slice(0, 7);
+    const [later, budgets] = await Promise.all([
+      this._items("list_account_transactions", { account_id: accountId, start: isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 1)) }),
+      keys.has("with_budget") ? this._items("list_budgets").catch(() => []) : [],
+    ]);
+    out.afterCents = later.reduce((acc, tx) => acc + Math.round(Number(tx.amount) * 100), 0);
+    // Une dépense prévue non encore faite diminue le solde, une recette prévue non encore reçue l'augmente ; un
+    // dépassement ne compte pas (ses opérations sont déjà dans le solde). Le reste se calcule par enveloppe : la
+    // rubrique la plus haute qui a un montant prévu en propre, sous-rubriques comprises, au minimum zéro (un
+    // dépassement ailleurs ne libère rien ici).
+    const budget = budgets.find((b) => b.account_id === accountId && !b.archived && b.start_month.slice(0, 7) <= month && b.end_month.slice(0, 7) >= month);
+    if (budget) {
+      const r = await this._call("get_budget_report", { budget_id: budget.id }, true).catch(() => null);
+      const i = r ? r.months.indexOf(month) : -1;
+      if (i >= 0) {
+        const cents = (v) => Math.round(Number(v) * 100);
+        const children = new Map();
+        r.rows.forEach((x) => children.set(x.parent_id ?? null, [...(children.get(x.parent_id ?? null) || []), x]));
+        // planned/actual : montants de la rubrique et de ses sous-rubriques, dans le sens du type (positifs) ; direction : signe du flux.
+        const left = (x) => (cents(x.own_planned[i])
+          ? x.direction * Math.max(0, cents(x.planned[i]) - cents(x.actual[i]))
+          : (children.get(x.category_id) || []).reduce((acc, c) => acc + left(c), 0));
+        out.remainingCents = (children.get(null) || []).reduce((acc, x) => acc + left(x), 0);
+      }
+    }
+    return out;
+  }
+
+  // Re-reads only the balances above the list (after a state change or a delete).
   async _refreshSummary() {
     const accountId = this._txAccountId;
-    const [accounts, later] = await Promise.all([
+    const keys = new Set(balanceLayout(this._config, SUMMARY_BALANCES).map((x) => x.def.key));
+    const [accounts, adj] = await Promise.all([
       this._items("list_accounts"),
-      this._items("list_account_transactions", { account_id: accountId, start: isoDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) }),
+      this._balanceAdjustments(accountId, keys),
     ]);
     this._lookups.accounts = accounts;
     this._lookups.account = new Map(accounts.map((a) => [a.id, a]));
-    const account = this._lookups.account.get(accountId);
-    // Solde prévisionnel fin de mois : solde total moins les opérations datées après le dernier jour du mois.
-    if (account) {
-      const afterCents = later.reduce((acc, tx) => acc + Math.round(Number(tx.amount) * 100), 0);
-      this._txMonthEnd = { accountId, value: (Math.round(Number(account.balances.total) * 100) - afterCents) / 100 };
-    }
+    this._txAdj = adj;
     this._paintSummary(this._lookups.account.get(this._txAccountId));
     if (this._txRecon) this._paintRecon(); // le solde banque (pointé) vient de changer (pointage, rapprochement, suppression)
   }
@@ -1763,6 +2004,7 @@ class MyBankCard extends HTMLElement {
         <label data-f="account">${t("Compte")}${accountField}</label>
         <label data-f="type">${t("Type")}<select name="type">${types.map((ty) => `<option value="${ty}" ${ty === currentType ? "selected" : ""}>${typeLabels[ty]}</option>`).join("")}</select></label>
         <label data-f="date">${t("Date")}<input type="date" name="date" value="${esc(tx ? tx.date : isoDate(new Date()))}" required></label>
+        <label data-f="due_date">${t("Date limite de paiement")}<input type="date" name="due_date" value="${esc(tx ? tx.due_date || "" : "")}"></label>
         <label class="tiers-field f-payee" data-f="payee">${t("Tiers|champ")}
           <input type="text" name="payee" value="${esc(payee ? payee.name : "")}" autocomplete="off">
           <div class="tiers-suggestions" style="display: none;"></div>
@@ -1982,11 +2224,12 @@ class MyBankCard extends HTMLElement {
         analytic = { category_id: optId("category_id"), class_id: optId("class_id") };
       }
       const state = reconciledEl.checked ? 2 : pointedEl.checked ? 1 : 0;
+      const dueDate = $('[name="due_date"]').value || null;
       let service;
       let payload;
       if (tx) {
         service = "update_transaction";
-        payload = { transaction_id: tx.id, amount: signed, state, ...common, ...analytic };
+        payload = { transaction_id: tx.id, amount: signed, state, due_date: dueDate, ...common, ...analytic };
         if (!isTransfer) {
           const name = payeeInput.value.trim();
           if (name) payload.payee_name = name;
@@ -2015,7 +2258,7 @@ class MyBankCard extends HTMLElement {
         delete payload.number;
       } else {
         service = "create_transaction";
-        payload = { account_id: accountId, amount: signed, state, ...common, ...analytic };
+        payload = { account_id: accountId, amount: signed, state, due_date: dueDate, ...common, ...analytic };
         const name = payeeInput.value.trim();
         if (name) payload.payee_name = name;
       }
@@ -2023,10 +2266,12 @@ class MyBankCard extends HTMLElement {
       const submit = form.querySelector('button[type="submit"]');
       submit.disabled = true;
       try {
-        // Virement créé : la jambe sur le compte choisi est celle qui porte le justificatif.
-        const result = await this._call(service, payload, !tx && !!attachmentAction);
+        // Virement créé : la jambe sur le compte choisi est celle qui porte le justificatif et la date limite.
+        const transferDue = service === "create_transfer" && dueDate;
+        const result = await this._call(service, payload, !tx && (!!attachmentAction || !!transferDue));
+        const txId = tx ? tx.id : service === "create_transfer" ? result && result[type === "transfer_out" ? "source" : "destination"].id : result && result.id;
+        if (transferDue) await this._call("update_transaction", { transaction_id: txId, due_date: dueDate }, false);
         if (attachmentAction) {
-          const txId = tx ? tx.id : service === "create_transfer" ? result[type === "transfer_out" ? "source" : "destination"].id : result.id;
           if (attachmentAction.action === "remove") {
             await this._call("delete_transaction_attachment", { transaction_id: txId }, false);
           } else if (attachmentAction.kind === "link") {
@@ -2338,6 +2583,7 @@ class MyBankCard extends HTMLElement {
         <label class="f-count">${t("Nombre d'échéances")}<input type="number" name="count" min="1" value="${s && s.count ? s.count : 12}"></label>
         <label class="f-end-date">${t("Dernière échéance au plus tard le")}<input type="date" name="end_date" value="${esc(s && s.end_date ? s.end_date : "")}"></label>
         <label>${t("Jours d'anticipation")}<input type="number" name="lead_days" min="0" max="90" value="${s ? s.lead_days : 0}"><span class="muted f-lead-info"></span></label>
+        <label title="${esc(t("Vide : pas de date limite. 0 : le jour de l'opération."))}">${t("Date limite : jours après l'opération")}<input type="number" name="due_days" min="0" max="365" placeholder="${esc(t("aucune"))}" value="${s && s.due_days != null ? s.due_days : ""}"></label>
         <label>${t("Ne rien saisir d'office avant le")}<input type="date" name="generate_from" value="${esc(s ? s.generate_from : isoDate(new Date()))}"></label>
         <label class="check"><input type="checkbox" name="auto" ${!s || s.auto ? "checked" : ""}>${t("Saisie automatique à l'échéance")}</label>
         <label class="check"><input type="checkbox" name="active" ${!s || s.active ? "checked" : ""}>${t("Active")}</label>
@@ -2592,6 +2838,7 @@ class MyBankCard extends HTMLElement {
         count: $('[name="end_mode"]').value === "count" ? Number($('[name="count"]').value) : null,
         end_date: $('[name="end_mode"]').value === "date" ? $('[name="end_date"]').value || null : null,
         lead_days: Number($('[name="lead_days"]').value) || 0,
+        due_days: $('[name="due_days"]').value === "" ? null : Number($('[name="due_days"]').value),
         auto: $('[name="auto"]').checked,
         active: $('[name="active"]').checked,
         notes: $('[name="notes"]').value.trim() || null,
@@ -3626,6 +3873,8 @@ class MyBankCard extends HTMLElement {
         <li>${t("L'opération Café du Coin est à pointer puisqu'elle apparaît sur le site de la banque. Elle pourra aussi être rapprochée dans My Bank dès qu'elle sera cochée sur le site, la coche y étant disponible.")}</li>
         <li>${t("L'opération Boulangerie n'est ni à pointer ni à rapprocher : elle ne figure pas encore sur le site de la banque, donc pas dans le solde banque — mais elle compte déjà dans le solde prévisionnel.")}</li>
       </ul>
+      <h3>${t("Date limite de paiement")}</h3>
+      <p>${t("Une opération peut avoir une date limite de paiement (facultative ; une planification peut la poser sur les opérations qu'elle génère, en jours après leur date). Tant qu'elle n'est pas pointée, elle est signalée en orange quelques jours avant (délai réglé dans les options de l'intégration), puis en rouge comme impayée une fois la date limite dépassée. La pointer fait disparaître l'alerte.")}</p>
     `;
   }
 
@@ -4098,15 +4347,20 @@ class MyBankCardEditor extends HTMLElement {
       ${SECTION_DEFS.map(
         (s) => `<div class="row"><input type="checkbox" id="s-${s.key}" ${selected.has(s.key) ? "checked" : ""}><label for="s-${s.key}">${esc(s.label)}</label></div>`
       ).join("")}
+      <p>${t("Soldes du bandeau du volet « Opérations » (coche ceux à afficher, range-les avec les flèches, mets-en un ou plusieurs en emphase) :")}</p>
+      ${balancesEditorHtml(this._config, SUMMARY_BALANCES)}
     `;
     SECTION_DEFS.forEach((s) => {
       this.shadowRoot.getElementById(`s-${s.key}`).addEventListener("change", () => this._emit());
     });
+    wireBalancesEditor(this.shadowRoot, () => this._emit());
+    this.shadowRoot.querySelectorAll(".bal-row input").forEach((el) => el.addEventListener("change", () => this._emit()));
   }
 
   _emit() {
     const sections = SECTION_DEFS.filter((s) => this.shadowRoot.getElementById(`s-${s.key}`).checked).map((s) => s.key);
     this._config = { ...this._config, sections };
+    readBalancesEditor(this.shadowRoot, this._config, SUMMARY_BALANCES);
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config } }));
   }
 }
@@ -4120,6 +4374,7 @@ const ENTRY_FIELDS = [
   ["account", "Compte"],
   ["type", "Type (dépense, recette, virement)"],
   ["date", "Date"],
+  ["due_date", "Date limite de paiement"],
   ["payee", "Tiers|champ"],
   ["payment_method", "Mode de règlement"],
   ["number", "N° de chèque"],
@@ -4178,6 +4433,7 @@ const SIMPLE_STYLE = `
   .entry-card form.entity-form { margin-top: 0; }
   .bal-name { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
   .bal-main { font-size: 26px; font-weight: 600; margin-bottom: 6px; }
+  .bal-emph-label { font-size: 13px; color: var(--secondary-text-color); }
   .neg { color: var(--error-color, #db4437); }
   .bl { padding: 6px 0; border-bottom: 1px solid var(--divider-color); }
   .bl-head { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; margin-bottom: 4px; }
@@ -4372,16 +4628,21 @@ class MyBankBalanceCard extends MyBankSimpleCard {
       this._bodyEl.innerHTML = `<div class="empty">${t("Compte introuvable.")}</div>`;
       return;
     }
-    const b = a.balances || {};
-    const n = (v) => Number(v);
+    const layout = balanceLayout(this._config, CARD_BALANCES);
+    const [adj, due] = await Promise.all([this._balanceAdjustments(a.id, new Set(layout.map((x) => x.def.key))), myBankDue(this._hass)]);
+    const values = balanceValues(a, adj);
     const currency = a.currency || this._currency();
-    const line = (label, value) => `<div class="balance-line ${n(value) < 0 ? "neg" : ""}"><span>${label}</span><strong>${fmtMoney(value, currency)}</strong></div>`;
-    this._bodyEl.innerHTML = `
-      <div class="bal-name">${esc(a.name || "")}</div>
-      <div class="bal-main ${n(b.total) < 0 ? "neg" : ""}" title="${t("Solde prévisionnel (toutes opérations)")}">${fmtMoney(b.total, currency)}</div>
-      ${line(t("Solde prévisionnel"), b.total)}
-      ${line(t("Solde banque (pointé)"), b.pointed)}
-      ${line(t("Rapproché"), b.reconciled)}`;
+    const rows = layout.map(({ def, emphasis }) => {
+      const v = values[def.key];
+      // budget inclus sans budget en cours sur le compte : tiret plutôt qu'un montant trompeur
+      const amount = v == null ? "—" : fmtMoney(v, currency);
+      const neg = v != null && Number(v) < 0 ? "neg" : "";
+      const title = def.key === "with_budget" ? ` title="${esc(v == null ? t("Aucun budget en cours sur ce compte.") : t(WITH_BUDGET_HELP))}"` : "";
+      return emphasis
+        ? `<div class="bal-emph"${title}><div class="bal-emph-label">${esc(def.label)}</div><div class="bal-main ${neg}">${amount}</div></div>`
+        : `<div class="balance-line ${neg}"${title}><span>${esc(def.label)}</span><strong>${amount}</strong></div>`;
+    });
+    this._bodyEl.innerHTML = `<div class="bal-name">${esc(a.name || "")}</div>${rows.join("")}${dueSummaryHtml(due, a.id, currency)}`;
   }
 }
 
@@ -5208,6 +5469,7 @@ class MyBankSimpleEditor extends HTMLElement {
         return `<div class="group"><div>${esc(f.label)}</div>${f.options.map((o) => `<label class="row"><input type="checkbox" data-check="${f.key}" value="${o.key}" ${on.has(o.key) ? "checked" : ""}>${esc(o.label)}</label>`).join("")}<p>${esc(f.help || "")}</p></div>`;
       }
       if (f.type === "bool") return `<label class="row"><input type="checkbox" data-bool="${f.key}" ${c[f.key] ? "checked" : ""}>${esc(f.label)}</label>`;
+      if (f.type === "balances") return `<div class="group"><div>${esc(f.label)}</div>${balancesEditorHtml(c, f.defaults)}<p>${esc(f.help || "")}</p></div>`;
       return `<label>${esc(f.label)}<input type="${f.type || "text"}" data-key="${f.key}" data-num="${f.type === "number" ? 1 : ""}" ${f.min ? `min="${f.min}"` : ""} value="${esc(c[f.key] ?? "")}"></label>`;
     }).join("");
     this.shadowRoot.innerHTML = `
@@ -5219,10 +5481,13 @@ class MyBankSimpleEditor extends HTMLElement {
         p { color: var(--secondary-text-color); font-size: 12px; margin: 4px 0; }
       </style>${html}`;
     this.shadowRoot.querySelectorAll("input, select").forEach((el) => el.addEventListener("change", () => this._emit()));
+    wireBalancesEditor(this.shadowRoot, () => this._emit());
   }
 
   _emit() {
     const config = { ...this._config };
+    const balances = this._fields().find((f) => f.type === "balances");
+    if (balances) readBalancesEditor(this.shadowRoot, config, balances.defaults);
     this.shadowRoot.querySelectorAll("[data-key]").forEach((el) => {
       const v = el.value.trim();
       if (v === "") delete config[el.dataset.key];
@@ -5281,6 +5546,8 @@ class MyBankBalanceCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       { key: "account_id", label: t("Compte"), type: "select", number: true, empty: t("Compte par défaut") },
+      { key: "balances", label: t("Soldes affichés :"), type: "balances", defaults: CARD_BALANCES,
+        help: t("Range les soldes avec les flèches ; un solde en emphase s'affiche en grand.") },
     ];
   }
 }
@@ -5293,9 +5560,11 @@ class MyBankShareCardEditor extends MyBankSimpleEditor {
 }
 
 class MyBankTransactionsCardEditor extends MyBankSimpleEditor {
-  _render() {
-    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
-    this.shadowRoot.innerHTML = `<p style="color: var(--secondary-text-color); font-size: 13px;">${t("Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.")}</p>`;
+  _fields() {
+    return [
+      { key: "balances", label: t("Soldes du bandeau au-dessus de la liste :"), type: "balances", defaults: SUMMARY_BALANCES,
+        help: t("Range les soldes avec les flèches ; un solde en emphase s'affiche en plus grand.") },
+    ];
   }
 }
 
@@ -5398,9 +5667,22 @@ const I18N = {
     "Mois en cours strict": "Current month only",
     "Solde prévisionnel total :": "Total projected balance:",
     "Solde prévisionnel fin de mois :": "Projected end-of-month balance:",
+    "Solde prévisionnel fin de mois": "Projected end-of-month balance",
+    "Solde (budget inclus)": "Balance (budget included)",
+    "Aucun budget en cours sur ce compte.": "No current budget on this account.",
+    "Mettre ce solde en avant (plus grand)": "Highlight this balance (larger)",
+    "Emphase": "Highlight",
+    "Monter": "Move up",
+    "Descendre": "Move down",
+    "Soldes du bandeau du volet « Opérations » (coche ceux à afficher, range-les avec les flèches, mets-en un ou plusieurs en emphase) :": "Balances in the “Transactions” tab banner (tick those to show, order them with the arrows, highlight one or more):",
+    "Soldes affichés :": "Balances shown:",
+    "Range les soldes avec les flèches ; un solde en emphase s'affiche en grand.": "Order the balances with the arrows; a highlighted balance is shown large.",
+    "Soldes du bandeau au-dessus de la liste :": "Balances in the banner above the list:",
+    "Range les soldes avec les flèches ; un solde en emphase s'affiche en plus grand.": "Order the balances with the arrows; a highlighted balance is shown larger.",
+    "Solde (budget inclus) :": "Balance (budget included):",
+    "Solde prévisionnel fin de mois, plus ce qui reste à réaliser du budget du mois en cours (prévu non encore réalisé, rubrique par rubrique ; les dépassements sont déjà dans le solde)": "Projected end-of-month balance, plus what remains to be realised in the current month's budget (planned but not yet realised, category by category; overruns are already in the balance)",
     "Sous-rubriques": "Subcategories",
     "Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.": "With a category selected: checked, the list also shows the transactions of its subcategories, at every level; unchecked, only those attached directly to the category. The total only counts the share of these categories in split transactions.",
-    "Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.": "No settings: the card shows the main card's “Transactions” tab.",
     "My Bank — opérations": "My Bank — transactions",
     "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie.": "The main card's Transactions tab on its own: list, filters, clearing, reconciliation, entry.",
     "Opérations et échéances à venir": "Upcoming transactions and occurrences",
@@ -5708,7 +5990,6 @@ const I18N = {
     "Solde du site bancaire": "Bank website balance",
     "Solde initial": "Opening balance",
     "Solde prévisionnel": "Projected balance",
-    "Solde prévisionnel (toutes opérations)": "Projected balance (all transactions)",
     "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte.": "Projected, bank (cleared) and reconciled balance of an account.",
     "Solde prévu (recettes − dépenses + épargne)": "Planned balance (income − expenses + savings)",
     "Solde prévu (recettes − dépenses − épargne)": "Planned balance (income − expenses − savings)",
@@ -5916,15 +6197,44 @@ const I18N = {
     "Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.": "All checked by default. Months outside the chosen budget are taken from another budget of the same account, if there is one.",
     "My Bank — respect du budget": "My Bank — budget adherence",
     "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Actual / planned in %, month by month, for a budget's income, expenses and savings, with 100 % as a dashed line.",
+    "Date limite de paiement": "Payment due date",
+    "Date limite : jours après l'opération": "Due date: days after the transaction",
+    "Vide : pas de date limite. 0 : le jour de l'opération.": "Empty: no due date. 0: the day of the transaction.",
+    "aucune": "none",
+    "limite le {date}": "due {date}",
+    "Impayée": "Unpaid",
+    "À payer": "Due soon",
+    "Impayée : « {label} » ({amount}), date limite le {date} ({when})": "Unpaid: “{label}” ({amount}), due {date} ({when})",
+    "À payer : « {label} » ({amount}), date limite le {date} ({when})": "To pay: “{label}” ({amount}), due {date} ({when})",
+    "Marquer l'opération comme pointée (payée)": "Mark the transaction as cleared (paid)",
+    "Pointer": "Clear",
+    "… et {n} autre(s)": "… and {n} more",
+    "{n} opération(s) impayée(s), date limite dépassée : {amount}": "{n} unpaid transaction(s), past due date: {amount}",
+    "{n} opération(s) à payer aujourd'hui : {amount}": "{n} transaction(s) to pay today: {amount}",
+    "{n} opération(s) à payer dans les {days} jours : {amount}": "{n} transaction(s) to pay within {days} days: {amount}",
+    "Une opération peut avoir une date limite de paiement (facultative ; une planification peut la poser sur les opérations qu'elle génère, en jours après leur date). Tant qu'elle n'est pas pointée, elle est signalée en orange quelques jours avant (délai réglé dans les options de l'intégration), puis en rouge comme impayée une fois la date limite dépassée. La pointer fait disparaître l'alerte.": "A transaction can have a payment due date (optional; a scheduled transaction can set it on the transactions it generates, as a number of days after their date). Until it is cleared, it is flagged in orange a few days before (delay set in the integration options), then in red as unpaid once the due date has passed. Clearing it removes the warning.",
   },
   de: {
     "Mois en cours et à venir": "Aktueller Monat und künftige",
     "Mois en cours strict": "Nur aktueller Monat",
     "Solde prévisionnel total :": "Voraussichtlicher Gesamtsaldo:",
     "Solde prévisionnel fin de mois :": "Voraussichtlicher Saldo zum Monatsende:",
+    "Solde prévisionnel fin de mois": "Voraussichtlicher Saldo zum Monatsende",
+    "Solde (budget inclus)": "Saldo (inkl. Budget)",
+    "Aucun budget en cours sur ce compte.": "Kein laufendes Budget für dieses Konto.",
+    "Mettre ce solde en avant (plus grand)": "Diesen Saldo hervorheben (größer)",
+    "Emphase": "Hervorheben",
+    "Monter": "Nach oben",
+    "Descendre": "Nach unten",
+    "Soldes du bandeau du volet « Opérations » (coche ceux à afficher, range-les avec les flèches, mets-en un ou plusieurs en emphase) :": "Salden im Banner des Bereichs „Buchungen“ (anzuzeigende anhaken, mit den Pfeilen ordnen, einen oder mehrere hervorheben):",
+    "Soldes affichés :": "Angezeigte Salden:",
+    "Range les soldes avec les flèches ; un solde en emphase s'affiche en grand.": "Ordne die Salden mit den Pfeilen; ein hervorgehobener Saldo wird groß angezeigt.",
+    "Soldes du bandeau au-dessus de la liste :": "Salden im Banner über der Liste:",
+    "Range les soldes avec les flèches ; un solde en emphase s'affiche en plus grand.": "Ordne die Salden mit den Pfeilen; ein hervorgehobener Saldo wird größer angezeigt.",
+    "Solde (budget inclus) :": "Saldo (inkl. Budget):",
+    "Solde prévisionnel fin de mois, plus ce qui reste à réaliser du budget du mois en cours (prévu non encore réalisé, rubrique par rubrique ; les dépassements sont déjà dans le solde)": "Voraussichtlicher Saldo zum Monatsende, zuzüglich des noch offenen Budgets des laufenden Monats (geplant, aber noch nicht angefallen, je Kategorie; Überschreitungen sind bereits im Saldo)",
     "Sous-rubriques": "Unterkategorien",
     "Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.": "Bei gewählter Kategorie: angehakt zeigt die Liste auch die Buchungen ihrer Unterkategorien auf allen Ebenen; nicht angehakt nur die direkt der Kategorie zugeordneten. Die Summe zählt bei aufgeteilten Buchungen nur den Anteil dieser Kategorien.",
-    "Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.": "Keine Einstellungen: Die Karte zeigt den Bereich „Buchungen“ der Hauptkarte.",
     "My Bank — opérations": "My Bank — Buchungen",
     "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie.": "Nur der Bereich Buchungen der Hauptkarte: Liste, Filter, Abhaken, Abstimmung, Erfassung.",
     "Opérations et échéances à venir": "Anstehende Buchungen und Ausführungen",
@@ -6232,7 +6542,6 @@ const I18N = {
     "Solde du site bancaire": "Saldo der Bank-Website",
     "Solde initial": "Anfangssaldo",
     "Solde prévisionnel": "Voraussichtlicher Saldo",
-    "Solde prévisionnel (toutes opérations)": "Voraussichtlicher Saldo (alle Buchungen)",
     "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte.": "Voraussichtlicher Saldo, Banksaldo (abgeglichen) und abgestimmter Saldo eines Kontos.",
     "Solde prévu (recettes − dépenses + épargne)": "Geplanter Saldo (Einnahmen − Ausgaben + Sparen)",
     "Solde prévu (recettes − dépenses − épargne)": "Geplanter Saldo (Einnahmen − Ausgaben − Sparen)",
@@ -6440,15 +6749,44 @@ const I18N = {
     "Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.": "Standardmäßig alle ausgewählt. Monate außerhalb des gewählten Budgets werden aus einem anderen Budget desselben Kontos übernommen, falls vorhanden.",
     "My Bank — respect du budget": "My Bank — Budgeteinhaltung",
     "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Ist / Plan in %, Monat für Monat, für Einnahmen, Ausgaben und Sparen eines Budgets, 100 % gestrichelt.",
+    "Date limite de paiement": "Zahlungsfrist",
+    "Date limite : jours après l'opération": "Zahlungsfrist: Tage nach der Buchung",
+    "Vide : pas de date limite. 0 : le jour de l'opération.": "Leer: keine Zahlungsfrist. 0: am Tag der Buchung.",
+    "aucune": "keine",
+    "limite le {date}": "fällig am {date}",
+    "Impayée": "Unbezahlt",
+    "À payer": "Bald fällig",
+    "Impayée : « {label} » ({amount}), date limite le {date} ({when})": "Unbezahlt: „{label}“ ({amount}), fällig am {date} ({when})",
+    "À payer : « {label} » ({amount}), date limite le {date} ({when})": "Zu zahlen: „{label}“ ({amount}), fällig am {date} ({when})",
+    "Marquer l'opération comme pointée (payée)": "Buchung als abgeglichen (bezahlt) markieren",
+    "Pointer": "Abgleichen",
+    "… et {n} autre(s)": "… und {n} weitere",
+    "{n} opération(s) impayée(s), date limite dépassée : {amount}": "{n} unbezahlte Buchung(en), Zahlungsfrist abgelaufen: {amount}",
+    "{n} opération(s) à payer aujourd'hui : {amount}": "{n} Buchung(en) heute zu zahlen: {amount}",
+    "{n} opération(s) à payer dans les {days} jours : {amount}": "{n} Buchung(en) innerhalb von {days} Tagen zu zahlen: {amount}",
+    "Une opération peut avoir une date limite de paiement (facultative ; une planification peut la poser sur les opérations qu'elle génère, en jours après leur date). Tant qu'elle n'est pas pointée, elle est signalée en orange quelques jours avant (délai réglé dans les options de l'intégration), puis en rouge comme impayée une fois la date limite dépassée. La pointer fait disparaître l'alerte.": "Eine Buchung kann eine Zahlungsfrist haben (optional; eine geplante Buchung kann sie bei den von ihr erzeugten Buchungen setzen, in Tagen nach deren Datum). Solange sie nicht abgeglichen ist, wird sie einige Tage vorher orange markiert (Frist in den Optionen der Integration einstellbar), nach Ablauf der Zahlungsfrist dann rot als unbezahlt. Durch Abgleichen verschwindet die Warnung.",
   },
   es: {
     "Mois en cours et à venir": "Mes actual y próximos",
     "Mois en cours strict": "Solo mes actual",
     "Solde prévisionnel total :": "Saldo previsto total:",
     "Solde prévisionnel fin de mois :": "Saldo previsto a fin de mes:",
+    "Solde prévisionnel fin de mois": "Saldo previsto a fin de mes",
+    "Solde (budget inclus)": "Saldo (presupuesto incluido)",
+    "Aucun budget en cours sur ce compte.": "Ningún presupuesto en curso en esta cuenta.",
+    "Mettre ce solde en avant (plus grand)": "Destacar este saldo (más grande)",
+    "Emphase": "Destacar",
+    "Monter": "Subir",
+    "Descendre": "Bajar",
+    "Soldes du bandeau du volet « Opérations » (coche ceux à afficher, range-les avec les flèches, mets-en un ou plusieurs en emphase) :": "Saldos del banner de la pestaña «Operaciones» (marca los que quieras mostrar, ordénalos con las flechas, destaca uno o varios):",
+    "Soldes affichés :": "Saldos mostrados:",
+    "Range les soldes avec les flèches ; un solde en emphase s'affiche en grand.": "Ordena los saldos con las flechas; un saldo destacado se muestra en grande.",
+    "Soldes du bandeau au-dessus de la liste :": "Saldos del banner encima de la lista:",
+    "Range les soldes avec les flèches ; un solde en emphase s'affiche en plus grand.": "Ordena los saldos con las flechas; un saldo destacado se muestra más grande.",
+    "Solde (budget inclus) :": "Saldo (presupuesto incluido):",
+    "Solde prévisionnel fin de mois, plus ce qui reste à réaliser du budget du mois en cours (prévu non encore réalisé, rubrique par rubrique ; les dépassements sont déjà dans le solde)": "Saldo previsto a fin de mes, más lo que queda por realizar del presupuesto del mes en curso (previsto aún no realizado, categoría por categoría; los excesos ya están en el saldo)",
     "Sous-rubriques": "Subcategorías",
     "Avec une rubrique choisie : cochée, la liste montre aussi les opérations de ses sous-rubriques, à tous les niveaux ; décochée, seulement celles rattachées directement à la rubrique. Le total ne compte que la part de ces rubriques dans les opérations ventilées.": "Con una categoría elegida: marcada, la lista muestra también las operaciones de sus subcategorías, en todos los niveles; sin marcar, solo las asignadas directamente a la categoría. El total solo cuenta la parte de estas categorías en las operaciones desglosadas.",
-    "Aucun réglage : la carte reprend le volet « Opérations » de la carte principale.": "Sin ajustes: la tarjeta muestra la pestaña «Operaciones» de la tarjeta principal.",
     "My Bank — opérations": "My Bank — operaciones",
     "Le volet Opérations de la carte principale seul : liste, critères, pointage, rapprochement, saisie.": "Solo la pestaña Operaciones de la tarjeta principal: lista, criterios, marcado, conciliación, registro.",
     "Opérations et échéances à venir": "Operaciones y vencimientos próximos",
@@ -6756,7 +7094,6 @@ const I18N = {
     "Solde du site bancaire": "Saldo del sitio web del banco",
     "Solde initial": "Saldo inicial",
     "Solde prévisionnel": "Saldo previsto",
-    "Solde prévisionnel (toutes opérations)": "Saldo previsto (todas las operaciones)",
     "Solde prévisionnel, solde banque (pointé) et rapproché d'un compte.": "Saldo previsto, saldo bancario liquidado y saldo conciliado de una cuenta.",
     "Solde prévu (recettes − dépenses + épargne)": "Saldo previsto (ingresos − gastos + ahorro)",
     "Solde prévu (recettes − dépenses − épargne)": "Saldo previsto (ingresos − gastos − ahorro)",
@@ -6964,6 +7301,22 @@ const I18N = {
     "Tous cochés par défaut. Les mois hors du budget choisi sont pris dans un autre budget du même compte, s'il y en a un.": "Todos marcados por defecto. Los meses fuera del presupuesto elegido se toman de otro presupuesto de la misma cuenta, si lo hay.",
     "My Bank — respect du budget": "My Bank — cumplimiento del presupuesto",
     "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Real / previsto en %, mes a mes, de los ingresos, gastos y ahorro de un presupuesto, con el 100 % en línea discontinua.",
+    "Date limite de paiement": "Fecha límite de pago",
+    "Date limite : jours après l'opération": "Fecha límite: días después del movimiento",
+    "Vide : pas de date limite. 0 : le jour de l'opération.": "Vacío: sin fecha límite. 0: el día del movimiento.",
+    "aucune": "ninguna",
+    "limite le {date}": "vence el {date}",
+    "Impayée": "Impagada",
+    "À payer": "Por pagar",
+    "Impayée : « {label} » ({amount}), date limite le {date} ({when})": "Impagada: «{label}» ({amount}), vence el {date} ({when})",
+    "À payer : « {label} » ({amount}), date limite le {date} ({when})": "Por pagar: «{label}» ({amount}), vence el {date} ({when})",
+    "Marquer l'opération comme pointée (payée)": "Marcar el movimiento como liquidado (pagado)",
+    "Pointer": "Liquidar",
+    "… et {n} autre(s)": "… y {n} más",
+    "{n} opération(s) impayée(s), date limite dépassée : {amount}": "{n} movimiento(s) impagado(s), fecha límite vencida: {amount}",
+    "{n} opération(s) à payer aujourd'hui : {amount}": "{n} movimiento(s) por pagar hoy: {amount}",
+    "{n} opération(s) à payer dans les {days} jours : {amount}": "{n} movimiento(s) por pagar en {days} días: {amount}",
+    "Une opération peut avoir une date limite de paiement (facultative ; une planification peut la poser sur les opérations qu'elle génère, en jours après leur date). Tant qu'elle n'est pas pointée, elle est signalée en orange quelques jours avant (délai réglé dans les options de l'intégration), puis en rouge comme impayée une fois la date limite dépassée. La pointer fait disparaître l'alerte.": "Un movimiento puede tener una fecha límite de pago (opcional; un movimiento programado puede fijarla en los movimientos que genera, en días después de su fecha). Mientras no esté liquidado, se marca en naranja unos días antes (plazo fijado en las opciones de la integración) y luego en rojo como impagado una vez pasada la fecha límite. Al liquidarlo desaparece el aviso.",
   },
 };
 // @@I18N-END@@

@@ -66,6 +66,16 @@
               "ending_sensor": "Anzahl und Liste der Daueraufträge, deren letzte Ausführung in die nächsten 30 Tage fällt (für eine Benachrichtigung).",
               "balance_sensors": "Ein Sensor pro gewähltem Konto (Gesamtsaldo; abgehakter und abgeglichener Saldo als Attribute). Ein später angelegtes Konto wird erst veröffentlicht, wenn es hier gewählt wird."
             }
+          },
+          "due": {
+            "name": "Zahlungsfristen",
+            "description": "Eine Buchung kann eine Zahlungsfrist haben (standardmäßig leer). Solange sie nicht abgeglichen ist, wird sie nach Ablauf der Frist auf den Karten rot markiert.",
+            "data": {
+              "due_warning_days": "So viele Tage vorher warnen"
+            },
+            "data_description": {
+              "due_warning_days": "Eine unbezahlte Buchung wird ab so vielen Tagen vor ihrer Zahlungsfrist orange markiert (0 = nur am Tag selbst)."
+            }
           }
         }
       }
@@ -705,6 +715,10 @@
           "name": "Status",
           "description": "Nicht abgeglichen, abgeglichen oder abgestimmt."
         },
+        "due_date": {
+          "name": "Zahlungsfrist",
+          "description": "Zahlungsfrist (JJJJ-MM-TT); leer = keine. Ist sie abgelaufen und die Buchung nicht abgeglichen, wird sie als unbezahlt markiert."
+        },
         "category_id": {
           "name": "Kategorie",
           "description": "Kategorie-ID, ohne Aufteilung."
@@ -766,6 +780,10 @@
         "state": {
           "name": "Status",
           "description": "Nicht abgeglichen, abgeglichen oder abgestimmt."
+        },
+        "due_date": {
+          "name": "Zahlungsfrist",
+          "description": "Zahlungsfrist (JJJJ-MM-TT); leer = keine. Ist sie abgelaufen und die Buchung nicht abgeglichen, wird sie als unbezahlt markiert."
         },
         "category_id": {
           "name": "Kategorie",
@@ -1047,6 +1065,10 @@
           "name": "Text",
           "description": "Gesuchter Text."
         },
+        "due_before": {
+          "name": "Fällig bis",
+          "description": "Nur Buchungen mit einer Zahlungsfrist an oder vor diesem Datum (JJJJ-MM-TT)."
+        },
         "order": {
           "name": "Reihenfolge",
           "description": "Reihenfolge der Daten."
@@ -1141,6 +1163,10 @@
           "name": "Tage im Voraus",
           "description": "Buchung so viele Tage vor ihrem Datum erfassen."
         },
+        "due_days": {
+          "name": "Zahlungsfrist (Tage danach)",
+          "description": "Jede erzeugte Buchung erhält als Zahlungsfrist ihr Datum + so viele Tage (0 = am selben Tag); leer = keine Zahlungsfrist."
+        },
         "generate_from": {
           "name": "Buchen ab",
           "description": "Vor diesem Datum nichts automatisch buchen (Standard: heute)."
@@ -1234,6 +1260,10 @@
         "lead_days": {
           "name": "Tage im Voraus",
           "description": "Buchung so viele Tage vor ihrem Datum erfassen."
+        },
+        "due_days": {
+          "name": "Zahlungsfrist (Tage danach)",
+          "description": "Jede erzeugte Buchung erhält als Zahlungsfrist ihr Datum + so viele Tage (0 = am selben Tag); leer = keine Zahlungsfrist."
         },
         "generate_from": {
           "name": "Buchen ab",
@@ -1451,6 +1481,16 @@
           "name": "Horizont (Tage)",
           "description": "Anzahl der kommenden Tage."
         },
+        "account_id": {
+          "name": "Konto",
+          "description": "Konto-ID."
+        }
+      }
+    },
+    "list_due_transactions": {
+      "name": "Fällige Buchungen auflisten",
+      "description": "Unbezahlte (nicht abgeglichene) Buchungen, deren Zahlungsfrist abgelaufen ist (überfällig) oder in die in den Optionen eingestellte Vorwarnzeit fällt (bald).",
+      "fields": {
         "account_id": {
           "name": "Konto",
           "description": "Konto-ID."

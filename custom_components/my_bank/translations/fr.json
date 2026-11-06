@@ -66,6 +66,16 @@
               "ending_sensor": "Nombre et liste des planifications dont la dernière échéance tombe dans les 30 jours (pour une notification).",
               "balance_sensors": "Un capteur par compte choisi (solde total ; soldes pointé et rapproché en attributs). Un compte créé plus tard n'est pas publié tant qu'il n'est pas choisi ici."
             }
+          },
+          "due": {
+            "name": "Dates limites de paiement",
+            "description": "Une opération peut avoir une date limite de paiement (vide par défaut). Tant qu'elle n'est pas pointée, elle est signalée en rouge sur les cartes une fois sa date limite dépassée.",
+            "data": {
+              "due_warning_days": "Prévenir ce nombre de jours avant"
+            },
+            "data_description": {
+              "due_warning_days": "Une opération non payée est signalée en orange à partir de ce nombre de jours avant sa date limite (0 = le jour même seulement)."
+            }
           }
         }
       }
@@ -705,6 +715,10 @@
           "name": "État",
           "description": "Non pointée, pointée ou rapprochée."
         },
+        "due_date": {
+          "name": "Date limite de paiement",
+          "description": "Date limite de paiement (AAAA-MM-JJ) ; vide = aucune. Dépassée sans que l'opération soit pointée, elle est signalée comme impayée."
+        },
         "category_id": {
           "name": "Rubrique",
           "description": "Identifiant de la rubrique, sans ventilation."
@@ -766,6 +780,10 @@
         "state": {
           "name": "État",
           "description": "Non pointée, pointée ou rapprochée."
+        },
+        "due_date": {
+          "name": "Date limite de paiement",
+          "description": "Date limite de paiement (AAAA-MM-JJ) ; vide = aucune. Dépassée sans que l'opération soit pointée, elle est signalée comme impayée."
         },
         "category_id": {
           "name": "Rubrique",
@@ -1047,6 +1065,10 @@
           "name": "Texte",
           "description": "Texte cherché."
         },
+        "due_before": {
+          "name": "Date limite au plus tard le",
+          "description": "Seulement les opérations ayant une date limite de paiement au plus tard ce jour-là (AAAA-MM-JJ)."
+        },
         "order": {
           "name": "Ordre",
           "description": "Ordre des dates."
@@ -1141,6 +1163,10 @@
           "name": "Jours d'anticipation",
           "description": "Saisir l'opération ce nombre de jours avant sa date."
         },
+        "due_days": {
+          "name": "Date limite (jours après)",
+          "description": "Chaque opération générée reçoit une date limite égale à sa date + ce nombre de jours (0 = le jour même) ; vide = pas de date limite."
+        },
         "generate_from": {
           "name": "Générer à partir du",
           "description": "Ne rien saisir d'office avant cette date (défaut : aujourd'hui)."
@@ -1234,6 +1260,10 @@
         "lead_days": {
           "name": "Jours d'anticipation",
           "description": "Saisir l'opération ce nombre de jours avant sa date."
+        },
+        "due_days": {
+          "name": "Date limite (jours après)",
+          "description": "Chaque opération générée reçoit une date limite égale à sa date + ce nombre de jours (0 = le jour même) ; vide = pas de date limite."
         },
         "generate_from": {
           "name": "Générer à partir du",
@@ -1451,6 +1481,16 @@
           "name": "Horizon (jours)",
           "description": "Nombre de jours à venir."
         },
+        "account_id": {
+          "name": "Compte",
+          "description": "Identifiant du compte."
+        }
+      }
+    },
+    "list_due_transactions": {
+      "name": "Lister les opérations à payer",
+      "description": "Opérations non payées (non pointées) dont la date limite de paiement est dépassée (en retard) ou tombe dans le délai d'alerte réglé dans les options (bientôt).",
+      "fields": {
         "account_id": {
           "name": "Compte",
           "description": "Identifiant du compte."

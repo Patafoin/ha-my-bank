@@ -111,7 +111,7 @@ Si las tarjetas no aparecen en el selector después de instalar o actualizar, fu
 | Pestaña (clave `sections`) | Contenido |
 |---|---|
 | `dashboard` | Saldos de todas las cuentas y presupuesto del mes actual |
-| `transactions` | Movimientos de una cuenta con saldo acumulado; filtros (que se pueden guardar como predeterminados); añadir, editar, desglosar y transferir; liquidar (☐/☑) y conciliar (🔓/🔒) con un clic; un asistente de conciliación destaca el movimiento que explica una diferencia de saldo; adjuntar un justificante (un enlace, o un archivo guardado por el servidor) a un movimiento, que se abre con un clic (📎) |
+| `transactions` | Movimientos de una cuenta con saldo acumulado; filtros (que se pueden guardar como predeterminados); añadir, editar, desglosar y transferir; liquidar (☐/☑) y conciliar (🔓/🔒) con un clic; un asistente de conciliación destaca el movimiento que explica una diferencia de saldo; adjuntar un justificante (un enlace, o un archivo guardado por el servidor) a un movimiento, que se abre con un clic (📎); una fecha límite de pago opcional, con los movimientos impagados marcados en rojo y los que vencen pronto en naranja — ver [Fechas límite de pago](#fechas-límite-de-pago) |
 | `accounts` | Cuentas (corriente, ahorro, tarjeta, efectivo…), moneda, saldo inicial, cierre, una cuenta predeterminada |
 | `categories` / `tags` | Árbol de categorías (ingresos / gastos / ahorro) y clases, un segundo eje de análisis; consulta [Categorías y clases](#categorías-y-clases) |
 | `payees` | Beneficiarios con categoría predeterminada |
@@ -129,6 +129,16 @@ sections:        # optional: omit to show every tab
 
 Asigna a cada instancia de la tarjeta sus propios `sections` para crear, por ejemplo, una vista solo para operaciones o una vista de configuración.
 
+Los saldos del banner de la pestaña Operaciones se pueden elegir, ordenar y destacar (editor visual, o `balances` / `balances_emphasis`). Claves: `total` (previsto), `month_end` (previsto a fin de mes), `with_budget` (fin de mes más lo que queda del presupuesto del mes en curso), `pointed` (banco, liquidado), `reconciled` (conciliado).
+
+```yaml
+balances:            # opcional: saldos mostrados, en este orden (por defecto: los cinco)
+  - month_end
+  - pointed
+balances_emphasis:   # opcional: saldos destacados
+  - month_end
+```
+
 | Movimientos | Presupuestos |
 |---|---|
 | ![Movimientos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-transactions.png) | ![Presupuestos](https://raw.githubusercontent.com/Patafoin/ha-my-bank/main/docs/images/card-budgets.png) |
@@ -143,7 +153,7 @@ Asigna a cada instancia de la tarjeta sus propios `sections` para crear, por eje
 
 | Tarjeta | Opciones |
 |---|---|
-| `custom:my-bank-balance-card` | `account_id` — los tres saldos de una cuenta |
+| `custom:my-bank-balance-card` | `account_id`, `balances`, `balances_emphasis` — los saldos de una cuenta (por defecto: previsto en grande, banco, conciliado), mismas claves que la tarjeta principal |
 | `custom:my-bank-entry-card` | `account_id`, `fields` — entrada rápida, con campos rellenados a partir del beneficiario; el botón «Todos los campos» muestra los campos ocultos |
 | `custom:my-bank-budget-card` | `budget_id`, `levels`, `period` (`month`, `cumul`, `all`), `collapse_level` |
 | `custom:my-bank-budget-trend-card` | `budget_id`, `period` (`12months`, `6months`, `year`, `last_year`, `budget`), `kinds` (`income`, `expense`, `savings`) — cumplimiento del presupuesto mes a mes (real / previsto en %, una línea por tipo, 100 % discontinuo); los meses fuera del presupuesto elegido salen de otro presupuesto de la misma cuenta |
@@ -151,7 +161,7 @@ Asigna a cada instancia de la tarjeta sus propios `sections` para crear, por eje
 | `custom:my-bank-upcoming-charge-card` | `account_ids`, `horizon` — operaciones ya registradas (con fecha posterior a hoy) y vencimientos aún no registrados (mismo verde / rojo, más claro), por semana o por mes según el horizonte; ingresos por encima del eje, gastos por debajo, etiqueta = saldo del periodo |
 | `custom:my-bank-category-spending-card` | `account_ids`, `period` — gastos por categoría (barras); el importe más alto equivale al 100 % |
 | `custom:my-bank-share-card` | — gastos compartidos |
-| `custom:my-bank-transactions-card` | — solo la pestaña Operaciones de la tarjeta principal (mismo código) |
+| `custom:my-bank-transactions-card` | `balances`, `balances_emphasis` — solo la pestaña Operaciones de la tarjeta principal (mismo código) |
 
 Todas las tarjetas tienen un editor visual.
 
@@ -190,6 +200,17 @@ Evita asignar solo una clase sin categoría: el análisis por coche seguiría fu
 
 **En resumen**: asigna siempre una categoría. Añade una clase cuando quieras hacer seguimiento de un objeto, un proyecto o una persona en varias categorías. En un movimiento desglosado, cada línea tiene su propia categoría y su propia clase.
 
+## Fechas límite de pago
+
+Un movimiento puede tener una **fecha límite de pago** opcional (vacía por defecto: entonces nada cambia). Un movimiento programado puede fijarla en cada movimiento que genera, como un número de días después de su fecha (0 = el mismo día; vacío = sin fecha límite).
+
+Mientras no esté liquidado (☑), un movimiento con fecha límite se marca:
+
+- en **naranja** unos días antes de su fecha límite — cuántos se fija en las opciones de la integración (Ajustes → Dispositivos y servicios → My Bank → Configurar, **Fechas límite de pago**, 7 días por defecto);
+- en **rojo**, como impagado, una vez pasada la fecha límite.
+
+Los avisos aparecen en la tarjeta de saldos y en los recuadros del panel (número y total por cuenta), y en la pestaña Movimientos: un aviso lista los movimientos por pagar de la cuenta, incluso fuera del periodo mostrado, cada uno con un botón para liquidarlo, y las filas llevan una etiqueta de color. `my_bank.list_due_transactions` devuelve la misma lista para las automatizaciones (por ejemplo, una notificación de recordatorio). Requiere My Bank API 0.10.0.
+
 ## Entidades
 
 En una instalación nueva no se crea ningún sensor: elige los que quieras publicar en las opciones de la integración (Ajustes → Dispositivos y servicios → My Bank → Configurar). El estado de un sensor lo puede leer **cualquier** usuario de Home Assistant, sea cual sea su acceso a My Bank: publica solo lo que uses en automatizaciones o paneles; las tarjetas no necesitan ningún sensor. Una cuenta creada más adelante no se publica hasta que la eliges.
@@ -199,7 +220,7 @@ En una instalación nueva no se crea ningún sensor: elige los que quieras publi
 
 ## Servicios
 
-Se puede crear, modificar o eliminar cada objeto desde automatizaciones y scripts: `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (más de 50 servicios; consulta **Herramientas de desarrollador → Acciones**). Los servicios de lectura (`list_accounts`, `search_transactions`, `get_budget_report`…) devuelven datos mediante `response_variable`.
+Se puede crear, modificar o eliminar cada objeto desde automatizaciones y scripts: `my_bank.create_transaction`, `create_transfer`, `set_transaction_state`, `create_schedule`, `set_budget_lines`, `add_shared_expense`… (más de 50 servicios; consulta **Herramientas de desarrollador → Acciones**). Los servicios de lectura (`list_accounts`, `search_transactions`, `list_due_transactions`, `get_budget_report`…) devuelven datos mediante `response_variable`.
 
 ```yaml
 action: my_bank.create_transaction
