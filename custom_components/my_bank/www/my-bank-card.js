@@ -254,7 +254,7 @@ const STYLE = `
   .due-alert.overdue { border-left: 4px solid var(--error-color, #db4437); background: rgba(var(--rgb-error-color, 219, 68, 55), 0.15); }
   .due-alert.soon { border-left: 4px solid var(--warning-color, #ffa600); background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.15); }
   .due-alert button { background: none; border: none; cursor: pointer; min-height: 44px; font-size: 14px; color: var(--primary-color); }
-  .due-badge { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 9px; font-size: 11px; line-height: 18px; color: #fff; vertical-align: 1px; }
+  .due-badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 9px; font-size: 11px; line-height: 18px; color: #fff; vertical-align: 1px; }
   .due-badge.overdue { background: var(--error-color, #db4437); }
   .due-badge.soon { background: var(--warning-color, #ffa600); }
   .tx-row.due-overdue { border-left: 4px solid var(--error-color, #db4437); }
@@ -343,26 +343,57 @@ const STYLE = `
   .form-actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
   .att-field { display: flex; flex-direction: column; gap: 4px; }
   .att-current { font-size: 12px; color: var(--secondary-text-color); }
+  /* Notes : repliées par défaut (juste le libellé + un "+"), pour ne pas occuper une cellule entière
+     la plupart du temps ; le "+" déplie une zone de texte sur toute la largeur du formulaire.
+     display: flex en colonne (comme les autres champs, des <label>) : sinon, en simple bloc, la grille
+     étire quand même la cellule à la hauteur de ses voisins mais le contenu (une seule ligne tant que
+     la zone de texte est masquée) se retrouve mal calé dans cet espace au lieu de rester en haut. */
+  .notes-field { display: flex; flex-direction: column; gap: 2px; }
+  .notes-field.expanded { grid-column: 1 / -1; }
+  .notes-field textarea {
+    width: 100%; min-height: 60px; box-sizing: border-box; font: inherit; resize: vertical;
+    border: 1px solid var(--divider-color); border-radius: 4px; background: var(--card-background-color); color: var(--primary-text-color); padding: 6px;
+  }
+  .notes-field textarea[hidden] { display: none; }
+  .notes-toggle {
+    background: none; border: 1px solid var(--secondary-text-color); border-radius: 50%; cursor: pointer;
+    width: 16px; height: 16px; padding: 0; font-size: 11px; line-height: 14px; color: var(--secondary-text-color); flex-shrink: 0;
+  }
+  /* Hiérarchie du budget : liseré de couleur sur les rubriques qui ont des sous-rubriques (dépassement/objectif
+     atteint), en plus du fond et du gras déjà appliqués par .tree-branch — pour repérer le statut sans lire le %. */
+  tr.tree-branch.b-over > td:first-child { border-left: 3px solid var(--error-color, #db4437); }
+  tr.tree-branch.b-good > td:first-child { border-left: 3px solid var(--success-color, #43a047); }
   .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
   .balance-tile { background: var(--secondary-background-color); border-radius: 8px; padding: 12px; }
   .balance-tile .name { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
   .balance-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--secondary-text-color); padding: 2px 0; }
   .balance-line strong { color: var(--primary-text-color); font-weight: 600; }
   .balance-line.main strong { font-size: 16px; }
+  /* Pointé/Rapproché : une seule ligne secondaire compacte au lieu de deux lignes à poids égal avec le solde. */
+  .balance-line.sub { display: block; font-size: 12px; }
+  .balance-line.sub strong { font-size: 12px; font-weight: 500; }
   .tx-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
   .tx-summary {
     display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; font-size: 13px; color: var(--secondary-text-color);
-    margin-bottom: 8px; padding: 8px 12px; background: var(--secondary-background-color); border-radius: 8px;
+    margin-top: 10px; margin-bottom: 8px; padding: 8px 12px; background: var(--secondary-background-color); border-radius: 8px;
   }
   .tx-summary strong { color: var(--primary-text-color); }
   .tx-summary .emph { font-size: 15px; color: var(--primary-text-color); }
   .tx-summary .emph strong { font-size: 18px; color: var(--primary-color); }
-  .tx-summary .tx-refresh {
-    margin-left: auto; background: none; border: 1px solid var(--divider-color); border-radius: 50%;
-    cursor: pointer; width: 39px; height: 39px; padding: 0; font-size: 21px; line-height: 36px;
+  .tx-summary-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .tx-select-inline { display: flex; align-items: center; gap: 6px; padding-right: 10px; border-right: 1px solid var(--divider-color); font-size: 13px; }
+  .tx-select-inline .tx-select-count { color: var(--secondary-text-color); }
+  .tx-select-inline button {
+    background: none; border: 1px solid var(--divider-color); border-radius: 4px; cursor: pointer;
+    min-height: 32px; padding: 4px 8px; font-size: 12px; color: var(--primary-text-color);
+  }
+  .tx-select-inline .tx-bulk-edit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .tx-summary .tx-refresh, .tx-summary .tx-download {
+    background: none; border: 1px solid var(--divider-color); border-radius: 50%;
+    cursor: pointer; width: 39px; height: 39px; padding: 0; font-size: 18px; line-height: 36px;
     color: var(--primary-color); vertical-align: middle;
   }
-  .tx-summary .tx-refresh:hover { border-color: var(--primary-color); background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12); }
+  .tx-summary .tx-refresh:hover, .tx-summary .tx-download:hover { border-color: var(--primary-color); background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12); }
   .month-sep {
     font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--primary-color); background: var(--secondary-background-color);
@@ -401,14 +432,8 @@ const STYLE = `
   .tx-recon .recon-diff { font-size: 14px; font-weight: 600; }
   .tx-recon .recon-ok { color: var(--success-color, #43a047); }
   .tx-row.recon-match { border-left: 4px solid var(--warning-color, #ffa600); background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12); }
-  .tx-select-toggle.active { background: var(--primary-color); color: var(--text-primary-color, #fff); }
-  .tx-select-bar {
-    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px 12px;
-    background: var(--secondary-background-color); border-radius: 8px;
-  }
-  .tx-select-bar[hidden] { display: none; }
-  .tx-select-bar .tx-select-count { font-size: 13px; color: var(--secondary-text-color); margin-right: auto; }
-  .tx-select-bar .tx-bulk-edit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .panel-title { flex-basis: 100%; margin: 0 0 4px; padding-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--primary-text-color); border-bottom: 2px solid var(--divider-color); }
+  form.entity-form .panel-title { grid-column: 1 / -1; }
   .tx-row.selectable { display: flex; align-items: center; gap: 8px; }
   .tx-row.selectable .tx-main { flex: 1; min-width: 0; }
   .tx-select-box { display: flex; align-items: center; flex-shrink: 0; }
@@ -641,6 +666,31 @@ function inputAmount(value) {
   if (value === null || value === undefined || value === "") return "";
   const text = String(Math.abs(Number(value)).toFixed(2));
   return LANG === "fr" || LANG === "de" ? text.replace(".", ",") : text;
+}
+
+// Comme inputAmount, mais signé (CSV) : un tableur réglé en fr/de lit la virgule comme décimale.
+function csvNumber(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  const text = n.toFixed(2);
+  return LANG === "fr" || LANG === "de" ? text.replace(".", ",") : text;
+}
+
+// Séparateur ';' (la virgule décimale ci-dessus serait sinon ambiguë avec un ',' séparateur de
+// colonnes) ; BOM UTF-8 et fin de ligne CRLF pour qu'Excel détecte l'encodage et les lignes.
+function downloadCsv(filename, headers, rows) {
+  const field = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const text = [headers, ...rows].map((r) => r.map(field).join(";")).join("\r\n");
+  const blob = new Blob(["﻿" + text], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // Montant d'une case de grille : vide = invalide (et non 0).
@@ -1215,8 +1265,7 @@ class MyBankCard extends HTMLElement {
       .map((a) => `<div class="balance-tile">
           <div class="name">${esc(a.name)}</div>
           <div class="balance-line main"><span>${t("Solde")}</span><strong>${fmtMoney(a.balances.total, a.currency)}</strong></div>
-          <div class="balance-line"><span>${t("Pointé")}</span><strong>${fmtMoney(a.balances.pointed, a.currency)}</strong></div>
-          <div class="balance-line"><span>${t("Rapproché")}</span><strong>${fmtMoney(a.balances.reconciled, a.currency)}</strong></div>
+          <div class="balance-line sub">${t("Pointé")} <strong>${fmtMoney(a.balances.pointed, a.currency)}</strong> · ${t("Rapproché")} <strong>${fmtMoney(a.balances.reconciled, a.currency)}</strong></div>
           ${dueSummaryHtml(due, a.id, a.currency)}
         </div>`)
       .join("");
@@ -1261,11 +1310,15 @@ class MyBankCard extends HTMLElement {
         .map((g) => {
           const tot = r.totals[g.kind];
           return `<tr class="kind-row"><td>${esc(KIND_TITLES[g.kind])}</td><td class="bar">${this._progressHtml(g.kind, tot.planned[i], tot.actual[i])}</td><td class="num">${fmtAmount(tot.actual[i])} / ${fmtMoney(tot.planned[i], currency)}</td></tr>`
-            + g.rows.map((x) => `<tr class="${x.depth === 0 && x.has_children ? "tree-branch" : ""}">
+            + g.rows.map((x) => {
+              const branch = x.depth === 0 && x.has_children;
+              const cls = branch ? `tree-branch b-${this._progressClass(g.kind, x.planned[i], x.actual[i]) || "none"}` : "";
+              return `<tr class="${cls}">
             <td><span style="display: inline-block; padding-left: ${x.depth * 20}px">${esc(x.name)}</span>${this._catInfoHtml(x.category_id, ctx)}</td>
             <td class="bar">${this._progressHtml(g.kind, x.planned[i], x.actual[i])}</td>
             <td class="num">${fmtAmount(x.actual[i])} / ${fmtMoney(x.planned[i], currency)}</td>
-          </tr>`).join("");
+          </tr>`;
+            }).join("");
         })
         .join("");
       const account = this._lookups.account.get(b.account_id);
@@ -1308,9 +1361,12 @@ class MyBankCard extends HTMLElement {
     return p ? p.name : "";
   }
 
-  _txRowHtml(tx, alt = false) {
+  // `partAmount` : part de l'opération sur la rubrique filtrée (non null seulement si un filtre de
+  // rubrique est actif) ; sinon le montant affiché est celui de l'opération entière.
+  _txRowHtml(tx, alt = false, partAmount = null) {
     const today = isoDate(new Date());
-    const credit = Number(tx.amount) > 0;
+    const shown = partAmount !== null ? partAmount : Number(tx.amount);
+    const credit = shown > 0;
     const method = this._lookups.method.get(tx.payment_method_id);
     const due = dueStatus(tx, this._due);
     const dueText = tx.due_date ? t("limite le {date}", { date: frDate(tx.due_date) }) : "";
@@ -1321,19 +1377,17 @@ class MyBankCard extends HTMLElement {
     const badge = due
       ? `<span class="due-badge ${due}">${due === "overdue" ? t("Impayée") : t("À payer")}</span>`
       : "";
-    const checkbox = this._txSelectMode
-      ? `<label class="tx-select-box"><input type="checkbox" class="tx-select" ${this._txSelected.has(tx.id) ? "checked" : ""}></label>`
-      : "";
-    return `<div class="tx-row ${alt ? "alt" : ""} ${tx.date > today ? "future" : ""} ${due ? `due-${due}` : ""} ${this._txSelectMode ? "selectable" : ""} ${this._txSelected.has(tx.id) ? "selected" : ""}" data-id="${tx.id}">
+    const checkbox = `<label class="tx-select-box"><input type="checkbox" class="tx-select" ${this._txSelected.has(tx.id) ? "checked" : ""}></label>`;
+    return `<div class="tx-row selectable ${alt ? "alt" : ""} ${tx.date > today ? "future" : ""} ${due ? `due-${due}` : ""} ${this._txSelected.has(tx.id) ? "selected" : ""}" data-id="${tx.id}">
       ${checkbox}
       <div class="tx-main">
         <div class="tx-info">
-          <div class="tx-desc">${badge}${esc(this._txTitle(tx))}</div>
+          <div class="tx-desc">${esc(this._txTitle(tx))}${badge}</div>
           <div class="tx-sub">${sub}</div>
         </div>
         <div class="tx-right">
           <div class="tx-amounts">
-            <div class="tx-amount ${credit ? "credit" : Number(tx.amount) < 0 ? "debit" : ""}">${credit ? "+" : ""}${fmtMoney(tx.amount, this._currency(tx.account_id))}</div>
+            <div class="tx-amount ${credit ? "credit" : shown < 0 ? "debit" : ""}">${credit ? "+" : ""}${fmtMoney(shown, this._currency(tx.account_id))}</div>
             <div class="tx-balance">${t("Solde :")} ${fmtAmount(tx.balance_after)}</div>
           </div>
           <div class="tx-actions">
@@ -1399,24 +1453,18 @@ class MyBankCard extends HTMLElement {
         <select class="tx-range">${RANGES.map((r) => `<option value="${r.key}" ${r.key === this._txRange ? "selected" : ""}>${esc(r.label)}</option>`).join("")}</select>
         <button class="secondary tx-filter-btn"></button>
         <button class="secondary tx-recon-btn ${this._txRecon ? "active" : ""}">${t("Rapprochement")}</button>
-        <button class="secondary tx-select-toggle ${this._txSelectMode ? "active" : ""}">${t("Sélection multiple")}</button>
         <button class="add">+ ${t("Ajouter")}</button>
       </div>
       <div class="tx-filters" ${this._txFiltersOpen ? "" : "hidden"}>${this._txFiltersHtml(query)}</div>
-      <div class="tx-select-bar" ${this._txSelectMode ? "" : "hidden"}>
-        <span class="tx-select-count"></span>
-        <button type="button" class="secondary tx-select-all">${t("Tout sélectionner")}</button>
-        <button type="button" class="secondary tx-select-none">${t("Tout désélectionner")}</button>
-        <button type="button" class="tx-bulk-edit" disabled>${t("Modifier la sélection…")}</button>
-      </div>
       <div class="tx-recon" ${this._txRecon ? "" : "hidden"}>
+        <span class="panel-title">${t("Rapprochement")}</span>
         <label>${t("Solde du site bancaire")}<input type="text" inputmode="decimal" name="reconBalance" value="${esc(this._txReconBalance || "")}"></label>
         <span class="recon-diff"></span>
       </div>
       <div class="tx-due">${this._dueBannerHtml(this._txAccountId)}</div>
+      <div class="form-container"></div>
       <div class="tx-summary"></div>
       <div class="tx-count"></div>
-      <div class="form-container"></div>
       <div class="tx-list"></div>
     `;
     this._paintSummary(this._lookups.account.get(this._txAccountId));
@@ -1426,11 +1474,6 @@ class MyBankCard extends HTMLElement {
     const formContainer = this._bodyEl.querySelector(".form-container");
     const list = this._bodyEl.querySelector(".tx-list");
     const filtersBox = this._bodyEl.querySelector(".tx-filters");
-    // Rafraîchissement manuel (bouton ↻ du bandeau des soldes) : ni les soldes ni la liste ne bougent
-    // tout seuls quand on modifie une opération par ailleurs, il faut donc pouvoir les relire à la demande.
-    this._bodyEl.querySelector(".tx-summary").addEventListener("click", (ev) => {
-      if (ev.target.closest(".tx-refresh")) this._renderActive(true);
-    });
     // Bandeau des opérations à payer : « Pointer » la marque payée, où qu'elle soit (hors de la période affichée comprise).
     this._bodyEl.querySelector(".tx-due").addEventListener("click", async (ev) => {
       const btn = ev.target.closest(".due-point");
@@ -1499,30 +1542,31 @@ class MyBankCard extends HTMLElement {
       this._paintRecon();
       this._navCommit(true);
     });
-    // Sélection multiple : case à cocher devant chaque opération, Maj+clic coche toute une plage
-    // (voir le gestionnaire de clic de la liste), panneau de modification en masse (décision 026).
-    this._bodyEl.querySelector(".tx-select-toggle").addEventListener("click", () => {
-      closeForms();
-      this._txSelectMode = !this._txSelectMode;
-      if (!this._txSelectMode) {
-        this._txSelected.clear();
-        this._txLastClickedId = null;
+    // Sélection multiple : case à cocher devant chaque opération (toujours affichée), Maj+clic coche toute
+    // une plage (voir le gestionnaire de clic de la liste), panneau de modification en masse (décision 026).
+    // Le compteur, « tout sélectionner/désélectionner » et le CSV vivent dans le bandeau des soldes
+    // (`_paintSummary`), reconstruit à chaque rafraîchissement : délégation sur `.tx-summary`, qui lui ne
+    // bouge pas, pour que les clics marchent aussi après un rafraîchissement des soldes.
+    this._bodyEl.querySelector(".tx-summary").addEventListener("click", (ev) => {
+      if (ev.target.closest(".tx-refresh")) { this._renderActive(true); return; }
+      // Export CSV : la liste affichée (critères compris), jamais tronquée côté API
+      // (list_account_transactions n'a pas de limite/pagination), donc toujours la totalité des résultats.
+      if (ev.target.closest(".tx-download")) { this._downloadTxCsv(); return; }
+      if (ev.target.closest(".tx-select-all")) {
+        this._txVisibleItems().forEach((tx) => this._txSelected.add(tx.id));
+        this._paintTxSelection();
+        return;
       }
-      this._renderActive(true);
-    });
-    const selectBar = this._bodyEl.querySelector(".tx-select-bar");
-    selectBar.querySelector(".tx-select-all").addEventListener("click", () => {
-      this._txVisibleItems().forEach((tx) => this._txSelected.add(tx.id));
-      this._paintTxSelection();
-    });
-    selectBar.querySelector(".tx-select-none").addEventListener("click", () => {
-      this._txSelected.clear();
-      this._paintTxSelection();
-    });
-    selectBar.querySelector(".tx-bulk-edit").addEventListener("click", () => {
-      if (!this._txSelected.size) return;
-      closeForms();
-      this._showBulkEditForm(formContainer, [...this._txSelected].sort((a, b) => a - b), closeForms);
+      if (ev.target.closest(".tx-select-none")) {
+        this._txSelected.clear();
+        this._paintTxSelection();
+        return;
+      }
+      if (ev.target.closest(".tx-bulk-edit")) {
+        if (!this._txSelected.size) return;
+        closeForms();
+        this._showBulkEditForm(formContainer, [...this._txSelected].sort((a, b) => a - b), closeForms);
+      }
     });
     const filterForm = filtersBox.querySelector("form");
     const readFilters = () => {
@@ -1570,6 +1614,8 @@ class MyBankCard extends HTMLElement {
       this._renderActive(true);
     });
     this._bodyEl.querySelector(".add").addEventListener("click", () => {
+      // Un 2e clic replie l'encart au lieu de le rouvrir tout neuf (et de reforcer le focus dessus).
+      if (formContainer.innerHTML) { closeForms(); return; }
       closeForms();
       this._showTransactionForm(formContainer, null);
     });
@@ -1649,6 +1695,7 @@ class MyBankCard extends HTMLElement {
     const tree = (list) => [["", t("Toutes")], ...list.map((c) => [c.id, `${"  ".repeat(c.depth)}${c.name}`])];
     const yesNo = [["", t("Indifférent")], ["yes", t("Oui")], ["no", t("Non")]];
     return `<form class="entity-form">
+      <span class="panel-title">${t("Critères de recherche")}</span>
       <label>${t("Du")}<input type="date" name="start" value="${esc(query.start || "")}"></label>
       <label>${t("Au")}<input type="date" name="end" value="${esc(query.end || "")}"></label>
       <label>${t("Type")}${sel("type", [["", t("Tous")], ["expense", t("Dépenses")], ["income", t("Recettes")], ["transfer", t("Virements")]])}</label>
@@ -1728,6 +1775,38 @@ class MyBankCard extends HTMLElement {
     return true;
   }
 
+  // CSV de la liste affichée (mêmes lignes, mêmes critères que `_paintTxList`) : les mêmes colonnes
+  // que la ligne de la liste, plus l'état (pointée/rapprochée) qui n'y est qu'en icône.
+  _downloadTxCsv() {
+    const items = this._txVisibleItems();
+    const headers = [
+      t("Date"), t("Libellé"), t("Tiers"), t("Rubrique"), t("Mode de règlement"),
+      t("Montant"), t("Solde"), t("Pointée"), t("Rapprochée"), t("Date limite de paiement"),
+    ];
+    const rows = items.map((tx) => {
+      const method = this._lookups.method.get(tx.payment_method_id);
+      return [
+        frDate(tx.date),
+        this._txTitle(tx),
+        this._txCounterpart(tx),
+        this._categoryLabel(tx),
+        method ? method.name : "",
+        csvNumber(tx.amount),
+        csvNumber(tx.balance_after),
+        tx.state >= 1 ? t("Oui") : t("Non"),
+        tx.state === 2 ? t("Oui") : t("Non"),
+        tx.due_date ? frDate(tx.due_date) : "",
+      ];
+    });
+    const dates = items.map((tx) => tx.date).sort();
+    const span = dates.length
+      ? dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]}_${dates[dates.length - 1]}`
+      : isoDate(new Date());
+    const account = this._lookups.account.get(this._txAccountId);
+    const name = (account ? account.name : "compte").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+    downloadCsv(`operations-${name}-${span}.csv`, headers, rows);
+  }
+
   // Opérations affichées compte tenu des critères actifs (liste complète sinon) : ce que « Tout
   // sélectionner » doit cocher, et ce que la liste doit peindre.
   _txVisibleItems() {
@@ -1739,6 +1818,13 @@ class MyBankCard extends HTMLElement {
     const f = this._txFilters;
     const items = this._txVisibleItems();
     const active = this._txFilterCount();
+    // Avec un filtre de rubrique, le total ne compte que les lignes de ventilation de la rubrique
+    // (comme le réalisé d'un budget) : une opération ventilée n'y entre que pour sa part.
+    const cat = f.category ? this._lookups.category.get(Number(f.category)) : null;
+    const catIds = cat
+      ? new Set(this._lookups.categories.filter((c) => c.id === cat.id || (f.sub && c.path.startsWith(cat.path + " > "))).map((c) => c.id))
+      : null;
+    const part = (tx) => (catIds ? tx.splits.filter((x) => catIds.has(x.category_id)).reduce((a, x) => a + Number(x.amount), 0) : Number(tx.amount));
     let lastMonth = null;
     let rank = 0; // alternance repartie de zéro à chaque mois : la 1re ligne sous un séparateur est toujours claire
     const rowsHtml = items
@@ -1750,19 +1836,12 @@ class MyBankCard extends HTMLElement {
           rank = 0;
           sep = `<div class="month-sep">${esc(monthLabel(month, "long"))}</div>`;
         }
-        return sep + this._txRowHtml(tx, rank++ % 2 === 1);
+        return sep + this._txRowHtml(tx, rank++ % 2 === 1, catIds ? part(tx) : null);
       })
       .join("");
     const empty = active ? t("Aucune opération ne correspond aux critères.") : t("Aucune opération sur cette période.");
     this._bodyEl.querySelector(".tx-list").innerHTML = rowsHtml || `<div class="empty">${empty}</div>`;
     this._bodyEl.querySelector(".tx-filter-btn").textContent = active ? t("Critères ({n})", { n: active }) : t("Critères");
-    // Avec un filtre de rubrique, le total ne compte que les lignes de ventilation de la rubrique
-    // (comme le réalisé d'un budget) : une opération ventilée n'y entre que pour sa part.
-    const cat = f.category ? this._lookups.category.get(Number(f.category)) : null;
-    const catIds = cat
-      ? new Set(this._lookups.categories.filter((c) => c.id === cat.id || (f.sub && c.path.startsWith(cat.path + " > "))).map((c) => c.id))
-      : null;
-    const part = (tx) => (catIds ? tx.splits.filter((x) => catIds.has(x.category_id)).reduce((a, x) => a + Number(x.amount), 0) : Number(tx.amount));
     const total = items.reduce((acc, tx) => acc + part(tx), 0);
     // Toujours affiché, sous les soldes : période et critères compris ; avec des critères, le total en plus.
     const shown = items.length === 1
@@ -1793,7 +1872,7 @@ class MyBankCard extends HTMLElement {
   }
 
   _paintTxSelectionBar() {
-    const bar = this._bodyEl.querySelector(".tx-select-bar");
+    const bar = this._bodyEl.querySelector(".tx-summary");
     if (!bar) return;
     const n = this._txSelected.size;
     bar.querySelector(".tx-select-count").textContent = n === 1 ? t("1 opération sélectionnée") : t("{n} opérations sélectionnées", { n });
@@ -1840,8 +1919,18 @@ class MyBankCard extends HTMLElement {
       const title = def.key === "with_budget" ? ` title="${esc(t(WITH_BUDGET_HELP))}"` : "";
       return `<span class="${emphasis ? "emph" : ""}"${title}>${def.summary} <strong>${v == null ? "…" : fmtMoney(v, account.currency)}</strong></span>`;
     });
+    const n = this._txSelected.size;
     el.innerHTML = `${items.join("")}
-      <button type="button" class="tx-refresh" title="${t("Rafraîchir la liste selon les critères sélectionnés")}">↻</button>`;
+      <span class="tx-summary-right">
+        <span class="tx-select-inline">
+          <span class="tx-select-count">${n === 1 ? t("1 opération sélectionnée") : t("{n} opérations sélectionnées", { n })}</span>
+          <button type="button" class="tx-select-all">${t("Tout sélectionner")}</button>
+          <button type="button" class="tx-select-none">${t("Tout désélectionner")}</button>
+          <button type="button" class="tx-bulk-edit" ${n ? "" : "disabled"}>${t("Modifier la sélection…")}</button>
+        </span>
+        <button type="button" class="tx-download" title="${esc(t("Télécharger la liste affichée au format CSV"))}">⬇</button>
+        <button type="button" class="tx-refresh" title="${t("Rafraîchir la liste selon les critères sélectionnés")}">↻</button>
+      </span>`;
   }
 
   // Soldes calculés par la carte, seulement si l'un d'eux est affiché (`keys`). afterCents : total des opérations
@@ -1999,8 +2088,12 @@ class MyBankCard extends HTMLElement {
       ? `<select name="account_id">${this._options(L.accounts.filter((a) => !a.closed), accountId, (a) => a.name)}</select>`
       : `<input type="text" value="${esc(account ? account.name : "")}" disabled>`;
 
+    // Enchaîner la saisie (bouton « Créer et enchaîner ») n'a de sens qu'à la création, et seulement quand
+    // personne d'autre (la carte de saisie rapide, `onSaved`) ne gère déjà elle-même la suite après l'ajout.
+    const canChain = !tx && !opts.onSaved;
     container.innerHTML = `
       <form class="entity-form tx-form">
+        <span class="panel-title">${tx ? t("Modifier l'opération") : t("Nouvelle opération")}</span>
         <label data-f="account">${t("Compte")}${accountField}</label>
         <label data-f="type">${t("Type")}<select name="type">${types.map((ty) => `<option value="${ty}" ${ty === currentType ? "selected" : ""}>${typeLabels[ty]}</option>`).join("")}</select></label>
         <label data-f="date">${t("Date")}<input type="date" name="date" value="${esc(tx ? tx.date : isoDate(new Date()))}" required></label>
@@ -2022,7 +2115,10 @@ class MyBankCard extends HTMLElement {
         </div>
         <label class="check check-aligned" data-f="state"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="pointed" ${tx && tx.state >= 1 ? "checked" : ""}>${t("Pointée")}</span></label>
         <label class="check check-aligned" data-f="state"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="reconciled" ${tx && tx.state === 2 ? "checked" : ""}>${t("Rapprochée")}</span></label>
-        <label data-f="notes">${t("Notes")}<input type="text" name="notes" value="${esc(tx ? tx.notes || "" : "")}"></label>
+        <div class="notes-field ${tx && tx.notes ? "expanded" : ""}" data-f="notes">
+          <span class="field-label">${t("Notes")}<button type="button" class="notes-toggle" aria-label="${esc(t("Ajouter une note"))}" title="${esc(t("Ajouter une note"))}">${tx && tx.notes ? "−" : "+"}</button></span>
+          <textarea name="notes" rows="2" ${tx && tx.notes ? "" : "hidden"}>${esc(tx ? tx.notes || "" : "")}</textarea>
+        </div>
         <div class="full att-field" data-f="attachment">
           <label>${t("Justificatif")}
             <select name="att_kind">
@@ -2038,7 +2134,10 @@ class MyBankCard extends HTMLElement {
           </div>
         </div>
         <div class="form-actions">
-          <button type="submit">${tx ? t("Enregistrer") : t("Créer")}</button>
+          ${tx || !canChain
+            ? `<button type="submit">${tx ? t("Enregistrer") : t("Créer")}</button>`
+            : `<button type="submit" class="tx-create-close">${t("Créer et fermer")}</button>
+               <button type="submit" class="tx-create-chain">${t("Créer et enchaîner")}</button>`}
           <button type="button" class="secondary toggle-split" data-f="split">${t("Ventiler")}</button>
           ${hidden.size ? `<button type="button" class="secondary toggle-hidden"></button>` : ""}
           <button type="button" class="cancel">${esc(opts.cancelLabel || t("Annuler"))}</button>
@@ -2098,6 +2197,18 @@ class MyBankCard extends HTMLElement {
     syncAttachment();
     $('[name="att_kind"]').addEventListener("change", syncAttachment);
     if (tx && tx.splits.length > 1) setSplitMode(true, tx.splits);
+
+    // Notes : repliées par défaut (juste le libellé et un "+"), pour ne pas occuper une cellule
+    // entière la plupart du temps ; le "+" déplie une zone de texte sur toute la largeur du formulaire.
+    const notesField = $(".notes-field");
+    const notesArea = $('[name="notes"]');
+    $(".notes-toggle").addEventListener("click", () => {
+      const expand = notesArea.hidden;
+      notesArea.hidden = !expand;
+      notesField.classList.toggle("expanded", expand);
+      $(".notes-toggle").textContent = expand ? "−" : "+";
+      if (expand) notesArea.focus();
+    });
 
     $('[name="type"]').addEventListener("change", syncType);
     if (opts.chooseAccount) {
@@ -2263,13 +2374,18 @@ class MyBankCard extends HTMLElement {
         if (name) payload.payee_name = name;
       }
       for (const key of Object.keys(payload)) if (payload[key] === null && !tx) delete payload[key];
-      const submit = form.querySelector('button[type="submit"]');
-      submit.disabled = true;
+      // Deux boutons « submit » à la création (créer et fermer / créer et enchaîner) : les désactiver
+      // tous les deux pendant l'enregistrement, pas seulement celui qui a déclenché l'envoi.
+      const submitButtons = [...form.querySelectorAll('button[type="submit"]')];
+      submitButtons.forEach((b) => (b.disabled = true));
       try {
         // Virement créé : la jambe sur le compte choisi est celle qui porte le justificatif et la date limite.
         const transferDue = service === "create_transfer" && dueDate;
-        const result = await this._call(service, payload, !tx && (!!attachmentAction || !!transferDue));
-        const txId = tx ? tx.id : service === "create_transfer" ? result && result[type === "transfer_out" ? "source" : "destination"].id : result && result.id;
+        const needsResult = !tx && (!!attachmentAction || !!transferDue);
+        const result = await this._call(service, payload, needsResult);
+        // result n'a la forme de la réponse API que si needsResult est vrai (sinon _call renvoie l'enveloppe
+        // websocket brute, sans "source"/"destination"/"id" : txId n'est alors pas utilisé plus bas).
+        const txId = tx ? tx.id : !needsResult ? undefined : service === "create_transfer" ? result[type === "transfer_out" ? "source" : "destination"].id : result.id;
         if (transferDue) await this._call("update_transaction", { transaction_id: txId, due_date: dueDate }, false);
         if (attachmentAction) {
           if (attachmentAction.action === "remove") {
@@ -2289,11 +2405,31 @@ class MyBankCard extends HTMLElement {
           opts.onSaved({ service, payload, accountId });
           return;
         }
+        // « Créer et enchaîner » : encart gardé ouvert pour saisir la suivante, seuls les champs qui changent
+        // vraiment d'une opération à l'autre repartent à vide (compte/type/date/mode de règlement/rubrique/
+        // classe/date limite restent, c'est souvent la même série). Liste et soldes sont quand même
+        // rafraîchis (sans passer par `_renderActive`, qui reconstruirait aussi l'encart).
+        if (canChain && ev.submitter && ev.submitter.classList.contains("tx-create-chain")) {
+          this._paintTxList();
+          this._refreshSummary().catch(() => {}); // best-effort, comme ailleurs : l'encart reste utilisable sans
+          filledFor = null; // sinon un même tiers resaisi d'affilée ne redéclenche pas le pré-remplissage
+          payeeInput.value = "";
+          $('[name="amount"]').value = "";
+          $('[name="label"]').value = "";
+          notesArea.value = "";
+          notesArea.hidden = true;
+          notesField.classList.remove("expanded");
+          $(".notes-toggle").textContent = "+";
+          if (splitMode) { lines.innerHTML = ""; setSplitMode(false); }
+          submitButtons.forEach((b) => (b.disabled = false));
+          payeeInput.focus();
+          return;
+        }
         container.innerHTML = "";
         this._lookups = null; // un tiers a pu être créé
         this._renderActive(true); // sur place : la liste ne remonte pas en haut
       } catch (err) {
-        submit.disabled = false;
+        submitButtons.forEach((b) => (b.disabled = false));
         alert(errMsg(err));
       }
     });
@@ -2350,7 +2486,6 @@ class MyBankCard extends HTMLElement {
         const res = await this._call("categorize_transactions", payload, true);
         const skipped = (res && res.skipped_split_ids) || [];
         this._txSelected.clear();
-        this._txSelectMode = false;
         if (onClose) onClose();
         await this._renderActive(true);
         if (skipped.length) {
@@ -2582,12 +2717,13 @@ class MyBankCard extends HTMLElement {
         </select></label>
         <label class="f-count">${t("Nombre d'échéances")}<input type="number" name="count" min="1" value="${s && s.count ? s.count : 12}"></label>
         <label class="f-end-date">${t("Dernière échéance au plus tard le")}<input type="date" name="end_date" value="${esc(s && s.end_date ? s.end_date : "")}"></label>
-        <label>${t("Jours d'anticipation")}<input type="number" name="lead_days" min="0" max="90" value="${s ? s.lead_days : 0}"><span class="muted f-lead-info"></span></label>
-        <label title="${esc(t("Vide : pas de date limite. 0 : le jour de l'opération."))}">${t("Date limite : jours après l'opération")}<input type="number" name="due_days" min="0" max="365" placeholder="${esc(t("aucune"))}" value="${s && s.due_days != null ? s.due_days : ""}"></label>
-        <label>${t("Ne rien saisir d'office avant le")}<input type="date" name="generate_from" value="${esc(s ? s.generate_from : isoDate(new Date()))}"></label>
-        <label class="check"><input type="checkbox" name="auto" ${!s || s.auto ? "checked" : ""}>${t("Saisie automatique à l'échéance")}</label>
-        <label class="check"><input type="checkbox" name="active" ${!s || s.active ? "checked" : ""}>${t("Active")}</label>
+        <label>${t("Jours d'anticipation")}<input type="number" name="lead_days" min="0" max="90" value="${s ? s.lead_days : 0}"></label>
+        <label>${t("À partir du")}<input type="date" name="generate_from" value="${esc(s ? s.generate_from : isoDate(new Date()))}"></label>
+        <label title="${esc(t("Vide : pas de date limite. 0 : le jour de l'opération."))}">${t("Délai de paiement (jours)")}<input type="number" name="due_days" min="0" max="365" placeholder="${esc(t("aucune"))}" value="${s && s.due_days != null ? s.due_days : ""}"></label>
+        <label class="check check-aligned"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="auto" ${!s || s.auto ? "checked" : ""}>${t("Saisir automatiquement")}</span></label>
+        <label class="check check-aligned"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="active" ${!s || s.active ? "checked" : ""}>${t("Active")}</span></label>
         <label class="full">${t("Notes")}<input type="text" name="notes" value="${esc(s ? s.notes || "" : "")}"></label>
+        <div class="full muted f-lead-info"></div>
         <div class="full inst-box" hidden>
           <div class="inst-head">
             <strong>${t("Montants et dates par échéance")}</strong><span class="muted inst-info"></span>
@@ -2685,40 +2821,45 @@ class MyBankCard extends HTMLElement {
         : t("Indiquer la première échéance et la fin");
       info.classList.remove("bad");
     };
-    // Sous « Jours d'anticipation » : date d'inscription de la 1re échéance à saisir (prochaine, en modification),
-    // comme l'API : date ≥ « ne rien saisir avant le », inscription à la date − anticipation, tout de suite si elle est passée.
+    // Sous Notes : résumé en une phrase de ce que fera la planification (date de départ, montant,
+    // fréquence, fin), à la place d'un détail technique sur la date d'inscription automatique.
+    // Dernière échéance d'une planification qui finit (count : rang N ; date : dernière occurrence de la
+    // règle qui ne dépasse pas la borne saisie, pas forcément la borne elle-même) ; null si elle ne finit pas.
+    const lastOccurrenceDate = (start, unit, every, endMode, count, endDate) => {
+      if (endMode === "count") return count > 0 ? occurrenceDate(start, unit, every, count) : null;
+      if (endMode === "date") {
+        if (!endDate) return null;
+        let last = null;
+        for (let r = 1; r <= 1200; r++) {
+          const d = occurrenceDate(start, unit, every, r);
+          if (d > endDate) break;
+          last = d;
+        }
+        return last;
+      }
+      return null;
+    };
     const paintLead = () => {
       const info = $(".f-lead-info");
-      const start = $('[name="start_date"]').value;
       if (!$('[name="active"]').checked) return void (info.textContent = t("Inactive : rien ne sera inscrit"));
-      if (!$('[name="auto"]').checked) return void (info.textContent = t("Saisie manuelle : pas d'inscription automatique"));
+      const start = $('[name="start_date"]').value;
       if (!start) return void (info.textContent = "");
+      const installments = $('[name="mode"]').value === "installments";
       const unit = $('[name="unit"]').value;
       const every = Number($('[name="every"]').value) || 1;
       const endMode = $('[name="end_mode"]').value;
       const count = Number($('[name="count"]').value) || 0;
-      const end = $('[name="end_date"]').value;
-      const from = $('[name="generate_from"]').value || isoDate(new Date());
-      const installments = $('[name="mode"]').value === "installments";
-      let first = null;
-      for (let r = s ? s.next_rank || (s.total_occurrences || 0) + 1 : 1; r <= 1200; r++) {
-        const rule = occurrenceDate(start, unit, every, r);
-        if ((endMode === "count" && r > count) || (endMode === "date" && (!end || rule > end))) break;
-        const date = installments ? dateOf({ rank: r, date: rule }) : rule;
-        if (installments && frozen.has(r)) continue;
-        if (date >= from) {
-          first = date;
-          break;
-        }
-      }
-      if (!first) return void (info.textContent = t("Aucune échéance à inscrire"));
-      const [y, m, d] = first.split("-").map(Number);
-      const entry = isoDate(new Date(y, m - 1, d - (Number($('[name="lead_days"]').value) || 0)));
-      const vars = { date: frDate(first), entry: frDate(entry) };
-      const now = entry <= isoDate(new Date());
-      info.textContent = s
-        ? (now ? t("Prochaine échéance ({date}) inscrite dès l'enregistrement", vars) : t("Prochaine échéance ({date}) inscrite le {entry}", vars))
-        : (now ? t("1re échéance ({date}) inscrite dès l'enregistrement", vars) : t("1re échéance ({date}) inscrite le {entry}", vars));
+      const endDate = $('[name="end_date"]').value;
+      const freq = freqLabel({ unit, every, end_mode: endMode, count, end_date: endDate });
+      const base = installments
+        ? t("Première échéance le {date} (montant variable, voir la grille), {freq}", { date: frDate(start), freq })
+        : t("Première échéance le {date} d'un montant de {amount}, {freq}", {
+          date: frDate(start),
+          amount: fmtMoney(toNumber($('[name="amount"]').value) || 0, this._currency(Number($('[name="account_id"]').value))),
+          freq,
+        });
+      const last = lastOccurrenceDate(start, unit, every, endMode, count, endDate);
+      info.textContent = last ? t("{base}, dernière échéance le {date}", { base, date: frDate(last) }) : base;
     };
     const renderGrid = () => {
       paintLead();
@@ -3219,12 +3360,21 @@ class MyBankCard extends HTMLElement {
   }
 
   // Barre de réalisation : réalisé / prévu. Dépense au-delà du prévu en rouge, recette ou épargne atteinte en vert.
+  // "over" (dépense qui dépasse le prévu), "good" (recette/épargne qui atteint l'objectif) ou "" (en cours,
+  // rien à signaler) : utilisé pour la couleur de la barre, et pour le liseré des rubriques (tr.tree-branch).
+  _progressClass(kind, planned, actual) {
+    const p = Number(planned);
+    if (!p) return "";
+    const pct = Math.round((Number(actual) / p) * 100);
+    return kind === "expense" ? (pct > 100 ? "over" : "") : pct >= 100 ? "good" : "";
+  }
+
   _progressHtml(kind, planned, actual) {
     const p = Number(planned);
     const a = Number(actual);
     if (!p) return a ? `<span class="muted">${t("hors budget")}</span>` : "";
     const pct = Math.round((a / p) * 100);
-    const cls = kind === "expense" ? (pct > 100 ? "over" : "") : pct >= 100 ? "good" : "";
+    const cls = this._progressClass(kind, planned, actual);
     return `<div class="pbar ${cls}" title="${esc(t("{actual} réalisés sur {planned} prévus", { actual: fmtAmount(actual), planned: fmtAmount(planned) }))}"><div style="width: ${Math.max(0, Math.min(pct, 100))}%"></div><span>${pct} %</span></div>`;
   }
 
@@ -3255,7 +3405,8 @@ class MyBankCard extends HTMLElement {
           + visible.map((x) => {
             const xp = pick(x.planned);
             const xa = pick(x.actual);
-            return `<tr data-cat="${x.category_id}" data-parent="${x.parent_id ?? ""}" class="${x.has_children ? "tree-branch" : ""}">
+            const cls = x.has_children ? `tree-branch b-${this._progressClass(kind, xp, xa) || "none"}` : "";
+            return `<tr data-cat="${x.category_id}" data-parent="${x.parent_id ?? ""}" class="${cls}">
               <td>${this._treeLabel(x.name, x.depth, branches.has(x.category_id), this._catInfoHtml(x.category_id, ctx))}</td>
               <td>${this._progressHtml(kind, xp, xa)}</td>
               <td class="num">${fmtAmount(xp)}</td>
@@ -3996,7 +4147,8 @@ class MyBankCard extends HTMLElement {
     if (isCategory) {
       fields.push({
         key: "kind",
-        label: t("Type (rubrique racine ; hérité sinon)"),
+        label: t("Type"),
+        help: t("Rubrique racine ; hérité sinon."),
         type: "select",
         options: () => Object.entries(CATEGORY_KINDS).map(([id, name]) => ({ id, name })),
         default: "expense",
@@ -4255,7 +4407,7 @@ class MyBankCard extends HTMLElement {
       const opts = f.options(item)
         .map((o) => `<option value="${esc(o.id)}" ${String(o.id) === String(value ?? "") ? "selected" : ""}>${esc(o.name)}</option>`)
         .join("");
-      return `<label>${esc(f.label)}<select name="${name}">${empty}${opts}</select></label>`;
+      return `<label><span class="field-label">${esc(f.label)}${fieldHelpButtonHtml(f.help)}</span><select name="${name}">${empty}${opts}</select>${fieldHintHtml(f.help)}</label>`;
     }
     if (f.type === "checkbox") {
       // Espaceur invisible de la même hauteur que la ligne de libellé des autres champs (texte
@@ -5707,8 +5859,6 @@ const I18N = {
     ", {n} échéances": ", {n} occurrences",
     "12 derniers mois": "Last 12 months",
     "12 prochains mois": "Next 12 months",
-    "1re échéance ({date}) inscrite dès l'enregistrement": "1st occurrence ({date}) entered on save",
-    "1re échéance ({date}) inscrite le {entry}": "1st occurrence ({date}) entered on {entry}",
     "2 prochaines semaines": "Next 2 weeks",
     "3 derniers mois": "Last 3 months",
     "3 prochains mois": "Next 3 months",
@@ -5721,6 +5871,7 @@ const I18N = {
     "Abandonner les montants saisis non enregistrés ?": "Discard the unsaved amounts?",
     "Actif": "Active",
     "Active": "Active",
+    "À partir du": "From",
     "Active|classe": "Active",
     "Active|rubrique": "Active",
     "Adresse": "Address",
@@ -5728,6 +5879,7 @@ const I18N = {
     "Ajouter": "Add",
     "Ajouter la dépense": "Add the expense",
     "Ajouter un sous-élément": "Add a sub-item",
+    "Ajouter une note": "Add a note",
     "Annuler": "Cancel",
     "Année en cours": "Current year",
     "Antérieure": "Before start",
@@ -5752,7 +5904,6 @@ const I18N = {
     "Aucune opération planifiée.": "No scheduled transaction.",
     "Aucune opération sur cette période.": "No transaction in this period.",
     "Aucune échéance dans les 30 prochains jours.": "Nothing due in the next 30 days.",
-    "Aucune échéance à inscrire": "No occurrence to enter",
     "Autre": "Other",
     "Autre compte": "Other account",
     "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie.": "Bars proportional to the amount spent, category by category, over the chosen period.",
@@ -5799,7 +5950,10 @@ const I18N = {
     "Courses, restaurant…": "Groceries, restaurant…",
     "Critères": "Filters",
     "Critères ({n})": "Filters ({n})",
+    "Critères de recherche": "Search filters",
     "Créer": "Create",
+    "Créer et enchaîner": "Create and continue",
+    "Créer et fermer": "Create and close",
     "Date": "Date",
     "Date du solde initial": "Opening balance date",
     "Dates de la règle": "Dates from the rule",
@@ -5859,6 +6013,7 @@ const I18N = {
     "Mode": "Mode",
     "Mode de règlement": "Payment method",
     "Modifier": "Edit",
+    "Modifier l'opération": "Edit the transaction",
     "Moins de champs": "Fewer fields",
     "Mois en cours": "Current month",
     "Montant": "Amount",
@@ -5889,6 +6044,7 @@ const I18N = {
     "Non pointée": "Not cleared",
     "Non rapprochée": "Not reconciled",
     "Notes": "Notes",
+    "Nouvelle opération": "New transaction",
     "Numéro": "Number",
     "N°": "No.",
     "N° de chèque": "Cheque number",
@@ -5917,10 +6073,11 @@ const I18N = {
     "Premier compte": "First account",
     "Premier mois": "First month",
     "Première échéance": "First occurrence",
+    "Première échéance le {date} (montant variable, voir la grille), {freq}": "First occurrence on {date} (variable amount, see the grid), {freq}",
+    "{base}, dernière échéance le {date}": "{base}, last occurrence on {date}",
+    "Première échéance le {date} d'un montant de {amount}, {freq}": "First occurrence on {date} for {amount}, {freq}",
     "Prochaine dépense :": "Next expense:",
     "Prochaine dépense : {name}.": "Next expense: {name}.",
-    "Prochaine échéance ({date}) inscrite dès l'enregistrement": "Next occurrence ({date}) entered on save",
-    "Prochaine échéance ({date}) inscrite le {entry}": "Next occurrence ({date}) entered on {entry}",
     "Prénom": "First name",
     "Prévu": "Planned",
     "Période": "Period",
@@ -5960,6 +6117,7 @@ const I18N = {
     "Rouvrir": "Reopen",
     "Rubrique": "Category",
     "Rubrique par défaut": "Default category",
+    "Rubrique racine ; hérité sinon.": "Top-level category; inherited otherwise.",
     "Rubriques": "Categories",
     "Réalisation": "Progress",
     "Réalisé": "Actual",
@@ -5969,11 +6127,10 @@ const I18N = {
     "Rétablir": "Restore",
     "Saisi dans la grille": "Entered in the grid",
     "Saisie": "Entered",
-    "Saisie automatique à l'échéance": "Enter automatically when due",
     "Saisie d'opérations : compte par défaut et champs affichés réglables, pré-remplissage par le tiers.": "Transaction entry: default account and visible fields can be set, pre-filled from the payee.",
-    "Saisie manuelle : pas d'inscription automatique": "Manual entry: no automatic entry",
     "Saisie|vue": "Planning",
     "Saisir l'opération maintenant": "Enter the transaction now",
+    "Saisir automatiquement": "Enter automatically",
     "Sans rubrique": "Uncategorized",
     "Sans ventilation": "No split",
     "Sauter": "Skip",
@@ -6007,6 +6164,8 @@ const I18N = {
     "Supprimer « {name} » ensuite": "Then delete “{name}”",
     "Supprimer « {name} », ses participants et ses {n} dépense(s) ?": "Delete “{name}”, its participants and its {n} expense(s)?",
     "Tableau de bord": "Dashboard",
+    "Télécharger": "Download",
+    "Télécharger la liste affichée au format CSV": "Download the displayed list as CSV",
     "Tiers": "Payees",
     "Tiers / autre compte": "Payee / other account",
     "Tiers|champ": "Payee",
@@ -6038,7 +6197,6 @@ const I18N = {
     "Toutes les {n} semaines": "Every {n} weeks",
     "Type": "Type",
     "Type (dépense, recette, virement)": "Type (expense, income, transfer)",
-    "Type (rubrique racine ; hérité sinon)": "Type (top-level category; inherited otherwise)",
     "Téléphone": "Phone",
     "Un champ masqué reste pré-rempli depuis la dernière opération du tiers et enregistré ; la date est celle du jour.": "A hidden field is still pre-filled from the payee's last transaction and saved; the date is today's.",
     "Un virement ne se ventile pas : choisir une seule rubrique.": "A transfer cannot be split: choose a single category.",
@@ -6198,7 +6356,7 @@ const I18N = {
     "My Bank — respect du budget": "My Bank — budget adherence",
     "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Actual / planned in %, month by month, for a budget's income, expenses and savings, with 100 % as a dashed line.",
     "Date limite de paiement": "Payment due date",
-    "Date limite : jours après l'opération": "Due date: days after the transaction",
+    "Délai de paiement (jours)": "Payment deadline (days)",
     "Vide : pas de date limite. 0 : le jour de l'opération.": "Empty: no due date. 0: the day of the transaction.",
     "aucune": "none",
     "limite le {date}": "due {date}",
@@ -6259,8 +6417,6 @@ const I18N = {
     ", {n} échéances": ", {n} Ausführungen",
     "12 derniers mois": "Letzte 12 Monate",
     "12 prochains mois": "Nächste 12 Monate",
-    "1re échéance ({date}) inscrite dès l'enregistrement": "1. Ausführung ({date}) wird beim Speichern gebucht",
-    "1re échéance ({date}) inscrite le {entry}": "1. Ausführung ({date}) wird am {entry} gebucht",
     "2 prochaines semaines": "Nächste 2 Wochen",
     "3 derniers mois": "Letzte 3 Monate",
     "3 prochains mois": "Nächste 3 Monate",
@@ -6273,6 +6429,7 @@ const I18N = {
     "Abandonner les montants saisis non enregistrés ?": "Nicht gespeicherte Beträge verwerfen?",
     "Actif": "Aktiv",
     "Active": "Aktiv",
+    "À partir du": "Ab dem",
     "Active|classe": "Aktiv",
     "Active|rubrique": "Aktiv",
     "Adresse": "Adresse",
@@ -6280,6 +6437,7 @@ const I18N = {
     "Ajouter": "Hinzufügen",
     "Ajouter la dépense": "Ausgabe hinzufügen",
     "Ajouter un sous-élément": "Unterelement hinzufügen",
+    "Ajouter une note": "Notiz hinzufügen",
     "Annuler": "Abbrechen",
     "Année en cours": "Aktuelles Jahr",
     "Antérieure": "Vor Beginn",
@@ -6304,7 +6462,6 @@ const I18N = {
     "Aucune opération planifiée.": "Kein Dauerauftrag.",
     "Aucune opération sur cette période.": "Keine Buchungen in diesem Zeitraum.",
     "Aucune échéance dans les 30 prochains jours.": "In den nächsten 30 Tagen ist nichts fällig.",
-    "Aucune échéance à inscrire": "Keine Ausführung zu buchen",
     "Autre": "Sonstiges",
     "Autre compte": "Anderes Konto",
     "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie.": "Balken proportional zum ausgegebenen Betrag, Kategorie für Kategorie, über den gewählten Zeitraum.",
@@ -6351,7 +6508,10 @@ const I18N = {
     "Courses, restaurant…": "Einkäufe, Restaurant…",
     "Critères": "Filter",
     "Critères ({n})": "Filter ({n})",
+    "Critères de recherche": "Suchkriterien",
     "Créer": "Anlegen",
+    "Créer et enchaîner": "Anlegen und weiter",
+    "Créer et fermer": "Anlegen und schließen",
     "Date": "Datum",
     "Date du solde initial": "Datum des Anfangssaldos",
     "Dates de la règle": "Daten laut Regel",
@@ -6411,6 +6571,7 @@ const I18N = {
     "Mode": "Modus",
     "Mode de règlement": "Zahlungsart",
     "Modifier": "Bearbeiten",
+    "Modifier l'opération": "Buchung bearbeiten",
     "Moins de champs": "Weniger Felder",
     "Mois en cours": "Aktueller Monat",
     "Montant": "Betrag",
@@ -6441,6 +6602,7 @@ const I18N = {
     "Non pointée": "Nicht abgeglichen",
     "Non rapprochée": "Nicht abgestimmt",
     "Notes": "Notizen",
+    "Nouvelle opération": "Neue Buchung",
     "Numéro": "Nummer",
     "N°": "Nr.",
     "N° de chèque": "Schecknummer",
@@ -6469,10 +6631,11 @@ const I18N = {
     "Premier compte": "Erstes Konto",
     "Premier mois": "Erster Monat",
     "Première échéance": "Erste Ausführung",
+    "Première échéance le {date} (montant variable, voir la grille), {freq}": "Erste Ausführung am {date} (variabler Betrag, siehe Tabelle), {freq}",
+    "{base}, dernière échéance le {date}": "{base}, letzte Ausführung am {date}",
+    "Première échéance le {date} d'un montant de {amount}, {freq}": "Erste Ausführung am {date} über {amount}, {freq}",
     "Prochaine dépense :": "Nächste Ausgabe:",
     "Prochaine dépense : {name}.": "Nächste Ausgabe: {name}.",
-    "Prochaine échéance ({date}) inscrite dès l'enregistrement": "Nächste Ausführung ({date}) wird beim Speichern gebucht",
-    "Prochaine échéance ({date}) inscrite le {entry}": "Nächste Ausführung ({date}) wird am {entry} gebucht",
     "Prénom": "Vorname",
     "Prévu": "Geplant",
     "Période": "Zeitraum",
@@ -6512,6 +6675,7 @@ const I18N = {
     "Rouvrir": "Wieder öffnen",
     "Rubrique": "Kategorie",
     "Rubrique par défaut": "Standardkategorie",
+    "Rubrique racine ; hérité sinon.": "Oberste Kategorie; sonst geerbt.",
     "Rubriques": "Kategorien",
     "Réalisation": "Fortschritt",
     "Réalisé": "Ist",
@@ -6521,11 +6685,10 @@ const I18N = {
     "Rétablir": "Wiederherstellen",
     "Saisi dans la grille": "In der Tabelle erfasst",
     "Saisie": "Gebucht",
-    "Saisie automatique à l'échéance": "Bei Fälligkeit automatisch buchen",
     "Saisie d'opérations : compte par défaut et champs affichés réglables, pré-remplissage par le tiers.": "Buchungserfassung: Standardkonto und sichtbare Felder einstellbar, Vorbelegung anhand des Empfängers.",
-    "Saisie manuelle : pas d'inscription automatique": "Manuelle Buchung: keine automatische Buchung",
     "Saisie|vue": "Planung",
     "Saisir l'opération maintenant": "Buchung jetzt erfassen",
+    "Saisir automatiquement": "Automatisch buchen",
     "Sans rubrique": "Ohne Kategorie",
     "Sans ventilation": "Ohne Aufteilung",
     "Sauter": "Überspringen",
@@ -6559,6 +6722,8 @@ const I18N = {
     "Supprimer « {name} » ensuite": "„{name}“ danach löschen",
     "Supprimer « {name} », ses participants et ses {n} dépense(s) ?": "„{name}“ mit seinen Teilnehmern und {n} Ausgabe(n) löschen?",
     "Tableau de bord": "Übersicht",
+    "Télécharger": "Herunterladen",
+    "Télécharger la liste affichée au format CSV": "Angezeigte Liste als CSV herunterladen",
     "Tiers": "Empfänger",
     "Tiers / autre compte": "Empfänger / anderes Konto",
     "Tiers|champ": "Empfänger",
@@ -6590,7 +6755,6 @@ const I18N = {
     "Toutes les {n} semaines": "Alle {n} Wochen",
     "Type": "Art",
     "Type (dépense, recette, virement)": "Art (Ausgabe, Einnahme, Umbuchung)",
-    "Type (rubrique racine ; hérité sinon)": "Art (oberste Kategorie; sonst geerbt)",
     "Téléphone": "Telefon",
     "Un champ masqué reste pré-rempli depuis la dernière opération du tiers et enregistré ; la date est celle du jour.": "Ein ausgeblendetes Feld wird weiterhin aus der letzten Buchung des Empfängers vorausgefüllt und gespeichert; das Datum ist das heutige.",
     "Un virement ne se ventile pas : choisir une seule rubrique.": "Eine Umbuchung kann nicht aufgeteilt werden: eine einzige Kategorie wählen.",
@@ -6750,7 +6914,7 @@ const I18N = {
     "My Bank — respect du budget": "My Bank — Budgeteinhaltung",
     "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Ist / Plan in %, Monat für Monat, für Einnahmen, Ausgaben und Sparen eines Budgets, 100 % gestrichelt.",
     "Date limite de paiement": "Zahlungsfrist",
-    "Date limite : jours après l'opération": "Zahlungsfrist: Tage nach der Buchung",
+    "Délai de paiement (jours)": "Zahlungsfrist (Tage)",
     "Vide : pas de date limite. 0 : le jour de l'opération.": "Leer: keine Zahlungsfrist. 0: am Tag der Buchung.",
     "aucune": "keine",
     "limite le {date}": "fällig am {date}",
@@ -6811,8 +6975,6 @@ const I18N = {
     ", {n} échéances": ", {n} vencimientos",
     "12 derniers mois": "Últimos 12 meses",
     "12 prochains mois": "Próximos 12 meses",
-    "1re échéance ({date}) inscrite dès l'enregistrement": "Primer vencimiento ({date}) registrado al guardar",
-    "1re échéance ({date}) inscrite le {entry}": "Primer vencimiento ({date}) registrado el {entry}",
     "2 prochaines semaines": "Próximas 2 semanas",
     "3 derniers mois": "Últimos 3 meses",
     "3 prochains mois": "Próximos 3 meses",
@@ -6825,6 +6987,7 @@ const I18N = {
     "Abandonner les montants saisis non enregistrés ?": "¿Descartar los importes sin guardar?",
     "Actif": "Activo",
     "Active": "Activo",
+    "À partir du": "Desde el",
     "Active|classe": "Activa",
     "Active|rubrique": "Activa",
     "Adresse": "Dirección",
@@ -6832,6 +6995,7 @@ const I18N = {
     "Ajouter": "Añadir",
     "Ajouter la dépense": "Añadir el gasto",
     "Ajouter un sous-élément": "Añadir un subelemento",
+    "Ajouter une note": "Añadir una nota",
     "Annuler": "Cancelar",
     "Année en cours": "Año actual",
     "Antérieure": "Anterior al inicio",
@@ -6856,7 +7020,6 @@ const I18N = {
     "Aucune opération planifiée.": "No hay ninguna operación programada.",
     "Aucune opération sur cette période.": "No hay operaciones en este periodo.",
     "Aucune échéance dans les 30 prochains jours.": "No hay nada que venza en los próximos 30 días.",
-    "Aucune échéance à inscrire": "No hay vencimientos que registrar",
     "Autre": "Otro",
     "Autre compte": "Otra cuenta",
     "Barres proportionnelles au montant dépensé, rubrique par rubrique, sur la période choisie.": "Barras proporcionales al importe gastado, categoría por categoría, durante el periodo elegido.",
@@ -6903,7 +7066,10 @@ const I18N = {
     "Courses, restaurant…": "Compra, restaurante…",
     "Critères": "Filtros",
     "Critères ({n})": "Filtros ({n})",
+    "Critères de recherche": "Criterios de búsqueda",
     "Créer": "Crear",
+    "Créer et enchaîner": "Crear y continuar",
+    "Créer et fermer": "Crear y cerrar",
     "Date": "Fecha",
     "Date du solde initial": "Fecha del saldo inicial",
     "Dates de la règle": "Fechas según la regla",
@@ -6963,6 +7129,7 @@ const I18N = {
     "Mode": "Modo",
     "Mode de règlement": "Método de pago",
     "Modifier": "Editar",
+    "Modifier l'opération": "Editar la operación",
     "Moins de champs": "Menos campos",
     "Mois en cours": "Mes actual",
     "Montant": "Importe",
@@ -6993,6 +7160,7 @@ const I18N = {
     "Non pointée": "Sin liquidar",
     "Non rapprochée": "No conciliada",
     "Notes": "Notas",
+    "Nouvelle opération": "Nueva operación",
     "Numéro": "Número",
     "N°": "N.º",
     "N° de chèque": "Número de cheque",
@@ -7021,10 +7189,11 @@ const I18N = {
     "Premier compte": "Primera cuenta",
     "Premier mois": "Primer mes",
     "Première échéance": "Primer vencimiento",
+    "Première échéance le {date} (montant variable, voir la grille), {freq}": "Primer vencimiento el {date} (importe variable, ver la tabla), {freq}",
+    "{base}, dernière échéance le {date}": "{base}, último vencimiento el {date}",
+    "Première échéance le {date} d'un montant de {amount}, {freq}": "Primer vencimiento el {date} por {amount}, {freq}",
     "Prochaine dépense :": "Próximo gasto:",
     "Prochaine dépense : {name}.": "Próximo gasto: {name}.",
-    "Prochaine échéance ({date}) inscrite dès l'enregistrement": "Próximo vencimiento ({date}) registrado al guardar",
-    "Prochaine échéance ({date}) inscrite le {entry}": "Próximo vencimiento ({date}) registrado el {entry}",
     "Prénom": "Nombre",
     "Prévu": "Previsto",
     "Période": "Periodo",
@@ -7064,6 +7233,7 @@ const I18N = {
     "Rouvrir": "Volver a abrir",
     "Rubrique": "Categoría",
     "Rubrique par défaut": "Categoría predeterminada",
+    "Rubrique racine ; hérité sinon.": "Categoría principal; heredado en los demás casos.",
     "Rubriques": "Categorías",
     "Réalisation": "Progreso",
     "Réalisé": "Realizado",
@@ -7073,11 +7243,10 @@ const I18N = {
     "Rétablir": "Restaurar",
     "Saisi dans la grille": "Introducido en la tabla",
     "Saisie": "Registrado",
-    "Saisie automatique à l'échéance": "Registrar automáticamente al vencer",
     "Saisie d'opérations : compte par défaut et champs affichés réglables, pré-remplissage par le tiers.": "Registro de operaciones: cuenta predeterminada y campos visibles configurables; autocompletado a partir del beneficiario.",
-    "Saisie manuelle : pas d'inscription automatique": "Registro manual: sin registro automático",
     "Saisie|vue": "Planificación",
     "Saisir l'opération maintenant": "Registrar la operación ahora",
+    "Saisir automatiquement": "Registrar automáticamente",
     "Sans rubrique": "Sin categoría",
     "Sans ventilation": "Sin desglose",
     "Sauter": "Omitir",
@@ -7111,6 +7280,8 @@ const I18N = {
     "Supprimer « {name} » ensuite": "Eliminar después «{name}»",
     "Supprimer « {name} », ses participants et ses {n} dépense(s) ?": "¿Eliminar «{name}», a sus participantes y sus {n} gastos?",
     "Tableau de bord": "Panel",
+    "Télécharger": "Descargar",
+    "Télécharger la liste affichée au format CSV": "Descargar la lista mostrada en formato CSV",
     "Tiers": "Beneficiarios",
     "Tiers / autre compte": "Beneficiario / otra cuenta",
     "Tiers|champ": "Beneficiario",
@@ -7142,7 +7313,6 @@ const I18N = {
     "Toutes les {n} semaines": "Cada {n} semanas",
     "Type": "Tipo",
     "Type (dépense, recette, virement)": "Tipo (gasto, ingreso, transferencia)",
-    "Type (rubrique racine ; hérité sinon)": "Tipo (categoría principal; heredado en los demás casos)",
     "Téléphone": "Teléfono",
     "Un champ masqué reste pré-rempli depuis la dernière opération du tiers et enregistré ; la date est celle du jour.": "Un campo oculto se sigue rellenando automáticamente con los datos de la última operación del beneficiario y se guarda; la fecha es la de hoy.",
     "Un virement ne se ventile pas : choisir une seule rubrique.": "Una transferencia no se puede desglosar: elige una sola categoría.",
@@ -7302,7 +7472,7 @@ const I18N = {
     "My Bank — respect du budget": "My Bank — cumplimiento del presupuesto",
     "Réalisé / prévu en %, mois par mois, des recettes, dépenses et épargne d'un budget, avec le 100 % en pointillés.": "Real / previsto en %, mes a mes, de los ingresos, gastos y ahorro de un presupuesto, con el 100 % en línea discontinua.",
     "Date limite de paiement": "Fecha límite de pago",
-    "Date limite : jours après l'opération": "Fecha límite: días después del movimiento",
+    "Délai de paiement (jours)": "Plazo de pago (días)",
     "Vide : pas de date limite. 0 : le jour de l'opération.": "Vacío: sin fecha límite. 0: el día del movimiento.",
     "aucune": "ninguna",
     "limite le {date}": "vence el {date}",

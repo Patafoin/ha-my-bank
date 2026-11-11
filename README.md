@@ -111,7 +111,7 @@ If the cards don't show up in the picker after installing or updating, force-rel
 | Tab (`sections` key) | Content |
 |---|---|
 | `dashboard` | Balances of every account, budget of the current month |
-| `transactions` | Transactions of an account with running balance; filters (savable as default); add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click; a reconciliation helper highlights the transaction that explains a balance gap; attach a receipt (a link, or a file kept by the server) to a transaction, opened in one click (📎); an optional payment due date, with unpaid transactions flagged in red and those due soon in orange — see [Payment due dates](#payment-due-dates) |
+| `transactions` | Transactions of an account with running balance; filters (savable as default); add, edit, split, transfer; clear (☐/☑) and reconcile (🔓/🔒) in one click; a reconciliation helper highlights the transaction that explains a balance gap; attach a receipt (a link, or a file kept by the server) to a transaction, opened in one click (📎); an optional payment due date, with unpaid transactions flagged in red and those due soon in orange — see [Payment due dates](#payment-due-dates); tick several transactions (Shift+click for a range) to change their category, class or payee at once; download the displayed list as CSV |
 | `accounts` | Accounts (checking, savings, card, cash…), currency, opening balance, closing, one default account |
 | `categories` / `tags` | Category tree (income / expense / savings) and classes, a second axis for analysis — see [Categories and classes](#categories-and-classes) |
 | `payees` | Payees with default category |
