@@ -1083,6 +1083,10 @@ create_schedule:
       selector:
         number:
           mode: box
+    use_global_lead_days:
+      required: false
+      selector:
+        boolean: {}
     due_days:
       required: false
       selector:
@@ -1207,6 +1211,10 @@ update_schedule:
       selector:
         number:
           mode: box
+    use_global_lead_days:
+      required: false
+      selector:
+        boolean: {}
     due_days:
       required: false
       selector:
@@ -1278,6 +1286,20 @@ generate_occurrence:
         number:
           mode: box
 generate_due_occurrences: {}
+get_schedule_settings: {}
+update_schedule_settings:
+  fields:
+    auto_entry_enabled:
+      required: false
+      selector:
+        boolean: {}
+    auto_entry_days_before_month_start:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 90
+          mode: box
 create_budget:
   fields:
     account_id:

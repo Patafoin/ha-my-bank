@@ -1174,6 +1174,10 @@
         "active": {
           "name": "Activo",
           "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "use_global_lead_days": {
+          "name": "Usar el ajuste global",
+          "description": "Ignora «Días de antelación»: sigue el ajuste global de registro automático (días antes del inicio del mes)."
         }
       }
     },
@@ -1272,6 +1276,10 @@
         "active": {
           "name": "Activo",
           "description": "Elemento activo (los inactivos no aparecen entre las opciones)."
+        },
+        "use_global_lead_days": {
+          "name": "Usar el ajuste global",
+          "description": "Ignora «Días de antelación»: sigue el ajuste global de registro automático (días antes del inicio del mes)."
         }
       }
     },
@@ -1786,6 +1794,24 @@
         "target_id": {
           "name": "Destino",
           "description": "ID del elemento que recibirá los movimientos."
+        }
+      }
+    },
+    "get_schedule_settings": {
+      "name": "Obtener el ajuste de registro automático",
+      "description": "Devuelve el ajuste global de registro automático anclado al mes (días antes de su inicio)."
+    },
+    "update_schedule_settings": {
+      "name": "Configurar el registro automático",
+      "description": "Cambia el ajuste global de registro automático anclado al mes.",
+      "fields": {
+        "auto_entry_enabled": {
+          "name": "Activo",
+          "description": "Las planificaciones que usan el ajuste global («Usar el ajuste global») lo siguen solo mientras esté activo."
+        },
+        "auto_entry_days_before_month_start": {
+          "name": "Días antes del día 1",
+          "description": "Número de días antes del inicio del mes a partir del cual se registran sus vencimientos."
         }
       }
     }

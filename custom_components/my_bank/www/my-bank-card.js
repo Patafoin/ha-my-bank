@@ -288,6 +288,7 @@ const STYLE = `
     background: none; border: none; cursor: pointer; font-size: 18px; min-width: 44px; min-height: 44px; padding: 4px;
     color: var(--primary-text-color);
   }
+  .tx-actions button ha-icon { --mdc-icon-size: 20px; display: block; margin: auto; }
   .muted { color: var(--secondary-text-color); }
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
   .toolbar input[type="search"] { flex: 1 1 160px; }
@@ -340,6 +341,9 @@ const STYLE = `
   tr.flash > td { animation: flash 2s ease-out; }
   @keyframes flash { from { background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.25); } to { background: transparent; } }
   .form-actions, .full { grid-column: 1 / -1; }
+  .lead-group { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+  form.entity-form .lead-group label.lead-days-field { flex-direction: row; align-items: center; gap: 6px; }
+  .lead-group .lead-days-field input { width: 70px; }
   .form-actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
   .att-field { display: flex; flex-direction: column; gap: 4px; }
   .att-current { font-size: 12px; color: var(--secondary-text-color); }
@@ -721,10 +725,17 @@ function isoDate(d) {
 }
 
 // Date d'inscription automatique d'une échéance : sa date moins les jours d'anticipation (comme l'API) ;
+// ou, si la planification suit le réglage global actif, le 1er du mois de l'échéance moins ses jours
+// (plus tôt possible : la tâche quotidienne peut l'inscrire n'importe quel jour à partir de celle-ci).
 // null si la saisie est manuelle ou sans anticipation (inscrite le jour même).
-function autoEntryDate(date, s) {
-  if (!s || !s.auto || !s.lead_days) return null;
+function autoEntryDate(date, s, globalSettings) {
+  if (!s || !s.auto) return null;
   const [y, m, d] = date.split("-").map(Number);
+  if (s.use_global_lead_days) {
+    if (!globalSettings || !globalSettings.auto_entry_enabled) return null;
+    return isoDate(new Date(y, m - 1, 1 - globalSettings.auto_entry_days_before_month_start));
+  }
+  if (!s.lead_days) return null;
   return isoDate(new Date(y, m - 1, d - s.lead_days));
 }
 
@@ -2502,9 +2513,10 @@ class MyBankCard extends HTMLElement {
 
   async _renderSchedules() {
     await this._ensureLookups();
-    const [schedules, upcoming] = await Promise.all([
+    const [schedules, upcoming, settings] = await Promise.all([
       this._items("list_schedules"),
       this._items("list_upcoming_occurrences", { days: TERM_DAYS }),
+      this._call("get_schedule_settings", {}, true),
     ]);
     this._schedItems = new Map(schedules.map((s) => [s.id, s]));
     this._refreshAlerts([schedules, upcoming]);
@@ -2512,6 +2524,7 @@ class MyBankCard extends HTMLElement {
     const upcomingHtml = upcoming
       .map((o) => {
         const s = this._schedItems.get(o.schedule_id);
+        const entry = autoEntryDate(o.date, s, settings);
         return `<div class="tx-row ${o.overdue ? "overdue" : ""}" data-schedule="${o.schedule_id}" data-rank="${o.rank}">
           <div class="tx-main">
             <div class="tx-info">
@@ -2519,7 +2532,7 @@ class MyBankCard extends HTMLElement {
               <div class="tx-sub">${esc([
                 frDate(o.date),
                 o.overdue ? t("en retard") : "",
-                autoEntryDate(o.date, s) ? t("inscription auto le {date}", { date: frDate(autoEntryDate(o.date, s)) }) : "",
+                entry ? t("inscription auto le {date}", { date: frDate(entry) }) : "",
                 this._schedAccounts(s),
                 o.auto ? "" : t("saisie manuelle"),
               ].filter(Boolean).join(" · "))}</div>
@@ -2527,8 +2540,8 @@ class MyBankCard extends HTMLElement {
             <div class="tx-right">
               <div class="tx-amounts"><div class="tx-amount ${Number(o.amount) > 0 ? "credit" : Number(o.amount) < 0 ? "debit" : ""}">${Number(o.amount) > 0 ? "+" : ""}${fmtMoney(o.amount, this._currency(o.account_id))}</div></div>
               <div class="tx-actions">
-                <button class="occ-generate" title="${t("Saisir l'opération maintenant")}">✓</button>
-                <button class="occ-skip" title="${t("Sauter cette échéance")}">⏭</button>
+                <button class="occ-generate" title="${t("Saisir l'opération maintenant")}"><ha-icon icon="mdi:check-circle-outline"></ha-icon></button>
+                <button class="occ-skip" title="${t("Sauter cette échéance")}"><ha-icon icon="mdi:skip-next-outline"></ha-icon></button>
               </div>
             </div>
           </div>
@@ -2537,6 +2550,7 @@ class MyBankCard extends HTMLElement {
       .join("");
     const listHtml = schedules
       .map((s) => {
+        const globalEntry = s.auto && s.use_global_lead_days && s.next_date ? autoEntryDate(s.next_date, s, settings) : null;
         const sub = [
           this._schedAccounts(s),
           freqLabel(s),
@@ -2544,6 +2558,9 @@ class MyBankCard extends HTMLElement {
           s.total_occurrences ? t("{done}/{total} générées", { done: s.generated, total: s.total_occurrences }) : "",
           s.active ? "" : t("inactive"),
           s.auto ? "" : t("saisie manuelle"),
+          s.auto && s.use_global_lead_days
+            ? (globalEntry ? t("réglage global ({date})", { date: frDate(globalEntry) }) : t("réglage global"))
+            : "",
         ].filter(Boolean);
         const amount = s.next_amount ?? s.amount;
         return `<div class="tx-row ${s.active ? "" : "future"}" data-id="${s.id}">
@@ -2565,21 +2582,46 @@ class MyBankCard extends HTMLElement {
       })
       .join("");
     this._bodyEl.innerHTML = `
-      <div class="toolbar"><button class="add">+ ${t("Opération planifiée")}</button></div>
+      <div class="toolbar sched-toolbar">
+        <label class="check-inline"><input type="checkbox" class="g-auto-enabled" ${settings.auto_entry_enabled ? "checked" : ""}>${t("Saisie automatique de toutes les opérations")}</label>
+        <label class="check-inline g-auto-days" ${settings.auto_entry_enabled ? "" : "hidden"}><input type="number" class="g-auto-days-input" min="0" max="90" value="${settings.auto_entry_days_before_month_start}">${t("jours avant le 1er du mois")}</label>
+        <button class="add">+ ${t("Opération planifiée")}</button>
+      </div>
       <div class="form-container"></div>
-      <div class="month-sep">${t("À venir (30 jours)")}</div>
-      <div class="upcoming-list">${upcomingHtml || `<div class="empty">${t("Aucune échéance dans les 30 prochains jours.")}</div>`}</div>
       <div class="month-sep">${t("Opérations planifiées")}</div>
       <div class="sched-list">${listHtml || `<div class="empty">${t("Aucune opération planifiée.")}</div>`}</div>
+      <div class="month-sep">${t("À venir (30 jours)")}</div>
+      <div class="upcoming-list">${upcomingHtml || `<div class="empty">${t("Aucune échéance dans les 30 prochains jours.")}</div>`}</div>
     `;
     const formContainer = this._bodyEl.querySelector(".form-container");
     this._bodyEl.querySelector(".add").addEventListener("click", () => this._showScheduleForm(formContainer, null));
+    const gEnabled = this._bodyEl.querySelector(".g-auto-enabled");
+    const gDays = this._bodyEl.querySelector(".g-auto-days");
+    const gDaysInput = this._bodyEl.querySelector(".g-auto-days-input");
+    gEnabled.addEventListener("change", async () => {
+      gDays.hidden = !gEnabled.checked;
+      try {
+        await this._call("update_schedule_settings", { auto_entry_enabled: gEnabled.checked }, false);
+        this._renderActive();
+      } catch (err) {
+        alert(errMsg(err));
+      }
+    });
+    gDaysInput.addEventListener("change", async () => {
+      try {
+        await this._call("update_schedule_settings", { auto_entry_days_before_month_start: Number(gDaysInput.value) || 0 }, false);
+        this._renderActive();
+      } catch (err) {
+        alert(errMsg(err));
+      }
+    });
     this._bodyEl.querySelector(".upcoming-list").addEventListener("click", async (ev) => {
       const btn = ev.target.closest("button");
       const row = ev.target.closest("[data-schedule]");
       if (!btn || !row) return;
       const data = { schedule_id: Number(row.dataset.schedule), rank: Number(row.dataset.rank) };
       const service = btn.classList.contains("occ-generate") ? "generate_occurrence" : "skip_occurrence";
+      if (service === "generate_occurrence" && !confirm(t("Saisir cette opération maintenant ?"))) return;
       if (service === "skip_occurrence" && !confirm(t("Sauter cette échéance (elle ne sera pas saisie) ?"))) return;
       btn.disabled = true;
       try {
@@ -2717,10 +2759,13 @@ class MyBankCard extends HTMLElement {
         </select></label>
         <label class="f-count">${t("Nombre d'échéances")}<input type="number" name="count" min="1" value="${s && s.count ? s.count : 12}"></label>
         <label class="f-end-date">${t("Dernière échéance au plus tard le")}<input type="date" name="end_date" value="${esc(s && s.end_date ? s.end_date : "")}"></label>
-        <label>${t("Jours d'anticipation")}<input type="number" name="lead_days" min="0" max="90" value="${s ? s.lead_days : 0}"></label>
         <label>${t("À partir du")}<input type="date" name="generate_from" value="${esc(s ? s.generate_from : isoDate(new Date()))}"></label>
         <label title="${esc(t("Vide : pas de date limite. 0 : le jour de l'opération."))}">${t("Délai de paiement (jours)")}<input type="number" name="due_days" min="0" max="365" placeholder="${esc(t("aucune"))}" value="${s && s.due_days != null ? s.due_days : ""}"></label>
-        <label class="check check-aligned"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="auto" ${!s || s.auto ? "checked" : ""}>${t("Saisir automatiquement")}</span></label>
+        <div class="full lead-group">
+          <label class="check"><input type="checkbox" name="auto" ${!s || s.auto ? "checked" : ""}>${t("Saisir automatiquement")}</label>
+          <label class="check"><input type="checkbox" name="use_global_lead_days" ${s && !s.use_global_lead_days ? "" : "checked"}>${t("Utiliser le réglage global")}</label>
+          <label class="lead-days-field">${t("Jours d'anticipation")}<input type="number" name="lead_days" min="0" max="90" value="${s ? s.lead_days : 0}"></label>
+        </div>
         <label class="check check-aligned"><span class="check-spacer" aria-hidden="true">&nbsp;</span><span class="check-row"><input type="checkbox" name="active" ${!s || s.active ? "checked" : ""}>${t("Active")}</span></label>
         <label class="full">${t("Notes")}<input type="text" name="notes" value="${esc(s ? s.notes || "" : "")}"></label>
         <div class="full muted f-lead-info"></div>
@@ -2941,6 +2986,19 @@ class MyBankCard extends HTMLElement {
     sync();
     form.addEventListener("input", paintLead);
     form.addEventListener("change", paintLead);
+    // Saisir automatiquement → possibilité d'utiliser le réglage global ou des jours d'anticipation propres ;
+    // utiliser le réglage global → jours d'anticipation sans objet (grisés).
+    const syncLead = () => {
+      const autoOn = $('[name="auto"]').checked;
+      $('[name="use_global_lead_days"]').disabled = !autoOn;
+      $('[name="lead_days"]').disabled = !autoOn || $('[name="use_global_lead_days"]').checked;
+    };
+    $('[name="auto"]').addEventListener("change", () => {
+      if ($('[name="auto"]').checked) $('[name="use_global_lead_days"]').checked = true;
+      syncLead();
+    });
+    $('[name="use_global_lead_days"]').addEventListener("change", syncLead);
+    syncLead();
     ["type", "mode", "end_mode", "unit"].forEach((n) => $(`[name="${n}"]`).addEventListener("change", sync));
     ["start_date", "every", "count", "end_date"].forEach((n) => $(`[name="${n}"]`).addEventListener("input", renderGrid));
     $(".cancel").addEventListener("click", () => (container.innerHTML = ""));
@@ -2979,6 +3037,7 @@ class MyBankCard extends HTMLElement {
         count: $('[name="end_mode"]').value === "count" ? Number($('[name="count"]').value) : null,
         end_date: $('[name="end_mode"]').value === "date" ? $('[name="end_date"]').value || null : null,
         lead_days: Number($('[name="lead_days"]').value) || 0,
+        use_global_lead_days: $('[name="use_global_lead_days"]').checked,
         due_days: $('[name="due_days"]').value === "" ? null : Number($('[name="due_days"]').value),
         auto: $('[name="auto"]').checked,
         active: $('[name="active"]').checked,
@@ -6131,11 +6190,17 @@ const I18N = {
     "Saisie|vue": "Planning",
     "Saisir l'opération maintenant": "Enter the transaction now",
     "Saisir automatiquement": "Enter automatically",
+    "Saisie automatique de toutes les opérations": "Automatic entry for all scheduled transactions",
+    "jours avant le 1er du mois": "days before the 1st of the month",
+    "Utiliser le réglage global": "Use global setting",
+    "réglage global": "global setting",
+    "réglage global ({date})": "global setting ({date})",
     "Sans rubrique": "Uncategorized",
     "Sans ventilation": "No split",
     "Sauter": "Skip",
     "Sauter cette échéance": "Skip this occurrence",
     "Sauter cette échéance (elle ne sera pas saisie) ?": "Skip this occurrence (it will not be entered)?",
+    "Saisir cette opération maintenant ?": "Enter this transaction now?",
     "Sautée": "Skipped",
     "Section inconnue.": "Unknown section.",
     "Solde": "Balance",
@@ -6689,11 +6754,17 @@ const I18N = {
     "Saisie|vue": "Planung",
     "Saisir l'opération maintenant": "Buchung jetzt erfassen",
     "Saisir automatiquement": "Automatisch buchen",
+    "Saisie automatique de toutes les opérations": "Automatische Buchung für alle Planbuchungen",
+    "jours avant le 1er du mois": "Tage vor dem 1. des Monats",
+    "Utiliser le réglage global": "Globale Einstellung verwenden",
+    "réglage global": "globale Einstellung",
+    "réglage global ({date})": "globale Einstellung ({date})",
     "Sans rubrique": "Ohne Kategorie",
     "Sans ventilation": "Ohne Aufteilung",
     "Sauter": "Überspringen",
     "Sauter cette échéance": "Diese Ausführung überspringen",
     "Sauter cette échéance (elle ne sera pas saisie) ?": "Diese Ausführung überspringen (sie wird nicht gebucht)?",
+    "Saisir cette opération maintenant ?": "Diese Buchung jetzt erfassen?",
     "Sautée": "Übersprungen",
     "Section inconnue.": "Unbekannter Bereich.",
     "Solde": "Saldo",
@@ -7247,11 +7318,17 @@ const I18N = {
     "Saisie|vue": "Planificación",
     "Saisir l'opération maintenant": "Registrar la operación ahora",
     "Saisir automatiquement": "Registrar automáticamente",
+    "Saisie automatique de toutes les opérations": "Registro automático de todas las operaciones",
+    "jours avant le 1er du mois": "días antes del día 1 del mes",
+    "Utiliser le réglage global": "Usar el ajuste global",
+    "réglage global": "ajuste global",
+    "réglage global ({date})": "ajuste global ({date})",
     "Sans rubrique": "Sin categoría",
     "Sans ventilation": "Sin desglose",
     "Sauter": "Omitir",
     "Sauter cette échéance": "Omitir este vencimiento",
     "Sauter cette échéance (elle ne sera pas saisie) ?": "¿Omitir este vencimiento (no se registrará)?",
+    "Saisir cette opération maintenant ?": "¿Registrar este movimiento ahora?",
     "Sautée": "Omitida",
     "Section inconnue.": "Sección desconocida.",
     "Solde": "Saldo",

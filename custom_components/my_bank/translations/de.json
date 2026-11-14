@@ -1174,6 +1174,10 @@
         "active": {
           "name": "Aktiv",
           "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "use_global_lead_days": {
+          "name": "Globale Einstellung verwenden",
+          "description": "Ignoriert „Tage im Voraus“: folgt stattdessen der globalen Einstellung für die automatische Buchung (Tage vor Monatsbeginn)."
         }
       }
     },
@@ -1272,6 +1276,10 @@
         "active": {
           "name": "Aktiv",
           "description": "Aktives Element (inaktive werden nicht mehr angeboten)."
+        },
+        "use_global_lead_days": {
+          "name": "Globale Einstellung verwenden",
+          "description": "Ignoriert „Tage im Voraus“: folgt stattdessen der globalen Einstellung für die automatische Buchung (Tage vor Monatsbeginn)."
         }
       }
     },
@@ -1786,6 +1794,24 @@
         "target_id": {
           "name": "Ziel",
           "description": "ID des Elements, das die Buchungen erhält."
+        }
+      }
+    },
+    "get_schedule_settings": {
+      "name": "Einstellung für automatische Buchung abrufen",
+      "description": "Liefert die globale, auf den Monat bezogene Einstellung für die automatische Buchung (Tage vor dessen Beginn)."
+    },
+    "update_schedule_settings": {
+      "name": "Einstellung für automatische Buchung ändern",
+      "description": "Ändert die globale, auf den Monat bezogene Einstellung für die automatische Buchung.",
+      "fields": {
+        "auto_entry_enabled": {
+          "name": "Aktiv",
+          "description": "Planbuchungen, die die globale Einstellung verwenden („Globale Einstellung verwenden“), folgen ihr nur, solange dies aktiv ist."
+        },
+        "auto_entry_days_before_month_start": {
+          "name": "Tage vor dem 1.",
+          "description": "Anzahl Tage vor Monatsbeginn, ab der dessen Fälligkeiten erfasst werden."
         }
       }
     }

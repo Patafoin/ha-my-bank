@@ -246,6 +246,7 @@ _SCHEDULE_FIELDS = {
     vol.Optional("notes"): _TEXT,
     vol.Optional("auto"): cv.boolean,
     vol.Optional("lead_days"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+    vol.Optional("use_global_lead_days"): cv.boolean,
     vol.Optional("due_days"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=0, max=365))),
     vol.Optional("generate_from"): _DATE,
     vol.Optional("active"): cv.boolean,
@@ -328,6 +329,17 @@ _WRITE_SERVICES: list[tuple[str, vol.Schema, str, str]] = [
     ("restore_occurrence", _OCCURRENCE, "DELETE", "schedules/{schedule_id}/occurrences/{rank}/skip"),
     ("generate_occurrence", _OCCURRENCE, "POST", "schedules/{schedule_id}/occurrences/{rank}/generate"),
     ("generate_due_occurrences", vol.Schema({}), "POST", "schedules/generate"),
+    (
+        "update_schedule_settings",
+        vol.Schema(
+            {
+                vol.Optional("auto_entry_enabled"): cv.boolean,
+                vol.Optional("auto_entry_days_before_month_start"): vol.All(vol.Coerce(int), vol.Range(min=0, max=90)),
+            }
+        ),
+        "PATCH",
+        "schedules/settings",
+    ),
     ("create_budget", vol.Schema({vol.Required("account_id"): _ID, vol.Required("name"): cv.string, vol.Required("start_month"): _MONTH, **_BUDGET_FIELDS}), "POST", "budgets"),
     ("update_budget", vol.Schema({vol.Required("budget_id"): _ID, vol.Optional("account_id"): _ID, **_BUDGET_FIELDS}), "PATCH", "budgets/{budget_id}"),
     ("delete_budget", vol.Schema({vol.Required("budget_id"): _ID}), "DELETE", "budgets/{budget_id}"),
@@ -401,6 +413,7 @@ _READ_SERVICES: list[tuple[str, vol.Schema, str]] = [
         "transactions",
     ),
     ("list_schedules", vol.Schema({vol.Optional("account_id"): _ID, vol.Optional("active"): cv.boolean}), "schedules"),
+    ("get_schedule_settings", vol.Schema({}), "schedules/settings"),
     (
         "list_upcoming_occurrences",
         vol.Schema({vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min=0, max=366)), vol.Optional("account_id"): _ID}),

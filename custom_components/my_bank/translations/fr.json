@@ -1174,6 +1174,10 @@
         "active": {
           "name": "Actif",
           "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "use_global_lead_days": {
+          "name": "Utiliser le réglage global",
+          "description": "Ignore « Jours d'anticipation » : suit le réglage global de saisie automatique (jours avant le 1er du mois)."
         }
       }
     },
@@ -1272,6 +1276,10 @@
         "active": {
           "name": "Actif",
           "description": "Élément actif (les inactifs ne sont plus proposés)."
+        },
+        "use_global_lead_days": {
+          "name": "Utiliser le réglage global",
+          "description": "Ignore « Jours d'anticipation » : suit le réglage global de saisie automatique (jours avant le 1er du mois)."
         }
       }
     },
@@ -1786,6 +1794,24 @@
         "target_id": {
           "name": "Cible",
           "description": "Identifiant de l'élément qui reçoit les opérations."
+        }
+      }
+    },
+    "get_schedule_settings": {
+      "name": "Lire le réglage de saisie automatique",
+      "description": "Renvoie le réglage global de saisie automatique ancré sur le mois (jours avant son 1er)."
+    },
+    "update_schedule_settings": {
+      "name": "Régler la saisie automatique",
+      "description": "Change le réglage global de saisie automatique ancré sur le mois.",
+      "fields": {
+        "auto_entry_enabled": {
+          "name": "Actif",
+          "description": "Les planifications qui utilisent le réglage global (« Utiliser le réglage global ») le suivent seulement pendant que c'est actif."
+        },
+        "auto_entry_days_before_month_start": {
+          "name": "Jours avant le 1er",
+          "description": "Nombre de jours avant le début du mois à partir duquel ses échéances sont saisies."
         }
       }
     }

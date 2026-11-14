@@ -1174,6 +1174,10 @@
         "active": {
           "name": "Active",
           "description": "Active item (inactive items are hidden from choices)."
+        },
+        "use_global_lead_days": {
+          "name": "Use global setting",
+          "description": "Ignore \"Days in advance\": follow the global automatic entry setting (days before the start of the month) instead."
         }
       }
     },
@@ -1272,6 +1276,10 @@
         "active": {
           "name": "Active",
           "description": "Active item (inactive items are hidden from choices)."
+        },
+        "use_global_lead_days": {
+          "name": "Use global setting",
+          "description": "Ignore \"Days in advance\": follow the global automatic entry setting (days before the start of the month) instead."
         }
       }
     },
@@ -1786,6 +1794,24 @@
         "target_id": {
           "name": "Target",
           "description": "Id of the item that receives the transactions."
+        }
+      }
+    },
+    "get_schedule_settings": {
+      "name": "Get automatic entry setting",
+      "description": "Returns the global setting for automatic entry anchored on the month (days before its start)."
+    },
+    "update_schedule_settings": {
+      "name": "Set automatic entry setting",
+      "description": "Changes the global setting for automatic entry anchored on the month.",
+      "fields": {
+        "auto_entry_enabled": {
+          "name": "Enabled",
+          "description": "Scheduled transactions using the global setting (\"Use global setting\") follow it only while this is on."
+        },
+        "auto_entry_days_before_month_start": {
+          "name": "Days before the 1st",
+          "description": "Number of days before the start of the month from which its occurrences are entered."
         }
       }
     }

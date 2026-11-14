@@ -225,6 +225,18 @@ async def test_schedule_services(hass, aioclient_mock, loaded_entry):
     assert str(_last(aioclient_mock)[1]).endswith("/schedules/upcoming?days=15")
 
 
+async def test_schedule_settings_services(hass, aioclient_mock, loaded_entry):
+    aioclient_mock.get(f"{API}/schedules/settings", json={"auto_entry_enabled": True, "auto_entry_days_before_month_start": 5})
+    aioclient_mock.patch(f"{API}/schedules/settings", json={"auto_entry_enabled": True, "auto_entry_days_before_month_start": 5})
+
+    result = await _call(hass, "get_schedule_settings", {}, return_response=True)
+    assert result == {"auto_entry_enabled": True, "auto_entry_days_before_month_start": 5}
+    await _call(hass, "update_schedule_settings", {"auto_entry_enabled": True, "auto_entry_days_before_month_start": 5})
+    assert _last(aioclient_mock) == (
+        "PATCH", f"{API}/schedules/settings", {"auto_entry_enabled": True, "auto_entry_days_before_month_start": 5}
+    )
+
+
 async def test_budget_services(hass, aioclient_mock, loaded_entry):
     aioclient_mock.put(f"{API}/budgets/2/lines", json={"budget_id": 2, "months": [], "lines": []})
     aioclient_mock.post(f"{API}/budgets/2/copy", json={"id": 3})
