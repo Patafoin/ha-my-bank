@@ -388,12 +388,17 @@ async def test_admins_and_automations_always_have_full_access(hass, aioclient_mo
     assert await _as_user(hass, hass_admin_user, "get_access", {}, return_response=True) == {"level": "write"}
 
 
-async def test_options_flow_lists_non_admin_users_and_accounts(hass, loaded_entry, hass_admin_user, hass_read_only_user):
+def _profile(pid, name, position=0):
+    return {"id": pid, "name": name, "position": position, "is_default": pid == 1, "accounts": 0, "categories": 0, "classes": 0, "payees": 0}
+
+
+async def test_options_flow_lists_non_admin_users_and_accounts(hass, aioclient_mock, loaded_entry, hass_admin_user, hass_read_only_user):
     hass_read_only_user.name = "Alice"
+    aioclient_mock.get(f"{API}/profiles", json=[_profile(1, "Default")])
     result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
-    assert result["type"] == "form" and result["step_id"] == "init"
+    assert result["type"] == "form" and result["step_id"] == "settings"  # un seul profil : pas de menu
     # Entrée antérieure à 0.16.0 : les réglages affichés reproduisent le comportement d'avant
-    defaults = result["data_schema"]({"users": {}, "sensors": {}, "due": {}})
+    defaults = result["data_schema"]({"users": {}, "sensors": {}, "due": {}, "profiles": {}})
     assert defaults["users"] == {"default_access": "read", "Alice": "read"}  # pas les administrateurs
     assert defaults["sensors"] == {"ending_sensor": True, "balance_sensors": ["1", "2"]}
     assert defaults["due"] == {"due_warning_days": 7}
@@ -404,15 +409,123 @@ async def test_options_flow_lists_non_admin_users_and_accounts(hass, loaded_entr
             "users": {"default_access": "none", "Alice": "read"},
             "sensors": {"ending_sensor": False, "balance_sensors": ["2"]},
             "due": {"due_warning_days": 3},
+            "profiles": {"Default": "Default"},
         },
     )
     await hass.async_block_till_done()
     assert result["type"] == "create_entry"
     assert loaded_entry.options == _options(access={hass_read_only_user.id: "read"}, balance_sensors=["2"], due_warning_days=3)
+    assert not [c for c in aioclient_mock.mock_calls if c[0] != "GET"]  # nom inchangé : rien écrit
     # rechargée : seuls les capteurs choisis restent
     assert hass.states.get("sensor.livret_d_epargne") is not None
     assert hass.states.get("sensor.compte_courant") is None
     assert hass.states.get("sensor.scheduled_transactions_ending") is None
+
+
+_SETTINGS = {"users": {"default_access": "read"}, "sensors": {"ending_sensor": True, "balance_sensors": ["1"]}, "due": {"due_warning_days": 7}}
+
+
+async def test_options_flow_manages_profiles(hass, aioclient_mock, loaded_entry):
+    """Menu dès deux profils ; renommer, ajouter ; un nom vidé ne supprime rien ; comptes préfixés par leur profil."""
+    accounts = [{**a, "profile_id": 1 if a["id"] == 1 else 2} for a in loaded_entry.runtime_data.data.accounts.values()]
+    loaded_entry.runtime_data.data.accounts = {a["id"]: a for a in accounts}
+    aioclient_mock.get(f"{API}/profiles", json=[_profile(1, "Default"), _profile(2, "Bruno", 1), _profile(3, "Vide", 2)])
+    aioclient_mock.patch(f"{API}/profiles/1", json=_profile(1, "Alice"))
+    aioclient_mock.post(f"{API}/profiles", json=_profile(4, "Chloé", 3))
+    result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+    assert result["type"] == "menu" and result["menu_options"] == ["settings", "delete_profile"]
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+    assert result["step_id"] == "settings"
+    sensors = next(v for k, v in result["data_schema"].schema.items() if k == "sensors").schema.schema
+    options = [o for k, v in sensors.items() if k == "balance_sensors" for o in v.config["options"]]
+    assert [o["label"] for o in options] == [f"Default · {a['name']}" if a["profile_id"] == 1 else f"Bruno · {a['name']}" for a in accounts]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**_SETTINGS, "profiles": {"Default": "Alice", "Bruno": "Bruno", "new_profile": " Chloé "}}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    writes = [(c[0], str(c[1]), c[2]) for c in aioclient_mock.mock_calls if c[0] != "GET"]
+    assert writes == [("PATCH", f"{API}/profiles/1", {"name": "Alice"}), ("POST", f"{API}/profiles", {"name": "Chloé", "position": 3})]
+
+
+async def test_options_flow_shows_the_api_refusal(hass, aioclient_mock, loaded_entry):
+    aioclient_mock.get(f"{API}/profiles", json=[_profile(1, "Default"), _profile(2, "Bruno", 1)])
+    aioclient_mock.patch(f"{API}/profiles/2", status=409, json={"detail": "Le profil « Default » existe déjà"})
+    result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {**_SETTINGS, "profiles": {"Default": "Default", "Bruno": "Default"}})
+    assert result["type"] == "form" and result["errors"] == {"base": "profiles_failed"}
+    assert "existe déjà" in result["description_placeholders"]["error"]
+
+
+async def _to_delete_step(hass, aioclient_mock, loaded_entry):
+    accounts = [{**a, "profile_id": 1 if a["id"] == 1 else 2} for a in loaded_entry.runtime_data.data.accounts.values()]
+    loaded_entry.runtime_data.data.accounts = {a["id"]: a for a in accounts}
+    marie = {**_profile(2, "Bruno", 1), "accounts": 1, "transactions": 42}
+    aioclient_mock.get(f"{API}/profiles", json=[_profile(1, "Default"), marie])
+    result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "delete_profile"})
+    assert result["step_id"] == "delete_profile"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"profile_id": "2"})
+    assert result["step_id"] == "delete_confirm"
+    assert result["description_placeholders"]["name"] == "Bruno" and result["description_placeholders"]["transactions"] == "42"
+    return result
+
+
+async def test_options_flow_deletes_a_profile_after_two_confirmations(hass, aioclient_mock, loaded_entry):
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, "balance_sensors": ["1", "2"]})
+    aioclient_mock.delete(f"{API}/profiles/2?with_data=true", status=204)
+    result = await _to_delete_step(hass, aioclient_mock, loaded_entry)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"confirm": True})
+    assert result["step_id"] == "delete_confirm_again"
+    assert not [c for c in aioclient_mock.mock_calls if c[0] == "DELETE"]  # rien avant la seconde confirmation
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"confirm": True})
+    await hass.async_block_till_done()
+    assert result["type"] == "abort" and result["reason"] == "profile_deleted"
+    assert [(c[0], str(c[1])) for c in aioclient_mock.mock_calls if c[0] == "DELETE"] == [("DELETE", f"{API}/profiles/2?with_data=true")]
+    assert loaded_entry.options["balance_sensors"] == ["1"]  # capteur du compte supprimé retiré
+
+
+async def test_options_flow_profile_deletion_can_be_cancelled_twice(hass, aioclient_mock, loaded_entry):
+    result = await _to_delete_step(hass, aioclient_mock, loaded_entry)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"confirm": False})
+    assert result["type"] == "abort" and result["reason"] == "delete_cancelled"
+    result = await _to_delete_step(hass, aioclient_mock, loaded_entry)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"confirm": True})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"confirm": False})
+    assert result["type"] == "abort" and result["reason"] == "delete_cancelled"
+    assert not [c for c in aioclient_mock.mock_calls if c[0] == "DELETE"]
+
+
+async def test_options_flow_explains_an_api_too_old_for_profiles(hass, aioclient_mock, loaded_entry):
+    """Intégration mise à jour sans l'API : message explicite, les autres réglages restent enregistrables."""
+    aioclient_mock.get(f"{API}/profiles", status=404, json={"detail": "Not Found"})  # health : 0.6.0 (conftest)
+    result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+    assert "profiles" not in [str(k) for k in result["data_schema"].schema]
+    assert result["errors"] == {"base": "api_too_old"}
+    assert result["description_placeholders"] == {"version": "0.6.0", "minimum": "0.12.0"}
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"users": {"default_access": "read"}, "sensors": {"ending_sensor": True, "balance_sensors": []}, "due": {"due_warning_days": 4}},
+    )
+    assert result["type"] == "create_entry" and loaded_entry.options["due_warning_days"] == 4
+
+
+async def test_profile_services_and_filters(hass, aioclient_mock, loaded_entry):
+    aioclient_mock.get(f"{API}/profiles", json=[_profile(1, "Default")])
+    assert (await _call(hass, "list_profiles", {}, return_response=True))["items"][0]["name"] == "Default"
+    aioclient_mock.post(f"{API}/profiles", json=_profile(2, "Bruno"))
+    await _call(hass, "create_profile", {"name": "Bruno"})
+    assert _last(aioclient_mock)[2] == {"name": "Bruno"}
+    aioclient_mock.post(f"{API}/accounts", json={"id": 9})
+    await _call(hass, "create_account", {"name": "Livret", "profile_id": "2"})
+    assert _last(aioclient_mock)[2]["profile_id"] == 2
+    aioclient_mock.get(f"{API}/categories?profile_id=2", json=[])
+    await _call(hass, "list_categories", {"profile_id": 2}, return_response=True)
+    assert str(_last(aioclient_mock)[1]).endswith("categories?profile_id=2")
+    aioclient_mock.delete(f"{API}/profiles/2", status=204)
+    await _call(hass, "delete_profile", {"profile_id": 2})
+    assert _last(aioclient_mock)[:2] == ("DELETE", f"{API}/profiles/2")
 
 
 async def test_create_transaction_and_schedule_pass_due_fields(hass, aioclient_mock, loaded_entry):

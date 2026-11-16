@@ -12,9 +12,9 @@ CONF_DEFAULT_ACCESS = "default_access"
 CONF_ENDING_SENSOR = "ending_sensor"
 CONF_BALANCE_SENSORS = "balance_sensors"
 DEFAULT_URL = "http://127.0.0.1:9931"
-MIN_API_VERSION = "0.11.0"  # oldest My Bank API this version of the integration works with: the card always sends
-# `due_date` (0.10.0+) on a transaction, `due_days` and `use_global_lead_days` (0.11.0+) on a schedule, and calls
-# `schedules/settings` (0.11.0+) — all rejected (or missing) on an older API's strict schema
+MIN_API_VERSION = "0.12.0"  # oldest My Bank API this version of the integration works with: the card always sends
+# `due_date` (0.10.0+) on a transaction, `due_days` and `use_global_lead_days` (0.11.0+) on a schedule, calls
+# `schedules/settings` (0.11.0+) and `profiles` (0.12.0+) — all rejected (or missing) on an older API's strict schema
 
 # Payment methods created by My Bank API in a new database, renamed in the language of Home Assistant on a fresh
 # install (no account yet). Keys are the names the server creates.

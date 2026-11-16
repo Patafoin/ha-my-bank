@@ -200,6 +200,17 @@ Evita asignar solo una clase sin categoría: el análisis por coche seguiría fu
 
 **En resumen**: asigna siempre una categoría. Añade una clase cuando quieras hacer seguimiento de un objeto, un proyecto o una persona en varias categorías. En un movimiento desglosado, cada línea tiene su propia categoría y su propia clase.
 
+## Perfiles
+
+Un perfil es un conjunto separado de cuentas, categorías, clases y beneficiarios — por ejemplo uno por persona del hogar. Solo sirve para separar, no para controlar el acceso (el acceso sigue configurándose por usuario de Home Assistant, en las opciones de la integración).
+
+- Toda instalación empieza con un perfil; los datos existentes le pertenecen. Con un solo perfil, nada cambia en las tarjetas.
+- **Ajustes → Dispositivos y servicios → My Bank → Configurar → Perfiles**: cambiar el nombre de un perfil o añadir uno (empieza vacío). A partir de dos perfiles, estas opciones se abren con un menú: **Eliminar un perfil** elimina un perfil y todos sus datos (cuentas, movimientos, operaciones programadas, presupuestos, categorías, clases, beneficiarios) tras dos confirmaciones.
+- A partir de dos perfiles, unos botones en la parte superior de `custom:my-bank-card` (y de la tarjeta de movimientos) cambian de un perfil a otro. El navegador recuerda la elección. Todo lo que la tarjeta muestra y crea pertenece entonces al perfil elegido.
+- Las tarjetas pequeñas configuradas con una cuenta usan el perfil de esa cuenta; las demás siguen el perfil elegido en la tarjeta principal.
+- Los movimientos, las operaciones programadas y los presupuestos siguen el perfil de su cuenta. Una transferencia solo une dos cuentas del mismo perfil. Los medios de pago y los gastos compartidos son comunes a todos los perfiles.
+- Requiere My Bank API 0.12.0 o posterior.
+
 ## Fechas límite de pago
 
 Un movimiento puede tener una **fecha límite de pago** opcional (vacía por defecto: entonces nada cambia). Un movimiento programado puede fijarla en cada movimiento que genera, como un número de días después de su fecha (0 = el mismo día; vacío = sin fecha límite).

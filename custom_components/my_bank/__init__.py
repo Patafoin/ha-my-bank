@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
-import re
 from typing import Any
 
 import voluptuous as vol
@@ -21,7 +20,7 @@ from homeassistant.exceptions import HomeAssistantError, Unauthorized, UnknownUs
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.util import dt as dt_util
 
-from .api import MyBankApiError, MyBankClient
+from .api import MyBankApiError, MyBankClient, outdated_server
 from .access import READ, WRITE, allows, user_level
 from .const import (
     CONF_DUE_WARNING_DAYS,
@@ -75,21 +74,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: MyBankConfigEntry) -> bo
     return True
 
 
-def _version(text: str) -> tuple[int, ...]:
-    return tuple(int(n) for n in re.findall(r"\d+", text)[:3])
-
-
 async def _check_api_version(hass: HomeAssistant, client: MyBankClient) -> None:
     """Raise a repair issue when My Bank API is older than this integration expects.
 
     HACS updates the integration and the add-on (or Docker image) is updated separately:
     without this, an outdated server would only show up as obscure errors in the card.
     """
-    try:
-        version = str((await client.get("health") or {}).get("version", ""))
-    except MyBankApiError:
-        return
-    if version and _version(version) < _version(MIN_API_VERSION):
+    if version := await outdated_server(client):
         ir.async_create_issue(
             hass,
             DOMAIN,
@@ -174,6 +165,8 @@ _SPLIT = vol.Schema(
     }
 )
 
+# Profil d'une création (absent : premier profil) ou filtre d'une liste (absent : tous les profils).
+_PROFILE = {vol.Optional("profile_id"): _ID}
 _ACCOUNT_FIELDS = {
     vol.Optional("kind"): vol.In(["checking", "savings", "card", "cash", "other"]),
     vol.Optional("number"): _TEXT,
@@ -274,16 +267,20 @@ _ATTACHMENT_FILE = vol.Schema(
 
 # (service, schema, HTTP method, path template — its {placeholders} are taken out of the body)
 _WRITE_SERVICES: list[tuple[str, vol.Schema, str, str]] = [
-    ("create_account", vol.Schema({vol.Required("name"): cv.string, **_ACCOUNT_FIELDS}), "POST", "accounts"),
+    # Profils (décision 028) : jeux séparés de comptes, rubriques, classes et tiers ; gérés depuis les options de l'entrée
+    ("create_profile", vol.Schema({vol.Required("name"): cv.string, vol.Optional("position"): vol.Coerce(int)}), "POST", "profiles"),
+    ("update_profile", vol.Schema({vol.Required("profile_id"): _ID, vol.Optional("name"): cv.string, vol.Optional("position"): vol.Coerce(int)}), "PATCH", "profiles/{profile_id}"),
+    ("delete_profile", vol.Schema({vol.Required("profile_id"): _ID}), "DELETE", "profiles/{profile_id}"),
+    ("create_account", vol.Schema({vol.Required("name"): cv.string, **_PROFILE, **_ACCOUNT_FIELDS}), "POST", "accounts"),
     ("update_account", vol.Schema({vol.Required("account_id"): _ID, vol.Optional("name"): cv.string, **_ACCOUNT_FIELDS}), "PATCH", "accounts/{account_id}"),
     ("delete_account", vol.Schema({vol.Required("account_id"): _ID}), "DELETE", "accounts/{account_id}"),
-    ("create_category", vol.Schema({vol.Required("name"): cv.string, vol.Optional("kind"): vol.In(["income", "expense", "savings"]), **_TREE_FIELDS}), "POST", "categories"),
+    ("create_category", vol.Schema({vol.Required("name"): cv.string, **_PROFILE, vol.Optional("kind"): vol.In(["income", "expense", "savings"]), **_TREE_FIELDS}), "POST", "categories"),
     ("update_category", vol.Schema({vol.Required("category_id"): _ID, vol.Optional("name"): cv.string, vol.Optional("kind"): vol.In(["income", "expense", "savings"]), **_TREE_FIELDS}), "PATCH", "categories/{category_id}"),
     ("delete_category", vol.Schema({vol.Required("category_id"): _ID}), "DELETE", "categories/{category_id}"),
-    ("create_class", vol.Schema({vol.Required("name"): cv.string, **_TREE_FIELDS}), "POST", "classes"),
+    ("create_class", vol.Schema({vol.Required("name"): cv.string, **_PROFILE, **_TREE_FIELDS}), "POST", "classes"),
     ("update_class", vol.Schema({vol.Required("class_id"): _ID, vol.Optional("name"): cv.string, **_TREE_FIELDS}), "PATCH", "classes/{class_id}"),
     ("delete_class", vol.Schema({vol.Required("class_id"): _ID}), "DELETE", "classes/{class_id}"),
-    ("create_payee", vol.Schema({vol.Required("name"): cv.string, **_PAYEE_FIELDS}), "POST", "payees"),
+    ("create_payee", vol.Schema({vol.Required("name"): cv.string, **_PROFILE, **_PAYEE_FIELDS}), "POST", "payees"),
     ("update_payee", vol.Schema({vol.Required("payee_id"): _ID, vol.Optional("name"): cv.string, **_PAYEE_FIELDS}), "PATCH", "payees/{payee_id}"),
     ("delete_payee", vol.Schema({vol.Required("payee_id"): _ID}), "DELETE", "payees/{payee_id}"),
     ("create_payment_method", vol.Schema({vol.Required("name"): cv.string, vol.Optional("active"): cv.boolean, vol.Optional("position"): vol.Coerce(int)}), "POST", "payment-methods"),
@@ -373,10 +370,11 @@ _WRITE_SERVICES: list[tuple[str, vol.Schema, str, str]] = [
 ]
 
 _READ_SERVICES: list[tuple[str, vol.Schema, str]] = [
-    ("list_accounts", vol.Schema({vol.Optional("date"): _DATE, vol.Optional("include_closed"): cv.boolean}), "accounts"),
-    ("list_categories", vol.Schema({}), "categories"),
-    ("list_classes", vol.Schema({}), "classes"),
-    ("list_payees", vol.Schema({vol.Optional("q"): cv.string, vol.Optional("active"): cv.boolean}), "payees"),
+    ("list_profiles", vol.Schema({}), "profiles"),
+    ("list_accounts", vol.Schema({vol.Optional("date"): _DATE, vol.Optional("include_closed"): cv.boolean, **_PROFILE}), "accounts"),
+    ("list_categories", vol.Schema({**_PROFILE}), "categories"),
+    ("list_classes", vol.Schema({**_PROFILE}), "classes"),
+    ("list_payees", vol.Schema({vol.Optional("q"): cv.string, vol.Optional("active"): cv.boolean, **_PROFILE}), "payees"),
     ("list_payment_methods", vol.Schema({}), "payment-methods"),
     (
         "list_account_transactions",
@@ -405,6 +403,7 @@ _READ_SERVICES: list[tuple[str, vol.Schema, str]] = [
                 vol.Optional("class_id"): _ID,
                 vol.Optional("q"): cv.string,
                 vol.Optional("due_before"): _DATE,
+                **_PROFILE,
                 vol.Optional("order"): vol.In(["asc", "desc"]),
                 vol.Optional("limit"): vol.All(vol.Coerce(int), vol.Range(min=1, max=1000)),
                 vol.Optional("offset"): vol.All(vol.Coerce(int), vol.Range(min=0)),
@@ -412,11 +411,11 @@ _READ_SERVICES: list[tuple[str, vol.Schema, str]] = [
         ),
         "transactions",
     ),
-    ("list_schedules", vol.Schema({vol.Optional("account_id"): _ID, vol.Optional("active"): cv.boolean}), "schedules"),
+    ("list_schedules", vol.Schema({vol.Optional("account_id"): _ID, vol.Optional("active"): cv.boolean, **_PROFILE}), "schedules"),
     ("get_schedule_settings", vol.Schema({}), "schedules/settings"),
     (
         "list_upcoming_occurrences",
-        vol.Schema({vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min=0, max=366)), vol.Optional("account_id"): _ID}),
+        vol.Schema({vol.Optional("days"): vol.All(vol.Coerce(int), vol.Range(min=0, max=366)), vol.Optional("account_id"): _ID, **_PROFILE}),
         "schedules/upcoming",
     ),
     (
@@ -424,7 +423,7 @@ _READ_SERVICES: list[tuple[str, vol.Schema, str]] = [
         vol.Schema({vol.Required("schedule_id"): _ID, vol.Optional("upcoming"): vol.All(vol.Coerce(int), vol.Range(min=1, max=240))}),
         "schedules/{schedule_id}/occurrences",
     ),
-    ("list_budgets", vol.Schema({vol.Optional("account_id"): _ID, vol.Optional("include_archived"): cv.boolean}), "budgets"),
+    ("list_budgets", vol.Schema({vol.Optional("account_id"): _ID, vol.Optional("include_archived"): cv.boolean, **_PROFILE}), "budgets"),
     ("get_budget_lines", vol.Schema({vol.Required("budget_id"): _ID}), "budgets/{budget_id}/lines"),
     ("get_budget_report", vol.Schema({vol.Required("budget_id"): _ID}), "budgets/{budget_id}/report"),
     ("list_shared_accounts", vol.Schema({}), "shared-accounts"),
@@ -527,8 +526,9 @@ def _register_services(hass: HomeAssistant) -> None:
             "order": "asc",
             "limit": 1000,
         }
-        if "account_id" in call.data:
-            params["account_id"] = call.data["account_id"]
+        for key in ("account_id", "profile_id"):
+            if key in call.data:
+                params[key] = call.data[key]
         try:
             page = await entry.runtime_data.client.get("transactions", params=_query(params))
         except MyBankApiError as err:
@@ -563,7 +563,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "list_due_transactions",
         list_due_transactions,
-        schema=vol.Schema({vol.Optional("account_id"): _ID}),
+        schema=vol.Schema({vol.Optional("account_id"): _ID, **_PROFILE}),
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(DOMAIN, "get_access", get_access, schema=vol.Schema({}), supports_response=SupportsResponse.ONLY)

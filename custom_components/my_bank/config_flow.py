@@ -11,6 +11,7 @@ from homeassistant.const import CONF_URL
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    TextSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -22,7 +23,7 @@ from homeassistant.helpers.selector import (
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .access import LEVELS, NEW_ENTRY_OPTIONS, published_accounts, publishes_ending, user_level
-from .api import MyBankApiError, MyBankAuthError, MyBankClient
+from .api import MyBankApiError, MyBankAuthError, MyBankClient, outdated_server
 from .const import (
     CONF_ACCESS,
     CONF_ADMIN_ONLY,
@@ -34,6 +35,7 @@ from .const import (
     DEFAULT_DUE_WARNING_DAYS,
     DEFAULT_URL,
     DOMAIN,
+    MIN_API_VERSION,
 )
 
 
@@ -120,15 +122,75 @@ _LEVEL_SELECTOR = SelectSelector(
 )
 
 
-class MyBankOptionsFlow(OptionsFlowWithReload):
-    """Access level of each non-admin Home Assistant user, the sensors to publish, and the due date warning.
+CONF_NEW_PROFILE = "new_profile"
 
-    One drop-down per user, labelled with the user's name (no translation exists for it: the key is shown).
-    Reloaded on save, so that the sensors follow; the access levels are read on each call anyway.
+
+def _unique_labels(names: dict[Any, str], reserved: set[str]) -> dict[str, Any]:
+    """Field label → key: the label is the name (no translation exists for it), made unique with trailing spaces."""
+    fields: dict[str, Any] = {}
+    for key, name in names.items():
+        label = name
+        while label in fields or label in reserved:
+            label += " "
+        fields[label] = key
+    return fields
+
+
+class MyBankOptionsFlow(OptionsFlowWithReload):
+    """Access level of each non-admin Home Assistant user, the sensors to publish, the due date warning, and the profiles.
+
+    One drop-down per user, labelled with the user's name (no translation exists for it: the key is shown); one
+    text field per profile, labelled with its name. Profiles live in My Bank API: they are written on save, not
+    kept in the options. Reloaded on save, so that the sensors follow; the access levels are read on each call anyway.
+
+    From two profiles on, a menu first: the settings, or deleting a profile with all its data — a separate path,
+    confirmed twice, never a side effect of the settings form (decision 028).
     """
+
+    _profiles: list[dict]
+    _api_too_old: str | None = None
+    _doomed: dict | None = None
+
+    async def _save_profiles(self, client: MyBankClient, profiles: list[dict], fields: dict[str, int], data: dict) -> str | None:
+        """Renames and creates profiles (an emptied name is left unchanged); the API's message on the first refusal."""
+        try:
+            for label, profile_id in fields.items():
+                name = (data.get(label) or "").strip()
+                current = next(p for p in profiles if p["id"] == profile_id)
+                if name and name != current["name"]:
+                    await client.patch(f"profiles/{profile_id}", {"name": name})
+            if new := (data.get(CONF_NEW_PROFILE) or "").strip():
+                position = max((p["position"] for p in profiles), default=0) + 1
+                await client.post("profiles", {"name": new, "position": position})
+        except MyBankApiError as err:
+            return str(err)
+        return None
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         entry = self.config_entry
+        self._profiles = []
+        if entry.state is ConfigEntryState.LOADED:
+            try:
+                self._profiles = await entry.runtime_data.client.get("profiles")
+            except MyBankApiError:
+                self._profiles = []  # API older than 0.12.0, or unreachable: no profiles section
+            if not self._profiles:
+                self._api_too_old = await outdated_server(entry.runtime_data.client)
+        if len(self._profiles) > 1:
+            return self.async_show_menu(step_id="init", menu_options=["settings", "delete_profile"])
+        return await self.async_step_settings()
+
+    async def async_step_settings(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        entry = self.config_entry
+        loaded = entry.state is ConfigEntryState.LOADED
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
+        profiles = self._profiles
+        if self._api_too_old:
+            # Intégration mise à jour sans l'API (application HA ou image Docker) : le dire ici, où l'on cherche les profils.
+            errors["base"] = "api_too_old"
+            placeholders.update(version=self._api_too_old, minimum=MIN_API_VERSION)
+        profile_fields = _unique_labels({p["id"]: p["name"] for p in profiles}, {CONF_NEW_PROFILE})
         users = sorted(
             (u for u in await self.hass.auth.async_get_users() if not u.system_generated and not u.is_admin),
             key=lambda u: (u.name or "").casefold(),
@@ -141,7 +203,13 @@ class MyBankOptionsFlow(OptionsFlowWithReload):
                 label += " "
             fields[label] = user
 
-        if user_input is not None:
+        if user_input is not None and profiles:
+            if error := await self._save_profiles(entry.runtime_data.client, profiles, profile_fields, user_input.get("profiles", {})):
+                errors["base"] = "profiles_failed"
+                placeholders["error"] = error
+            else:
+                await entry.runtime_data.async_request_refresh()
+        if user_input is not None and errors.get("base") != "profiles_failed":
             access_input = user_input["users"]
             sensors_input = user_input["sensors"]
             due_input = user_input["due"]
@@ -161,10 +229,15 @@ class MyBankOptionsFlow(OptionsFlowWithReload):
         for label, user in fields.items():
             users_schema[vol.Required(label, default=user_level(entry, user))] = _LEVEL_SELECTOR
 
-        accounts = entry.runtime_data.data.accounts if entry.state is ConfigEntryState.LOADED else {}
+        accounts = entry.runtime_data.data.accounts if loaded else {}
         chosen = published_accounts(entry)
         chosen = set(accounts) if chosen is None else chosen
-        names = {aid: a.get("name", str(aid)) for aid, a in accounts.items()}
+        # Plusieurs profils : « Profil · Compte », deux comptes de même nom pouvant exister dans deux profils.
+        profile_names = {p["id"]: p["name"] for p in profiles} if len(profiles) > 1 else {}
+        names = {
+            aid: " · ".join(filter(None, (profile_names.get(a.get("profile_id")), a.get("name", str(aid)))))
+            for aid, a in accounts.items()
+        }
         names.update({aid: str(aid) for aid in chosen if aid not in names})  # compte non chargé : gardé coché
         sensors_schema = {
             vol.Required(CONF_ENDING_SENSOR, default=publishes_ending(entry)): BooleanSelector(),
@@ -181,13 +254,83 @@ class MyBankOptionsFlow(OptionsFlowWithReload):
                 CONF_DUE_WARNING_DAYS, default=entry.options.get(CONF_DUE_WARNING_DAYS, DEFAULT_DUE_WARNING_DAYS)
             ): NumberSelector(NumberSelectorConfig(min=0, max=90, step=1, mode=NumberSelectorMode.BOX)),
         }
+        schema = {
+            vol.Required("users"): section(vol.Schema(users_schema), {"collapsed": False}),
+            vol.Required("sensors"): section(vol.Schema(sensors_schema), {"collapsed": False}),
+            vol.Required("due"): section(vol.Schema(due_schema), {"collapsed": False}),
+        }
+        if profiles:
+            profiles_schema: dict[Any, Any] = {
+                vol.Optional(label, description={"suggested_value": next(p["name"] for p in profiles if p["id"] == pid)}): TextSelector()
+                for label, pid in profile_fields.items()
+            }
+            profiles_schema[vol.Optional(CONF_NEW_PROFILE)] = TextSelector()
+            schema[vol.Required("profiles")] = section(vol.Schema(profiles_schema), {"collapsed": len(profiles) == 1})
+        data_schema = vol.Schema(schema)
+        if user_input is not None:
+            data_schema = self.add_suggested_values_to_schema(data_schema, user_input)
         return self.async_show_form(
-            step_id="init",
+            step_id="settings", data_schema=data_schema, errors=errors, description_placeholders=placeholders
+        )
+
+    # --- Suppression d'un profil et de toutes ses données : choix, puis deux confirmations ----------------------
+
+    async def async_step_delete_profile(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            self._doomed = next(p for p in self._profiles if str(p["id"]) == user_input["profile_id"])
+            return await self.async_step_delete_confirm()
+        options = [SelectOptionDict(value=str(p["id"]), label=p["name"]) for p in self._profiles]
+        return self.async_show_form(
+            step_id="delete_profile",
             data_schema=vol.Schema(
-                {
-                    vol.Required("users"): section(vol.Schema(users_schema), {"collapsed": False}),
-                    vol.Required("sensors"): section(vol.Schema(sensors_schema), {"collapsed": False}),
-                    vol.Required("due"): section(vol.Schema(due_schema), {"collapsed": False}),
-                }
+                {vol.Required("profile_id"): SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST))}
             ),
+        )
+
+    def _doomed_placeholders(self) -> dict[str, str]:
+        p = self._doomed or {}
+        return {key: str(p.get(key, 0)) for key in ("accounts", "transactions", "categories", "classes", "payees")} | {
+            "name": p.get("name", "")
+        }
+
+    async def async_step_delete_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """First question: what will be deleted, and do you want it."""
+        if user_input is not None and "confirm" in user_input:
+            if not user_input["confirm"]:
+                return self.async_abort(reason="delete_cancelled")
+            return await self.async_step_delete_confirm_again()
+        return self.async_show_form(
+            step_id="delete_confirm",
+            data_schema=vol.Schema({vol.Required("confirm", default=False): BooleanSelector()}),
+            description_placeholders=self._doomed_placeholders(),
+        )
+
+    async def async_step_delete_confirm_again(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Second question, the last chance: nothing can be undone after it."""
+        errors: dict[str, str] = {}
+        placeholders = self._doomed_placeholders()
+        if user_input is not None and "confirm" in user_input:
+            if not user_input["confirm"]:
+                return self.async_abort(reason="delete_cancelled")
+            entry = self.config_entry
+            doomed = self._doomed
+            gone = {aid for aid, a in entry.runtime_data.data.accounts.items() if a.get("profile_id") == doomed["id"]}
+            try:
+                await entry.runtime_data.client.delete(f"profiles/{doomed['id']}?with_data=true")
+            except MyBankApiError as err:
+                errors["base"] = "profiles_failed"
+                placeholders["error"] = str(err)
+            else:
+                options = dict(entry.options)
+                if isinstance(options.get(CONF_BALANCE_SENSORS), list):
+                    options[CONF_BALANCE_SENSORS] = [a for a in options[CONF_BALANCE_SENSORS] if int(a) not in gone]
+                self.hass.config_entries.async_update_entry(entry, options=options)
+                # Rechargée : les capteurs des comptes supprimés disparaissent.
+                self.hass.config_entries.async_schedule_reload(entry.entry_id)
+                return self.async_abort(reason="profile_deleted", description_placeholders={"name": doomed["name"]})
+        return self.async_show_form(
+            step_id="delete_confirm_again",
+            data_schema=vol.Schema({vol.Required("confirm", default=False): BooleanSelector()}),
+            description_placeholders=placeholders,
+            errors=errors,
         )

@@ -200,6 +200,17 @@ Vermeiden Sie es, nur die Klasse ohne Kategorie zu setzen: Die Auswertung pro Fa
 
 **Kurz gesagt**: Setzen Sie immer die Kategorie. Fügen Sie eine Klasse hinzu, wenn Sie einen Gegenstand, ein Projekt oder eine Person über mehrere Kategorien hinweg verfolgen möchten. In einer aufgeteilten Buchung hat jede Zeile ihre eigene Kategorie und ihre eigene Klasse.
 
+## Profile
+
+Ein Profil ist ein eigener Satz von Konten, Kategorien, Klassen und Empfängern — zum Beispiel eines pro Person im Haushalt. Es dient nur der Trennung, nicht der Zugriffskontrolle (der Zugriff bleibt pro Home-Assistant-Benutzer in den Optionen der Integration geregelt).
+
+- Jede Installation beginnt mit einem Profil; vorhandene Daten gehören dazu. Mit einem einzigen Profil ändert sich an den Karten nichts.
+- **Einstellungen → Geräte & Dienste → My Bank → Konfigurieren → Profile**: ein Profil umbenennen oder eines hinzufügen (es beginnt leer). Ab zwei Profilen öffnen sich diese Optionen mit einem Menü: **Ein Profil löschen** löscht ein Profil mit allen Daten (Konten, Buchungen, Daueraufträge, Budgets, Kategorien, Klassen, Empfänger) nach zwei Bestätigungen.
+- Ab zwei Profilen wechseln Schaltflächen oben in `custom:my-bank-card` (und in der Buchungskarte) zwischen den Profilen. Die Wahl merkt sich der Browser. Alles, was die Karte dann zeigt und anlegt, gehört zum gewählten Profil.
+- Kleine Karten, die auf ein Konto eingestellt sind, verwenden dessen Profil; die anderen folgen dem in der Hauptkarte gewählten Profil.
+- Buchungen, Daueraufträge und Budgets folgen dem Profil ihres Kontos. Eine Überweisung verbindet nur zwei Konten desselben Profils. Zahlungsarten und geteilte Ausgaben gelten für alle Profile.
+- Erfordert My Bank API 0.12.0 oder neuer.
+
 ## Zahlungsfristen
 
 Eine Buchung kann eine optionale **Zahlungsfrist** haben (standardmäßig leer: dann ändert sich nichts). Eine geplante Buchung kann bei jeder erzeugten Buchung eine setzen, als Anzahl Tage nach dem Buchungsdatum (0 = am selben Tag; leer = keine Zahlungsfrist).

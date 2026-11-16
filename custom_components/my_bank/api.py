@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json as json_lib
+import re
 from typing import Any
 
 from aiohttp import ClientError
@@ -14,7 +15,22 @@ from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .const import MIN_API_VERSION
+
 _TIMEOUT = 30
+
+
+def _version(text: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in re.findall(r"\d+", text)[:3])
+
+
+async def outdated_server(client: MyBankClient) -> str | None:
+    """Version of My Bank API when it is older than MIN_API_VERSION, else None (also when unreachable)."""
+    try:
+        version = str((await client.get("health") or {}).get("version", ""))
+    except MyBankApiError:
+        return None
+    return version if version and _version(version) < _version(MIN_API_VERSION) else None
 
 
 class MyBankApiError(Exception):

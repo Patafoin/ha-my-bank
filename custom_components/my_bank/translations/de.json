@@ -43,6 +43,13 @@
     "step": {
       "init": {
         "title": "My-Bank-Optionen",
+        "menu_options": {
+          "settings": "Einstellungen (Zugriff, Sensoren, Zahlungsfristen, Profile)",
+          "delete_profile": "Ein Profil mit allen Daten löschen"
+        }
+      },
+      "settings": {
+        "title": "My-Bank-Optionen",
         "description": "Home-Assistant-Administratoren haben immer vollen Zugriff auf My Bank. Von Home Assistant gestartete Automatisierungen und Skripte sind nicht eingeschränkt.",
         "sections": {
           "users": {
@@ -76,15 +83,54 @@
             "data_description": {
               "due_warning_days": "Eine unbezahlte Buchung wird ab so vielen Tagen vor ihrer Zahlungsfrist orange markiert (0 = nur am Tag selbst)."
             }
+          },
+          "profiles": {
+            "name": "Profile",
+            "description": "Jedes Profil hat eigene Konten, Kategorien, Klassen und Empfänger (keine Zugriffsrechte: nur getrennte Ansichten). Ein Profil umbenennen, indem man seinen Namen ändert. Mit einem einzigen Profil sehen die Karten aus wie bisher; ab zwei Profilen erscheint oben in der My-Bank-Karte eine Auswahl. Zum Löschen eines Profils: „Ein Profil löschen“ im Menü, das beim Öffnen dieser Optionen erscheint (ab zwei Profilen).",
+            "data": {
+              "new_profile": "Neues Profil"
+            },
+            "data_description": {
+              "new_profile": "Name eines hinzuzufügenden Profils (leer: keines). Es beginnt leer."
+            }
           }
         }
+      },
+      "delete_profile": {
+        "title": "Ein Profil löschen",
+        "description": "Das zu löschende Profil wählen. Es folgen zwei Bestätigungen; vor der zweiten wird nichts gelöscht.",
+        "data": {
+          "profile_id": "Profil"
+        }
+      },
+      "delete_confirm": {
+        "title": "„{name}“ löschen?",
+        "description": "Das Profil „{name}“ und **alle seine Daten** werden gelöscht: {accounts} Konto/Konten, {transactions} Buchung(en) (abgestimmte und Belege eingeschlossen), ihre Daueraufträge und Budgets, {categories} Kategorie(n), {classes} Klasse(n) und {payees} Empfänger. Die anderen Profile bleiben unberührt.\n\nZum Fortfahren das Kästchen ankreuzen; zum Abbrechen leer lassen.",
+        "data": {
+          "confirm": "Ja, ich möchte dieses Profil und alle seine Daten löschen"
+        }
+      },
+      "delete_confirm_again": {
+        "title": "Letzte Bestätigung",
+        "description": "**Das kann nicht rückgängig gemacht werden.** Das Löschen von „{name}“ entfernt {accounts} Konto/Konten und {transactions} Buchung(en) endgültig (nur eine Sicherung von My Bank API könnte sie zurückholen).\n\nZum sofortigen Löschen das Kästchen ankreuzen; zum Abbrechen leer lassen.",
+        "data": {
+          "confirm": "Ich bestätige: dieses Profil endgültig löschen"
+        }
       }
+    },
+    "error": {
+      "profiles_failed": "Profile nicht gespeichert: {error}",
+      "api_too_old": "My Bank API {version} ist für diese Version der Integration zu alt (benötigt {minimum} oder neuer): Profile sind nicht verfügbar. Die App My Bank API (Einstellungen → Apps) oder ihr Docker-Image aktualisieren und diese Optionen dann erneut öffnen."
+    },
+    "abort": {
+      "delete_cancelled": "Löschen abgebrochen: nichts wurde gelöscht.",
+      "profile_deleted": "Das Profil „{name}“ und alle seine Daten wurden gelöscht."
     }
   },
   "issues": {
     "api_too_old": {
       "title": "My Bank API muss aktualisiert werden",
-      "description": "My Bank API {version} ist älter als die von dieser Integration benötigte Mindestversion ({minimum}). App oder Docker-Image von My Bank API aktualisieren, sonst schlagen einige Funktionen der Karte fehl."
+      "description": "My Bank API {version} ist älter als die von dieser Integration benötigte Mindestversion ({minimum}). Die App oder das Docker-Image My Bank API aktualisieren: bis dahin sind die neuesten Funktionen (wie Profile) nicht verfügbar."
     }
   },
   "entity": {
@@ -109,6 +155,52 @@
     }
   },
   "services": {
+    "create_profile": {
+      "name": "Profil erstellen",
+      "description": "Erstellt ein leeres Profil (eigene Konten, Kategorien, Klassen und Empfänger).",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name des Profils."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge; das erste Profil ist das Standardprofil."
+        }
+      }
+    },
+    "update_profile": {
+      "name": "Profil ändern",
+      "description": "Benennt ein Profil um oder ändert seine Reihenfolge.",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "ID des Profils."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Name des Profils."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Sortierreihenfolge; das erste Profil ist das Standardprofil."
+        }
+      }
+    },
+    "delete_profile": {
+      "name": "Profil löschen",
+      "description": "Löscht ein leeres Profil (nie das letzte).",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "ID des Profils."
+        }
+      }
+    },
+    "list_profiles": {
+      "name": "Profile auflisten",
+      "description": "Gibt die Profile in Reihenfolge zurück (das erste ist das Standardprofil), mit ihrer Anzahl an Konten, Kategorien, Klassen und Empfängern."
+    },
     "create_account": {
       "name": "Konto anlegen",
       "description": "Legt ein Bankkonto an.",
@@ -156,6 +248,10 @@
         "is_default": {
           "name": "Standardkonto",
           "description": "Wird überall vorausgewählt, wo ein Konto gewählt wird; nur ein Konto kann das Standardkonto sein."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "ID des Profils des neuen Elements (siehe Profile auflisten); leer: das erste Profil."
         }
       }
     },
@@ -246,6 +342,10 @@
         "position": {
           "name": "Position",
           "description": "Sortierreihenfolge."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "ID des Profils des neuen Elements (siehe Profile auflisten); leer: das erste Profil."
         }
       }
     },
@@ -308,6 +408,10 @@
         "position": {
           "name": "Position",
           "description": "Sortierreihenfolge."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "ID des Profils des neuen Elements (siehe Profile auflisten); leer: das erste Profil."
         }
       }
     },
@@ -474,6 +578,10 @@
         "payee_category": {
           "name": "Empfängergruppe",
           "description": "Freie Gruppierung der Empfänger."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "ID des Profils des neuen Elements (siehe Profile auflisten); leer: das erste Profil."
         }
       }
     },
@@ -970,16 +1078,32 @@
         "include_closed": {
           "name": "Geschlossene Konten einschließen",
           "description": "Auch geschlossene Konten zurückgeben."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Elemente dieses Profils (ID); leer: alle Profile."
         }
       }
     },
     "list_categories": {
       "name": "Kategorien auflisten",
-      "description": "Gibt den Kategoriebaum als flache Liste zurück (mit Pfad und Tiefe)."
+      "description": "Gibt den Kategoriebaum als flache Liste zurück (mit Pfad und Tiefe).",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Elemente dieses Profils (ID); leer: alle Profile."
+        }
+      }
     },
     "list_classes": {
       "name": "Klassen auflisten",
-      "description": "Gibt den Klassenbaum als flache Liste zurück."
+      "description": "Gibt den Klassenbaum als flache Liste zurück.",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Elemente dieses Profils (ID); leer: alle Profile."
+        }
+      }
     },
     "list_payees": {
       "name": "Empfänger auflisten",
@@ -992,6 +1116,10 @@
         "active": {
           "name": "Nur aktive",
           "description": "Nur aktive Empfänger."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Elemente dieses Profils (ID); leer: alle Profile."
         }
       }
     },
@@ -1080,6 +1208,10 @@
         "offset": {
           "name": "Versatz",
           "description": "Anzahl zu überspringender Ergebnisse (Seitenweise)."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Buchungen der Konten dieses Profils (ID)."
         }
       }
     },
@@ -1478,6 +1610,10 @@
         "active": {
           "name": "Nur aktive",
           "description": "Nur aktive Daueraufträge."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Daueraufträge oder Budgets der Konten dieses Profils (ID)."
         }
       }
     },
@@ -1492,6 +1628,10 @@
         "account_id": {
           "name": "Konto",
           "description": "Konto-ID."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Daueraufträge oder Budgets der Konten dieses Profils (ID)."
         }
       }
     },
@@ -1502,6 +1642,10 @@
         "account_id": {
           "name": "Konto",
           "description": "Konto-ID."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Buchungen der Konten dieses Profils (ID)."
         }
       }
     },
@@ -1530,6 +1674,10 @@
         "include_archived": {
           "name": "Archivierte einschließen",
           "description": "Auch archivierte Budgets zurückgeben."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Nur die Daueraufträge oder Budgets der Konten dieses Profils (ID)."
         }
       }
     },

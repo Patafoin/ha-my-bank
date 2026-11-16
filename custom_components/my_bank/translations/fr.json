@@ -43,6 +43,13 @@
     "step": {
       "init": {
         "title": "Options de My Bank",
+        "menu_options": {
+          "settings": "Réglages (accès, capteurs, dates limites, profils)",
+          "delete_profile": "Supprimer un profil et toutes ses données"
+        }
+      },
+      "settings": {
+        "title": "Options de My Bank",
         "description": "Les administrateurs de Home Assistant ont toujours un accès complet à My Bank. Les automatisations et scripts lancés par Home Assistant ne sont pas limités.",
         "sections": {
           "users": {
@@ -76,15 +83,54 @@
             "data_description": {
               "due_warning_days": "Une opération non payée est signalée en orange à partir de ce nombre de jours avant sa date limite (0 = le jour même seulement)."
             }
+          },
+          "profiles": {
+            "name": "Profils",
+            "description": "Chaque profil a ses propres comptes, rubriques, classes et tiers (aucune notion de droits : juste des vues séparées). Renommer un profil en modifiant son nom. Avec un seul profil, les cartes restent comme avant ; dès deux profils, un sélecteur apparaît en haut de la carte My Bank. Pour supprimer un profil : « Supprimer un profil » dans le menu affiché à l'ouverture de ces options (dès deux profils).",
+            "data": {
+              "new_profile": "Nouveau profil"
+            },
+            "data_description": {
+              "new_profile": "Nom d'un profil à ajouter (vide : aucun). Il démarre vide."
+            }
           }
         }
+      },
+      "delete_profile": {
+        "title": "Supprimer un profil",
+        "description": "Choisir le profil à supprimer. Deux confirmations suivent ; rien n'est supprimé avant la seconde.",
+        "data": {
+          "profile_id": "Profil"
+        }
+      },
+      "delete_confirm": {
+        "title": "Supprimer « {name} » ?",
+        "description": "Le profil « {name} » et **toutes ses données** seront supprimés : {accounts} compte(s), {transactions} opération(s) (rapprochées et justificatifs compris), leurs planifications et budgets, {categories} rubrique(s), {classes} classe(s) et {payees} tiers. Les autres profils ne sont pas touchés.\n\nCocher la case pour continuer ; la laisser décochée pour annuler.",
+        "data": {
+          "confirm": "Oui, je veux supprimer ce profil et toutes ses données"
+        }
+      },
+      "delete_confirm_again": {
+        "title": "Dernière confirmation",
+        "description": "**Cette suppression est définitive.** Supprimer « {name} » efface pour de bon {accounts} compte(s) et {transactions} opération(s) (seule une sauvegarde de My Bank API pourrait les ramener).\n\nCocher la case pour supprimer maintenant ; la laisser décochée pour annuler.",
+        "data": {
+          "confirm": "Je confirme : supprimer ce profil définitivement"
+        }
       }
+    },
+    "error": {
+      "profiles_failed": "Profils non enregistrés : {error}",
+      "api_too_old": "My Bank API {version} est trop ancien pour cette version de l'intégration (il faut {minimum} ou plus récent) : les profils ne sont pas disponibles. Mettre à jour l'application My Bank API (Paramètres → Applications) ou son image Docker, puis rouvrir ces options."
+    },
+    "abort": {
+      "delete_cancelled": "Suppression annulée : rien n'a été supprimé.",
+      "profile_deleted": "Le profil « {name} » et toutes ses données ont été supprimés."
     }
   },
   "issues": {
     "api_too_old": {
       "title": "My Bank API doit être mis à jour",
-      "description": "My Bank API {version} est plus ancien que la version minimale attendue par l'intégration ({minimum}). Mettre à jour l'application ou l'image Docker My Bank API, sinon certaines fonctions de la carte échoueront."
+      "description": "My Bank API {version} est plus ancien que la version minimale attendue par l'intégration ({minimum}). Mettre à jour l'application ou l'image Docker My Bank API : d'ici là, les fonctions les plus récentes (comme les profils) ne sont pas disponibles."
     }
   },
   "entity": {
@@ -109,6 +155,52 @@
     }
   },
   "services": {
+    "create_profile": {
+      "name": "Créer un profil",
+      "description": "Crée un profil vide (ses propres comptes, rubriques, classes et tiers).",
+      "fields": {
+        "name": {
+          "name": "Nom",
+          "description": "Nom du profil."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Ordre de tri ; le premier profil est le profil par défaut."
+        }
+      }
+    },
+    "update_profile": {
+      "name": "Modifier un profil",
+      "description": "Renomme ou réordonne un profil.",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "Identifiant du profil."
+        },
+        "name": {
+          "name": "Nom",
+          "description": "Nom du profil."
+        },
+        "position": {
+          "name": "Position",
+          "description": "Ordre de tri ; le premier profil est le profil par défaut."
+        }
+      }
+    },
+    "delete_profile": {
+      "name": "Supprimer un profil",
+      "description": "Supprime un profil vide (jamais le dernier).",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "Identifiant du profil."
+        }
+      }
+    },
+    "list_profiles": {
+      "name": "Lister les profils",
+      "description": "Renvoie les profils dans l'ordre (le premier est le profil par défaut), avec leur nombre de comptes, rubriques, classes et tiers."
+    },
     "create_account": {
       "name": "Créer un compte",
       "description": "Crée un compte bancaire.",
@@ -156,6 +248,10 @@
         "is_default": {
           "name": "Compte par défaut",
           "description": "Préselectionné partout où un compte se choisit ; un seul compte à la fois."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Identifiant du profil du nouvel élément (voir Lister les profils) ; vide : le premier profil."
         }
       }
     },
@@ -246,6 +342,10 @@
         "position": {
           "name": "Ordre",
           "description": "Ordre d'affichage."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Identifiant du profil du nouvel élément (voir Lister les profils) ; vide : le premier profil."
         }
       }
     },
@@ -308,6 +408,10 @@
         "position": {
           "name": "Ordre",
           "description": "Ordre d'affichage."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Identifiant du profil du nouvel élément (voir Lister les profils) ; vide : le premier profil."
         }
       }
     },
@@ -474,6 +578,10 @@
         "payee_category": {
           "name": "Catégorie de tiers",
           "description": "Regroupement libre des tiers."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Identifiant du profil du nouvel élément (voir Lister les profils) ; vide : le premier profil."
         }
       }
     },
@@ -970,16 +1078,32 @@
         "include_closed": {
           "name": "Inclure les comptes clos",
           "description": "Renvoyer aussi les comptes clos."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les éléments de ce profil (identifiant) ; vide : tous les profils."
         }
       }
     },
     "list_categories": {
       "name": "Lister les rubriques",
-      "description": "Renvoie l'arborescence des rubriques à plat (avec chemin et profondeur)."
+      "description": "Renvoie l'arborescence des rubriques à plat (avec chemin et profondeur).",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les éléments de ce profil (identifiant) ; vide : tous les profils."
+        }
+      }
     },
     "list_classes": {
       "name": "Lister les classes",
-      "description": "Renvoie l'arborescence des classes à plat."
+      "description": "Renvoie l'arborescence des classes à plat.",
+      "fields": {
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les éléments de ce profil (identifiant) ; vide : tous les profils."
+        }
+      }
     },
     "list_payees": {
       "name": "Lister les tiers",
@@ -992,6 +1116,10 @@
         "active": {
           "name": "Actifs seulement",
           "description": "Seulement les tiers actifs."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les éléments de ce profil (identifiant) ; vide : tous les profils."
         }
       }
     },
@@ -1080,6 +1208,10 @@
         "offset": {
           "name": "Décalage",
           "description": "Nombre de résultats à sauter (pagination)."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les opérations des comptes de ce profil (identifiant)."
         }
       }
     },
@@ -1478,6 +1610,10 @@
         "active": {
           "name": "Actives seulement",
           "description": "Seulement les opérations planifiées actives."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les planifications ou budgets des comptes de ce profil (identifiant)."
         }
       }
     },
@@ -1492,6 +1628,10 @@
         "account_id": {
           "name": "Compte",
           "description": "Identifiant du compte."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les planifications ou budgets des comptes de ce profil (identifiant)."
         }
       }
     },
@@ -1502,6 +1642,10 @@
         "account_id": {
           "name": "Compte",
           "description": "Identifiant du compte."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les opérations des comptes de ce profil (identifiant)."
         }
       }
     },
@@ -1530,6 +1674,10 @@
         "include_archived": {
           "name": "Inclure les archivés",
           "description": "Renvoyer aussi les budgets archivés."
+        },
+        "profile_id": {
+          "name": "Profil",
+          "description": "Seulement les planifications ou budgets des comptes de ce profil (identifiant)."
         }
       }
     },

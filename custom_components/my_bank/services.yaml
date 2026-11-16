@@ -1,5 +1,44 @@
+create_profile:
+  fields:
+    name:
+      required: true
+      selector:
+        text: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+update_profile:
+  fields:
+    profile_id:
+      required: true
+      selector:
+        number:
+          mode: box
+    name:
+      required: false
+      selector:
+        text: {}
+    position:
+      required: false
+      selector:
+        number:
+          mode: box
+delete_profile:
+  fields:
+    profile_id:
+      required: true
+      selector:
+        number:
+          mode: box
 create_account:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     name:
       required: true
       selector:
@@ -125,6 +164,11 @@ delete_account:
           mode: box
 create_category:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     name:
       required: true
       selector:
@@ -195,6 +239,11 @@ delete_category:
           mode: box
 create_class:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     name:
       required: true
       selector:
@@ -247,6 +296,11 @@ delete_class:
           mode: box
 create_payee:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     name:
       required: true
       selector:
@@ -864,8 +918,14 @@ create_transfer:
           - '1'
           - '2'
           translation_key: transaction_state
+list_profiles: {}
 list_accounts:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     date:
       required: false
       selector:
@@ -874,10 +934,27 @@ list_accounts:
       required: false
       selector:
         boolean: {}
-list_categories: {}
-list_classes: {}
+list_categories:
+  fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
+list_classes:
+  fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
 list_payees:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     q:
       required: false
       selector:
@@ -917,6 +994,11 @@ list_account_transactions:
           translation_key: order
 search_transactions:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     account_id:
       required: false
       selector:
@@ -1409,6 +1491,11 @@ copy_budget:
           mode: box
 list_schedules:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     account_id:
       required: false
       selector:
@@ -1420,6 +1507,11 @@ list_schedules:
         boolean: {}
 list_upcoming_occurrences:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     days:
       required: false
       selector:
@@ -1432,6 +1524,11 @@ list_upcoming_occurrences:
           mode: box
 list_due_transactions:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     account_id:
       required: false
       selector:
@@ -1451,6 +1548,11 @@ list_schedule_occurrences:
           mode: box
 list_budgets:
   fields:
+    profile_id:
+      required: false
+      selector:
+        number:
+          mode: box
     account_id:
       required: false
       selector:

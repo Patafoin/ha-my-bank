@@ -125,6 +125,58 @@ function myBankDue(hass) {
   return promise;
 }
 
+// Profils (décision 028) : jeux séparés de comptes, rubriques, classes et tiers, gérés dans les options de
+// l'intégration. Lus pour toutes les cartes de la connexion, relus au bout de PROFILES_REFRESH_MS (un profil ajouté
+// dans les options apparaît sans recharger la page). [] si le service est indisponible (intégration plus ancienne).
+const PROFILES = new WeakMap();
+const PROFILES_REFRESH_MS = 60 * 1000;
+const PROFILE_KEY = "my-bank-profile"; // profil affiché, choisi dans ce navigateur
+const PROFILE_CHANGES = new EventTarget(); // un autre profil vient d'être choisi dans une carte de la page
+// Services filtrés (lectures) ou rattachés (créations) au profil affiché ; jamais quand un compte est précisé.
+const PROFILE_SCOPED = new Set([
+  "list_accounts", "list_categories", "list_classes", "list_payees", "search_transactions", "list_schedules",
+  "list_upcoming_occurrences", "list_budgets", "create_account", "create_category", "create_class", "create_payee",
+]);
+function myBankProfiles(hass) {
+  const conn = hass.connection;
+  const cached = PROFILES.get(conn);
+  if (cached && Date.now() - cached.at < PROFILES_REFRESH_MS) return cached.promise;
+  const promise = conn
+    .sendMessagePromise({ type: "call_service", domain: "my_bank", service: "list_profiles", service_data: {}, return_response: true })
+    .then((res) => (res && res.response && res.response.items) || [], () => []);
+  PROFILES.set(conn, { at: Date.now(), promise });
+  return promise;
+}
+
+// Profil affiché : celui choisi dans ce navigateur s'il existe encore, sinon le premier (profil par défaut).
+// null avec un seul profil : aucun filtre, la carte se comporte exactement comme avant les profils.
+function activeProfileId(profiles) {
+  if (profiles.length < 2) return null;
+  let stored = null;
+  try { stored = Number(window.localStorage.getItem(PROFILE_KEY)); } catch (e) { /* stockage indisponible */ }
+  return (profiles.find((p) => p.id === stored) || profiles[0]).id;
+}
+
+// Ce qui, dans la liste des profils, change l'affichage (ajout, suppression, renommage, ordre).
+function profilesSignature(profiles) {
+  return profiles.map((p) => `${p.id}:${p.name}`).join("|");
+}
+
+// Carte de nouveau affichée (retour sur le tableau de bord, par exemple depuis les options de l'intégration) :
+// profils relus — une fois pour toutes les cartes qui se rattachent ensemble — et carte redessinée s'ils ont changé.
+async function refreshProfilesOnReturn(card) {
+  if (!card._hass || card._profilesSig === undefined) return;
+  const conn = card._hass.connection;
+  const cached = PROFILES.get(conn);
+  if (cached && Date.now() - cached.at > 2000) PROFILES.delete(conn);
+  if (profilesSignature(await myBankProfiles(card._hass)) !== card._profilesSig) card._renderActive(true);
+}
+
+function chooseProfile(id) {
+  try { window.localStorage.setItem(PROFILE_KEY, String(id)); } catch (e) { /* stockage indisponible */ }
+  PROFILE_CHANGES.dispatchEvent(new Event("changed"));
+}
+
 // Statut d'une opération d'après sa date limite : "overdue", "soon" ou null (pas de date limite, pointée, ou lointaine).
 function dueStatus(tx, due) {
   if (!due || !tx.due_date || tx.state >= 1) return null;
@@ -232,6 +284,12 @@ const STYLE = `
     color: var(--primary-text-color); font-size: 14px; border-bottom: 2px solid transparent;
   }
   .tabs button.active { border-bottom-color: var(--primary-color); color: var(--primary-color); font-weight: 500; }
+  .profiles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .profiles button {
+    cursor: pointer; padding: 6px 16px; min-height: 36px; border-radius: 18px; font-size: 14px;
+    border: 1px solid var(--divider-color); background: none; color: var(--primary-text-color);
+  }
+  .profiles button.active { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); font-weight: 500; }
   .tab-badge {
     display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; box-sizing: border-box;
     font-size: 11px; line-height: 18px; text-align: center; background: var(--warning-color, #ffa600); color: #fff;
@@ -900,12 +958,16 @@ class MyBankCard extends HTMLElement {
   connectedCallback() {
     if (!this._onPopState) this._onPopState = (ev) => this._navPop(ev);
     window.addEventListener("popstate", this._onPopState);
+    if (!this._onProfile) this._onProfile = () => this._renderActive();
+    PROFILE_CHANGES.addEventListener("changed", this._onProfile);
     // retour sur la vue du tableau de bord (nouvelle entrée d'historique) : y noter l'écran affiché
     if (this._hass && this._bodyEl) this._navCommit(true);
+    refreshProfilesOnReturn(this);
   }
 
   disconnectedCallback() {
     if (this._onPopState) window.removeEventListener("popstate", this._onPopState);
+    if (this._onProfile) PROFILE_CHANGES.removeEventListener("changed", this._onProfile);
   }
 
   set hass(hass) {
@@ -931,6 +993,9 @@ class MyBankCard extends HTMLElement {
   }
 
   async _call(service, data, wantResponse) {
+    if (this._profileScope != null && PROFILE_SCOPED.has(service) && data && data.profile_id === undefined && data.account_id === undefined) {
+      data = { ...data, profile_id: this._profileScope };
+    }
     const res = await this._hass.connection.sendMessagePromise({
       type: "call_service",
       domain: "my_bank",
@@ -985,7 +1050,12 @@ class MyBankCard extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
-    this.shadowRoot.innerHTML = `<style>${STYLE}</style><ha-card><div class="term-alerts"></div><div class="tabs"></div><div class="body"><div class="loading">${t("Chargement…")}</div></div></ha-card>`;
+    this.shadowRoot.innerHTML = `<style>${STYLE}</style><ha-card><div class="profiles" hidden></div><div class="term-alerts"></div><div class="tabs"></div><div class="body"><div class="loading">${t("Chargement…")}</div></div></ha-card>`;
+    this._profilesEl = this.shadowRoot.querySelector(".profiles");
+    this._profilesEl.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("button[data-profile]");
+      if (btn && Number(btn.dataset.profile) !== this._profileScope) chooseProfile(Number(btn.dataset.profile));
+    });
     this._alertsEl = this.shadowRoot.querySelector(".term-alerts");
     this._tabsEl = this.shadowRoot.querySelector(".tabs");
     this._bodyEl = this.shadowRoot.querySelector(".body");
@@ -1059,6 +1129,7 @@ class MyBankCard extends HTMLElement {
       this._bodyEl.innerHTML = `<div class="empty">${t("Votre compte Home Assistant n'a pas accès à My Bank.")}</div>`;
       return;
     }
+    await this._syncProfiles();
     // L'échéancier rafraîchit lui-même le bandeau « arrive à terme » avec ses propres données.
     if (!this._noAlerts && this._active !== "recurrences" && Date.now() - this._alertsAt > TERM_REFRESH_MS) this._refreshAlerts();
     try {
@@ -1082,6 +1153,37 @@ class MyBankCard extends HTMLElement {
       this._focusId = null;
       this._navCommit();
     }
+  }
+
+  // --- Profils (décision 028) : sélecteur en haut de la carte, dès qu'il y a au moins deux profils ----
+
+  async _syncProfiles() {
+    const profiles = await myBankProfiles(this._hass);
+    const scope = activeProfileId(profiles);
+    this._profilesSig = profilesSignature(profiles);
+    if (scope !== this._profileScope) {
+      if (this._profileScope !== undefined) this._resetProfileState();
+      this._profileScope = scope;
+      this._profileDefault = profiles.length ? profiles[0].id : null;
+    }
+    if (!this._profilesEl) return;
+    this._profilesEl.hidden = scope == null || this._noProfiles;
+    this._profilesEl.innerHTML = scope == null ? "" : profiles
+      .map((p) => `<button data-profile="${p.id}" class="${p.id === scope ? "active" : ""}">${esc(p.name)}</button>`)
+      .join("");
+  }
+
+  // Autre profil affiché : tout ce qui désigne un compte, une rubrique, un tiers… du profil précédent est oublié.
+  _resetProfileState() {
+    this._lookups = null;
+    this._txAccountId = this._budgetId = this._openSchedule = this._txFilters = undefined;
+    this._txSelected = undefined;
+    this._txRecon = false;
+    this._returnTo = null;
+    this._ending = [];
+    this._alertsAt = 0;
+    if (this._alertsEl) this._alertsEl.innerHTML = "";
+    if (this._tabsEl && this._sections) this._renderTabs();
   }
 
   // --- Planifications arrivant à terme (bandeau en haut de la carte, quel que soit l'onglet) -------
@@ -1735,9 +1837,15 @@ class MyBankCard extends HTMLElement {
   }
 
   // Critères enregistrés comme vue par défaut des opérations (bouton « Enregistrer par défaut » du bandeau).
+  // Une vue par défaut par profil (elle désigne des rubriques, des tiers…) ; celle d'avant les profils reste au premier.
+  _txFiltersKey() {
+    const scope = this._profileScope;
+    return scope == null || scope === this._profileDefault ? TX_FILTERS_DEFAULT_KEY : `${TX_FILTERS_DEFAULT_KEY}-${scope}`;
+  }
+
   _loadDefaultTxFilters() {
     try {
-      const saved = JSON.parse(window.localStorage.getItem(TX_FILTERS_DEFAULT_KEY) || "null");
+      const saved = JSON.parse(window.localStorage.getItem(this._txFiltersKey()) || "null");
       return saved ? { ...TX_FILTERS, ...saved } : { ...TX_FILTERS };
     } catch (e) {
       return { ...TX_FILTERS }; // stockage indisponible : vue par défaut d'origine
@@ -1745,15 +1853,15 @@ class MyBankCard extends HTMLElement {
   }
 
   _hasDefaultTxFilters() {
-    try { return window.localStorage.getItem(TX_FILTERS_DEFAULT_KEY) !== null; } catch (e) { return false; }
+    try { return window.localStorage.getItem(this._txFiltersKey()) !== null; } catch (e) { return false; }
   }
 
   _saveDefaultTxFilters() {
-    try { window.localStorage.setItem(TX_FILTERS_DEFAULT_KEY, JSON.stringify(this._txFilters)); } catch (e) { /* stockage indisponible */ }
+    try { window.localStorage.setItem(this._txFiltersKey(), JSON.stringify(this._txFilters)); } catch (e) { /* stockage indisponible */ }
   }
 
   _clearDefaultTxFilters() {
-    try { window.localStorage.removeItem(TX_FILTERS_DEFAULT_KEY); } catch (e) { /* idem */ }
+    try { window.localStorage.removeItem(this._txFiltersKey()); } catch (e) { /* idem */ }
   }
 
   _txMatches(tx, f) {
@@ -3965,6 +4073,7 @@ class MyBankCard extends HTMLElement {
       { key: "schedules", label: t("Échéancier"), html: this._helpSchedulesHtml() },
       { key: "budgets", label: t("Budgets"), html: this._helpBudgetsHtml() },
       { key: "shares", label: t("Partages"), html: this._helpSharesHtml() },
+      { key: "profiles", label: t("Profils"), html: this._helpProfilesHtml() },
     ];
   }
 
@@ -4144,6 +4253,21 @@ class MyBankCard extends HTMLElement {
         <li>${t("Chaque participant enregistre ce qu'il a payé.")}</li>
         <li>${t("L'appli calcule qui doit combien à qui pour équilibrer.")}</li>
         <li>${t("Totalement indépendant de tes comptes et opérations bancaires : ça ne touche pas tes soldes.")}</li>
+      </ul>
+    `;
+  }
+
+  _helpProfilesHtml() {
+    return `
+      <h3>${t("Profils")}</h3>
+      <p>${t("Un profil regroupe ses propres comptes, rubriques, classes et tiers : par exemple un par personne du foyer. Ce n'est pas une protection : toute personne qui a accès à My Bank peut passer d'un profil à l'autre.")}</p>
+      <ul>
+        <li>${t("Créer ou renommer un profil : Paramètres → Appareils et services → My Bank → Configurer.")}</li>
+        <li>${t("Dès deux profils, les boutons en haut de cette carte changent le profil affiché ; ce navigateur retient le choix.")}</li>
+        <li>${t("Ce que tu crées ici (compte, rubrique, classe, tiers) va dans le profil affiché ; opérations, planifications et budgets suivent leur compte.")}</li>
+        <li>${t("Un virement ne relie que deux comptes du même profil. Modes de règlement et partages sont communs à tous les profils.")}</li>
+        <li>${t("Petites cartes : réglées sur un compte ou un profil, elles le gardent ; sinon elles suivent le profil affiché ici.")}</li>
+        <li>${t("Supprimer un profil et toutes ses données : même écran Configurer, « Supprimer un profil », avec deux confirmations.")}</li>
       </ul>
     `;
   }
@@ -4695,9 +4819,16 @@ class MyBankSimpleCard extends MyBankCard {
     this._render();
   }
 
-  connectedCallback() {}
+  // Pas d'historique de navigation : seulement le changement de profil affiché (voir _syncProfiles).
+  connectedCallback() {
+    if (!this._onProfile) this._onProfile = () => this._renderActive();
+    PROFILE_CHANGES.addEventListener("changed", this._onProfile);
+    refreshProfilesOnReturn(this);
+  }
 
-  disconnectedCallback() {}
+  disconnectedCallback() {
+    if (this._onProfile) PROFILE_CHANGES.removeEventListener("changed", this._onProfile);
+  }
 
   set hass(hass) {
     this._hass = hass;
@@ -4710,6 +4841,34 @@ class MyBankSimpleCard extends MyBankCard {
 
   getCardSize() {
     return 3;
+  }
+
+  // Profil d'une carte simple (pas de sélecteur) : celui réglé dans la carte (cartes graphiques), sinon celui du ou
+  // des comptes choisis, sinon celui affiché par la carte principale. Un budget choisi se retrouve parmi tous les
+  // budgets : aucun filtre. Des comptes de plusieurs profils (carte réglée avant les profils) : _profileMix.
+  async _syncProfiles() {
+    const previous = this._profileScope;
+    const c = this._config;
+    const profiles = await myBankProfiles(this._hass);
+    this._profilesSig = profilesSignature(profiles);
+    this._profileMix = false;
+    let scope = activeProfileId(profiles);
+    const pinned = c.account_id ? [Number(c.account_id)] : Array.isArray(c.account_ids) ? c.account_ids.map(Number) : [];
+    if (scope != null && c.budget_id) {
+      scope = null;
+    } else if (scope != null && profiles.some((p) => p.id === Number(c.profile_id))) {
+      scope = Number(c.profile_id);
+    } else if (scope != null && pinned.length) {
+      this._profileScope = null; // tous les comptes, pour trouver le profil de celui choisi
+      const own = new Set((await this._items("list_accounts")).filter((a) => pinned.includes(a.id)).map((a) => a.profile_id));
+      if (own.size) scope = [...own][0];
+      this._profileMix = own.size > 1;
+    }
+    this._profileScope = scope;
+    if (scope !== previous && previous !== undefined) {
+      this._lookups = null;
+      this._txAccountId = undefined;
+    }
   }
 
   _render() {
@@ -4729,6 +4888,11 @@ class MyBankSimpleCard extends MyBankCard {
       return;
     }
     try {
+      await this._syncProfiles();
+      if (this._profileMix) {
+        this._bodyEl.innerHTML = `<div class="empty">${t("Les comptes choisis appartiennent à plusieurs profils : modifier la carte pour choisir un seul profil.")}</div>`;
+        return;
+      }
       await this._renderCard();
     } catch (err) {
       this._bodyEl.innerHTML = `<div class="error">${esc(errMsg(err))}</div>`;
@@ -4815,12 +4979,14 @@ class MyBankBalanceCard extends MyBankSimpleCard {
   // Soldes lus par le service (droits de l'utilisateur appliqués), pas sur un capteur : les capteurs ne sont
   // publiés qu'à la demande. Relus après une saisie dans une autre carte My Bank de la page, sinon toutes les 5 minutes.
   connectedCallback() {
+    super.connectedCallback();
     if (!this._onChange) this._onChange = () => this._renderActive();
     CHANGES.addEventListener("changed", this._onChange);
     if (this._loadedAt && Date.now() - this._loadedAt > SIMPLE_REFRESH_MS) this._renderActive();
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     if (this._onChange) CHANGES.removeEventListener("changed", this._onChange);
   }
 
@@ -5597,6 +5763,7 @@ class MyBankBudgetTrendCard extends MyBankSimpleCard {
 class MyBankShareCard extends MyBankCard {
   setConfig(config) {
     this._noAlerts = true;
+    this._noProfiles = true; // comptes partagés : communs à tous les profils
     super.setConfig({ ...(config || {}), sections: ["shares"] });
   }
 
@@ -5640,11 +5807,18 @@ class MyBankSimpleEditor extends HTMLElement {
     if (first) this._load();
   }
 
-  async _items(service) {
+  // plain : noms des comptes tels quels (le profil est choisi à part).
+  async _items(service, { plain } = {}) {
     const res = await this._hass.connection.sendMessagePromise({
       type: "call_service", domain: "my_bank", service, service_data: {}, return_response: true,
     });
-    return (res && res.response && res.response.items) || [];
+    const items = (res && res.response && res.response.items) || [];
+    if (service !== "list_accounts" || plain) return items;
+    // Comptes de tous les profils : « Profil · Compte » dès deux profils (deux comptes peuvent porter le même nom).
+    const profiles = await myBankProfiles(this._hass);
+    if (profiles.length < 2) return items;
+    const names = new Map(profiles.map((p) => [p.id, p.name]));
+    return items.map((a) => (names.has(a.profile_id) ? { ...a, name: `${names.get(a.profile_id)} · ${a.name}` } : a));
   }
 
   async _load() {
@@ -5676,8 +5850,17 @@ class MyBankSimpleEditor extends HTMLElement {
         return `<label>${esc(f.label)}<select data-key="${f.key}" data-num="${f.number ? 1 : ""}">${empty}${list.map((o) => `<option value="${esc(o.id)}" ${String(c[f.key] ?? "") === String(o.id) ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></label>`;
       }
       if (f.type === "checks") {
-        const on = Array.isArray(c[f.key]) ? new Set(c[f.key]) : new Set(f.options.map((o) => o.key));
-        return `<div class="group"><div>${esc(f.label)}</div>${f.options.map((o) => `<label class="row"><input type="checkbox" data-check="${f.key}" value="${o.key}" ${on.has(o.key) ? "checked" : ""}>${esc(o.label)}</label>`).join("")}<p>${esc(f.help || "")}</p></div>`;
+        let options = f.options;
+        let profileSelect = "";
+        const profiles = f.byProfile ? (opts.profiles || []) : [];
+        if (profiles.length > 1) {
+          const pid = this._checksProfile(c, f);
+          profileSelect = `<label>${t("Profil")}<select data-profile-of="${f.key}"><option value="">${esc(t("Celui affiché dans la carte principale"))}</option>${profiles.map((p) => `<option value="${p.id}" ${p.id === pid ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>`;
+          if (pid == null) return `<div class="group">${profileSelect}<p>${esc(t("Tous les comptes du profil affiché dans la carte principale."))}</p></div>`;
+          options = options.filter((o) => o.profileId === pid);
+        }
+        const on = Array.isArray(c[f.key]) ? new Set(c[f.key].map(String)) : new Set(options.map((o) => o.key));
+        return `<div class="group">${profileSelect}<div>${esc(f.label)}</div>${options.map((o) => `<label class="row"><input type="checkbox" data-check="${f.key}" value="${o.key}" ${on.has(o.key) ? "checked" : ""}>${esc(o.label)}</label>`).join("")}<p>${esc(f.help || "")}</p></div>`;
       }
       if (f.type === "bool") return `<label class="row"><input type="checkbox" data-bool="${f.key}" ${c[f.key] ? "checked" : ""}>${esc(f.label)}</label>`;
       if (f.type === "balances") return `<div class="group"><div>${esc(f.label)}</div>${balancesEditorHtml(c, f.defaults)}<p>${esc(f.help || "")}</p></div>`;
@@ -5695,8 +5878,29 @@ class MyBankSimpleEditor extends HTMLElement {
     wireBalancesEditor(this.shadowRoot, () => this._emit());
   }
 
+  // Profil des comptes à cocher : celui réglé, sinon celui du premier compte coché (carte réglée avant les profils).
+  _checksProfile(config, f) {
+    if (config.profile_id != null) return Number(config.profile_id);
+    const checked = Array.isArray(config[f.key]) ? config[f.key].map(String) : [];
+    const first = f.options.find((o) => checked.includes(o.key));
+    return first ? first.profileId : null;
+  }
+
   _emit() {
     const config = { ...this._config };
+    // Autre profil choisi : les comptes cochés (d'un autre profil) sont oubliés, tous ceux du nouveau sont pris.
+    for (const el of this.shadowRoot.querySelectorAll("[data-profile-of]")) {
+      const f = this._fields().find((x) => x.key === el.dataset.profileOf);
+      const before = this._checksProfile(config, f);
+      if (el.value === String(before ?? "")) continue;
+      if (el.value) config.profile_id = Number(el.value);
+      else delete config.profile_id;
+      delete config[f.key];
+      this._config = config;
+      this.dispatchEvent(new CustomEvent("config-changed", { detail: { config } }));
+      this._render();
+      return;
+    }
     const balances = this._fields().find((f) => f.type === "balances");
     if (balances) readBalancesEditor(this.shadowRoot, config, balances.defaults);
     this.shadowRoot.querySelectorAll("[data-key]").forEach((el) => {
@@ -5725,8 +5929,13 @@ class MyBankSimpleEditor extends HTMLElement {
           return;
         }
       }
-      if (allChecked) delete config[key]; // tout coché = valeur par défaut
+      if (allChecked) delete config[key]; // tout coché = valeur par défaut (tous les comptes du profil réglé)
       else config[key] = checked;
+      const field2 = fields.find((f) => f.key === key);
+      if (field2 && field2.byProfile && config.profile_id == null && boxes.length) {
+        const pid = this._checksProfile({ ...config, [key]: boxes.map((el) => el.value) }, field2);
+        if (pid != null && (this._options.profiles || []).length > 1) config.profile_id = pid; // fige le profil affiché
+      }
     }
     this._config = config;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config } }));
@@ -5812,9 +6021,14 @@ class MyBankBudgetTrendCardEditor extends MyBankBudgetCardEditor {
 
 // Comptes à cocher, partagé par les trois éditeurs de cartes graphiques ci-dessous. La devise accolée au nom
 // prévient avant de cocher un mélange que la carte refusera (sommes ou axe communs à plusieurs comptes).
+// Dès deux profils, un profil se choisit d'abord et seuls ses comptes se cochent : aucun mélange possible.
 async function loadAccountChecks(editor) {
-  const accounts = (await editor._items("list_accounts")).filter((a) => !a.closed);
-  return { account_ids: accounts.map((a) => ({ key: String(a.id), label: `${a.name} (${a.currency})`, currency: a.currency })) };
+  const accounts = (await editor._items("list_accounts", { plain: true })).filter((a) => !a.closed);
+  const profiles = await myBankProfiles(editor._hass);
+  return {
+    profiles,
+    account_ids: accounts.map((a) => ({ key: String(a.id), label: `${a.name} (${a.currency})`, currency: a.currency, profileId: a.profile_id })),
+  };
 }
 
 class MyBankBalanceHistoryCardEditor extends MyBankSimpleEditor {
@@ -5826,7 +6040,7 @@ class MyBankBalanceHistoryCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       {
-        key: "account_ids", label: t("Comptes affichés"), type: "checks", sameCurrency: true,
+        key: "account_ids", label: t("Comptes affichés"), type: "checks", sameCurrency: true, byProfile: true,
         options: this._options ? this._options.account_ids : [],
         help: t("Tous cochés par défaut. Pour comparer des comptes d'échelles très différentes, préférer une carte par compte (ou groupe de comptes). Une seule devise à la fois."),
       },
@@ -5844,7 +6058,7 @@ class MyBankUpcomingChargeCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       {
-        key: "account_ids", label: t("Comptes pris en compte"), type: "checks", sameCurrency: true,
+        key: "account_ids", label: t("Comptes pris en compte"), type: "checks", sameCurrency: true, byProfile: true,
         options: this._options ? this._options.account_ids : [],
         help: t("Tous cochés par défaut. Une seule devise à la fois."),
       },
@@ -5862,7 +6076,7 @@ class MyBankCategorySpendingCardEditor extends MyBankSimpleEditor {
     return [
       { key: "title", label: t("Titre (facultatif)") },
       {
-        key: "account_ids", label: t("Comptes pris en compte"), type: "checks", sameCurrency: true,
+        key: "account_ids", label: t("Comptes pris en compte"), type: "checks", sameCurrency: true, byProfile: true,
         options: this._options ? this._options.account_ids : [],
         help: t("Tous cochés par défaut. Une seule devise à la fois."),
       },
@@ -5874,6 +6088,18 @@ class MyBankCategorySpendingCardEditor extends MyBankSimpleEditor {
 // @@I18N-BEGIN@@ — généré par i18n/gen.py depuis i18n/dict.json (clé : texte français de la carte)
 const I18N = {
   en: {
+    "Profil": "Profile",
+    "Profils": "Profiles",
+    "Celui affiché dans la carte principale": "The one shown in the main card",
+    "Tous les comptes du profil affiché dans la carte principale.": "All the accounts of the profile shown in the main card.",
+    "Les comptes choisis appartiennent à plusieurs profils : modifier la carte pour choisir un seul profil.": "The chosen accounts belong to several profiles: edit the card to choose a single profile.",
+    "Un profil regroupe ses propres comptes, rubriques, classes et tiers : par exemple un par personne du foyer. Ce n'est pas une protection : toute personne qui a accès à My Bank peut passer d'un profil à l'autre.": "A profile groups its own accounts, categories, classes and payees: for example one per person of the household. It is not a protection: anyone with access to My Bank can switch from one profile to another.",
+    "Créer ou renommer un profil : Paramètres → Appareils et services → My Bank → Configurer.": "Create or rename a profile: Settings → Devices & services → My Bank → Configure.",
+    "Dès deux profils, les boutons en haut de cette carte changent le profil affiché ; ce navigateur retient le choix.": "From two profiles on, the buttons at the top of this card change the profile shown; this browser remembers the choice.",
+    "Ce que tu crées ici (compte, rubrique, classe, tiers) va dans le profil affiché ; opérations, planifications et budgets suivent leur compte.": "What you create here (account, category, class, payee) goes to the profile shown; transactions, scheduled transactions and budgets follow their account.",
+    "Un virement ne relie que deux comptes du même profil. Modes de règlement et partages sont communs à tous les profils.": "A transfer only links two accounts of the same profile. Payment methods and sharing are common to all profiles.",
+    "Petites cartes : réglées sur un compte ou un profil, elles le gardent ; sinon elles suivent le profil affiché ici.": "Small cards: set to an account or a profile, they keep it; otherwise they follow the profile shown here.",
+    "Supprimer un profil et toutes ses données : même écran Configurer, « Supprimer un profil », avec deux confirmations.": "Delete a profile and all its data: same Configure screen, “Delete a profile”, with two confirmations.",
     "Mois en cours et à venir": "Current month and upcoming",
     "Mois en cours strict": "Current month only",
     "Solde prévisionnel total :": "Total projected balance:",
@@ -6438,6 +6664,18 @@ const I18N = {
     "Une opération peut avoir une date limite de paiement (facultative ; une planification peut la poser sur les opérations qu'elle génère, en jours après leur date). Tant qu'elle n'est pas pointée, elle est signalée en orange quelques jours avant (délai réglé dans les options de l'intégration), puis en rouge comme impayée une fois la date limite dépassée. La pointer fait disparaître l'alerte.": "A transaction can have a payment due date (optional; a scheduled transaction can set it on the transactions it generates, as a number of days after their date). Until it is cleared, it is flagged in orange a few days before (delay set in the integration options), then in red as unpaid once the due date has passed. Clearing it removes the warning.",
   },
   de: {
+    "Profil": "Profil",
+    "Profils": "Profile",
+    "Celui affiché dans la carte principale": "Das in der Hauptkarte angezeigte",
+    "Tous les comptes du profil affiché dans la carte principale.": "Alle Konten des in der Hauptkarte angezeigten Profils.",
+    "Les comptes choisis appartiennent à plusieurs profils : modifier la carte pour choisir un seul profil.": "Die gewählten Konten gehören zu mehreren Profilen: die Karte bearbeiten und ein einziges Profil wählen.",
+    "Un profil regroupe ses propres comptes, rubriques, classes et tiers : par exemple un par personne du foyer. Ce n'est pas une protection : toute personne qui a accès à My Bank peut passer d'un profil à l'autre.": "Ein Profil fasst eigene Konten, Kategorien, Klassen und Empfänger zusammen: zum Beispiel eines pro Person im Haushalt. Es ist kein Schutz: Wer Zugriff auf My Bank hat, kann zwischen den Profilen wechseln.",
+    "Créer ou renommer un profil : Paramètres → Appareils et services → My Bank → Configurer.": "Ein Profil erstellen oder umbenennen: Einstellungen → Geräte & Dienste → My Bank → Konfigurieren.",
+    "Dès deux profils, les boutons en haut de cette carte changent le profil affiché ; ce navigateur retient le choix.": "Ab zwei Profilen wechseln die Schaltflächen oben in dieser Karte das angezeigte Profil; dieser Browser merkt sich die Wahl.",
+    "Ce que tu crées ici (compte, rubrique, classe, tiers) va dans le profil affiché ; opérations, planifications et budgets suivent leur compte.": "Was du hier anlegst (Konto, Kategorie, Klasse, Empfänger), gehört zum angezeigten Profil; Buchungen, Daueraufträge und Budgets folgen ihrem Konto.",
+    "Un virement ne relie que deux comptes du même profil. Modes de règlement et partages sont communs à tous les profils.": "Eine Überweisung verbindet nur zwei Konten desselben Profils. Zahlungsarten und geteilte Ausgaben gelten für alle Profile.",
+    "Petites cartes : réglées sur un compte ou un profil, elles le gardent ; sinon elles suivent le profil affiché ici.": "Kleine Karten: auf ein Konto oder ein Profil eingestellt, behalten sie es; sonst folgen sie dem hier angezeigten Profil.",
+    "Supprimer un profil et toutes ses données : même écran Configurer, « Supprimer un profil », avec deux confirmations.": "Ein Profil mit allen Daten löschen: gleicher Bildschirm Konfigurieren, „Ein Profil löschen“, mit zwei Bestätigungen.",
     "Mois en cours et à venir": "Aktueller Monat und künftige",
     "Mois en cours strict": "Nur aktueller Monat",
     "Solde prévisionnel total :": "Voraussichtlicher Gesamtsaldo:",
@@ -7002,6 +7240,18 @@ const I18N = {
     "Une opération peut avoir une date limite de paiement (facultative ; une planification peut la poser sur les opérations qu'elle génère, en jours après leur date). Tant qu'elle n'est pas pointée, elle est signalée en orange quelques jours avant (délai réglé dans les options de l'intégration), puis en rouge comme impayée une fois la date limite dépassée. La pointer fait disparaître l'alerte.": "Eine Buchung kann eine Zahlungsfrist haben (optional; eine geplante Buchung kann sie bei den von ihr erzeugten Buchungen setzen, in Tagen nach deren Datum). Solange sie nicht abgeglichen ist, wird sie einige Tage vorher orange markiert (Frist in den Optionen der Integration einstellbar), nach Ablauf der Zahlungsfrist dann rot als unbezahlt. Durch Abgleichen verschwindet die Warnung.",
   },
   es: {
+    "Profil": "Perfil",
+    "Profils": "Perfiles",
+    "Celui affiché dans la carte principale": "El que se muestra en la tarjeta principal",
+    "Tous les comptes du profil affiché dans la carte principale.": "Todas las cuentas del perfil que se muestra en la tarjeta principal.",
+    "Les comptes choisis appartiennent à plusieurs profils : modifier la carte pour choisir un seul profil.": "Las cuentas elegidas pertenecen a varios perfiles: edita la tarjeta para elegir un solo perfil.",
+    "Un profil regroupe ses propres comptes, rubriques, classes et tiers : par exemple un par personne du foyer. Ce n'est pas une protection : toute personne qui a accès à My Bank peut passer d'un profil à l'autre.": "Un perfil agrupa sus propias cuentas, categorías, clases y beneficiarios: por ejemplo uno por persona del hogar. No es una protección: cualquiera con acceso a My Bank puede pasar de un perfil a otro.",
+    "Créer ou renommer un profil : Paramètres → Appareils et services → My Bank → Configurer.": "Crear o cambiar el nombre de un perfil: Ajustes → Dispositivos y servicios → My Bank → Configurar.",
+    "Dès deux profils, les boutons en haut de cette carte changent le profil affiché ; ce navigateur retient le choix.": "A partir de dos perfiles, los botones de la parte superior de esta tarjeta cambian el perfil mostrado; este navegador recuerda la elección.",
+    "Ce que tu crées ici (compte, rubrique, classe, tiers) va dans le profil affiché ; opérations, planifications et budgets suivent leur compte.": "Lo que creas aquí (cuenta, categoría, clase, beneficiario) va al perfil mostrado; los movimientos, las operaciones programadas y los presupuestos siguen a su cuenta.",
+    "Un virement ne relie que deux comptes du même profil. Modes de règlement et partages sont communs à tous les profils.": "Una transferencia solo une dos cuentas del mismo perfil. Los medios de pago y los gastos compartidos son comunes a todos los perfiles.",
+    "Petites cartes : réglées sur un compte ou un profil, elles le gardent ; sinon elles suivent le profil affiché ici.": "Tarjetas pequeñas: configuradas con una cuenta o un perfil, lo conservan; si no, siguen el perfil mostrado aquí.",
+    "Supprimer un profil et toutes ses données : même écran Configurer, « Supprimer un profil », avec deux confirmations.": "Eliminar un perfil y todos sus datos: misma pantalla Configurar, «Eliminar un perfil», con dos confirmaciones.",
     "Mois en cours et à venir": "Mes actual y próximos",
     "Mois en cours strict": "Solo mes actual",
     "Solde prévisionnel total :": "Saldo previsto total:",

@@ -200,6 +200,17 @@ Avoid setting only the class, without a category: the per-car analysis would sti
 
 **In short**: always set the category. Add a class when you want to follow an object, a project or a person across several categories. In a split transaction, each line has its own category and its own class.
 
+## Profiles
+
+A profile is a separate set of accounts, categories, classes and payees — for example one per person of the household. It is only about keeping things apart, not about access control (access stays per Home Assistant user, see the integration options).
+
+- Every installation starts with one profile; existing data belongs to it. With a single profile, nothing changes on the cards.
+- **Settings → Devices & services → My Bank → Configure → Profiles**: rename a profile or add one (it starts empty). From two profiles on, these options open on a menu: **Delete a profile** removes a profile and all its data (accounts, transactions, schedules, budgets, categories, classes, payees) after two confirmations.
+- From two profiles on, buttons at the top of `custom:my-bank-card` (and of the transactions card) switch from one profile to the other. The choice is remembered by the browser. Everything shown and created in the card then belongs to the selected profile.
+- Small cards set to an account use that account's profile; the others follow the profile selected in the main card.
+- Transactions, schedules and budgets follow the profile of their account. A transfer only links two accounts of the same profile. Payment methods and shared expenses are common to all profiles.
+- Requires My Bank API 0.12.0 or later.
+
 ## Payment due dates
 
 A transaction can have an optional **payment due date** (empty by default: nothing changes for it). A scheduled transaction can set one on every transaction it generates, as a number of days after the transaction date (0 = the same day; empty = no due date).

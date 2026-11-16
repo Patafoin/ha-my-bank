@@ -200,6 +200,17 @@ Une opération sans rubrique n'apparaît dans aucun de ces suivis.
 
 **En résumé** : renseignez toujours la rubrique. Ajoutez une classe quand vous voulez suivre un objet, un projet ou une personne à travers plusieurs rubriques. Dans une opération ventilée, chaque ligne a sa propre rubrique et sa propre classe.
 
+## Profils
+
+Un profil est un jeu séparé de comptes, rubriques, classes et tiers — par exemple un par personne du foyer. Il ne sert qu'à séparer, pas à restreindre l'accès (l'accès reste réglé par utilisateur Home Assistant, dans les options de l'intégration).
+
+- Toute installation démarre avec un profil ; les données existantes lui appartiennent. Avec un seul profil, rien ne change sur les cartes.
+- **Paramètres → Appareils et services → My Bank → Configurer → Profils** : renommer un profil ou en ajouter un (il démarre vide). Dès deux profils, ces options s'ouvrent sur un menu : **Supprimer un profil** supprime un profil et toutes ses données (comptes, opérations, planifications, budgets, rubriques, classes, tiers) après deux confirmations.
+- Dès deux profils, des boutons en haut de `custom:my-bank-card` (et de la carte des opérations) passent d'un profil à l'autre. Le choix est mémorisé par le navigateur. Tout ce que la carte affiche et crée appartient alors au profil choisi.
+- Les petites cartes réglées sur un compte utilisent le profil de ce compte ; les autres suivent le profil choisi dans la carte principale.
+- Opérations, planifications et budgets suivent le profil de leur compte. Un virement ne relie que deux comptes d'un même profil. Les modes de règlement et les comptes partagés sont communs à tous les profils.
+- Nécessite My Bank API 0.12.0 ou plus récente.
+
 ## Dates limites de paiement
 
 Une opération peut avoir une **date limite de paiement** facultative (vide par défaut : rien ne change pour elle). Une planification peut en poser une sur chaque opération qu'elle génère, en nombre de jours après la date de l'opération (0 = le jour même ; vide = pas de date limite).
