@@ -128,10 +128,15 @@ function myBankDue(hass) {
 // Profils (décision 028) : jeux séparés de comptes, rubriques, classes et tiers, gérés dans les options de
 // l'intégration. Lus pour toutes les cartes de la connexion, relus au bout de PROFILES_REFRESH_MS (un profil ajouté
 // dans les options apparaît sans recharger la page). [] si le service est indisponible (intégration plus ancienne).
+// Un échec passager (connexion perdue, HA qui redémarre) n'est jamais gardé : la dernière liste lue reste valable,
+// sinon la carte croirait n'avoir qu'un profil et mélangerait les données de tous les profils.
 const PROFILES = new WeakMap();
+const PROFILES_LAST = new WeakMap(); // dernière liste lue avec succès, par connexion
+const PROFILES_WATCHED = new WeakSet(); // connexions dont la reconnexion est suivie
 const PROFILES_REFRESH_MS = 60 * 1000;
 const PROFILE_KEY = "my-bank-profile"; // profil affiché, choisi dans ce navigateur
 const PROFILE_CHANGES = new EventTarget(); // un autre profil vient d'être choisi dans une carte de la page
+const PROFILES_STALE = new EventTarget(); // connexion rétablie : profils à relire par chaque carte
 // Services filtrés (lectures) ou rattachés (créations) au profil affiché ; jamais quand un compte est précisé.
 const PROFILE_SCOPED = new Set([
   "list_accounts", "list_categories", "list_classes", "list_payees", "search_transactions", "list_schedules",
@@ -139,13 +144,32 @@ const PROFILE_SCOPED = new Set([
 ]);
 function myBankProfiles(hass) {
   const conn = hass.connection;
+  if (!PROFILES_WATCHED.has(conn) && typeof conn.addEventListener === "function") {
+    PROFILES_WATCHED.add(conn);
+    conn.addEventListener("ready", () => {
+      PROFILES.delete(conn);
+      DUE.delete(conn);
+      PROFILES_STALE.dispatchEvent(new Event("stale"));
+    });
+  }
   const cached = PROFILES.get(conn);
   if (cached && Date.now() - cached.at < PROFILES_REFRESH_MS) return cached.promise;
-  const promise = conn
+  const entry = { at: Date.now() };
+  entry.promise = conn
     .sendMessagePromise({ type: "call_service", domain: "my_bank", service: "list_profiles", service_data: {}, return_response: true })
-    .then((res) => (res && res.response && res.response.items) || [], () => []);
-  PROFILES.set(conn, { at: Date.now(), promise });
-  return promise;
+    .then(
+      (res) => {
+        const items = (res && res.response && res.response.items) || [];
+        PROFILES_LAST.set(conn, items);
+        return items;
+      },
+      () => {
+        if (PROFILES.get(conn) === entry) PROFILES.delete(conn); // relu à la prochaine demande
+        return PROFILES_LAST.get(conn) || [];
+      },
+    );
+  PROFILES.set(conn, entry);
+  return entry.promise;
 }
 
 // Profil affiché : celui choisi dans ce navigateur s'il existe encore, sinon le premier (profil par défaut).
@@ -183,6 +207,11 @@ function dueStatus(tx, due) {
   if (tx.due_date < due.today) return "overdue";
   const [y, m, d] = due.today.split("-").map(Number);
   return tx.due_date <= isoDate(new Date(y, m - 1, d + due.warning_days)) ? "soon" : null;
+}
+
+// Badge « Impayée » / « À payer » d'une ligne d'opération ("" sans statut).
+function dueBadgeHtml(due) {
+  return due ? `<span class="due-badge ${due}">${due === "overdue" ? t("Impayée") : t("À payer")}</span>` : "";
 }
 
 // Résumé des opérations à payer d'un compte (carte Soldes, tuiles du tableau de bord) : une ligne rouge pour les
@@ -960,6 +989,8 @@ class MyBankCard extends HTMLElement {
     window.addEventListener("popstate", this._onPopState);
     if (!this._onProfile) this._onProfile = () => this._renderActive();
     PROFILE_CHANGES.addEventListener("changed", this._onProfile);
+    if (!this._onProfilesStale) this._onProfilesStale = () => refreshProfilesOnReturn(this);
+    PROFILES_STALE.addEventListener("stale", this._onProfilesStale);
     // retour sur la vue du tableau de bord (nouvelle entrée d'historique) : y noter l'écran affiché
     if (this._hass && this._bodyEl) this._navCommit(true);
     refreshProfilesOnReturn(this);
@@ -968,6 +999,7 @@ class MyBankCard extends HTMLElement {
   disconnectedCallback() {
     if (this._onPopState) window.removeEventListener("popstate", this._onPopState);
     if (this._onProfile) PROFILE_CHANGES.removeEventListener("changed", this._onProfile);
+    if (this._onProfilesStale) PROFILES_STALE.removeEventListener("stale", this._onProfilesStale);
   }
 
   set hass(hass) {
@@ -1487,9 +1519,7 @@ class MyBankCard extends HTMLElement {
       .filter(Boolean)
       .map(esc)
       .join(" · ");
-    const badge = due
-      ? `<span class="due-badge ${due}">${due === "overdue" ? t("Impayée") : t("À payer")}</span>`
-      : "";
+    const badge = dueBadgeHtml(due);
     const checkbox = `<label class="tx-select-box"><input type="checkbox" class="tx-select" ${this._txSelected.has(tx.id) ? "checked" : ""}></label>`;
     return `<div class="tx-row selectable ${alt ? "alt" : ""} ${tx.date > today ? "future" : ""} ${due ? `due-${due}` : ""} ${this._txSelected.has(tx.id) ? "selected" : ""}" data-id="${tx.id}">
       ${checkbox}
@@ -1548,6 +1578,9 @@ class MyBankCard extends HTMLElement {
     this._txSelected = this._txSelected || new Set();
     const query = { account_id: this._txAccountId, order: "desc" };
     if (this._txRange === "custom") {
+      // plage inversée retenue d'avant (historique de navigation) : la date de fin est oubliée, sinon l'API refuse
+      // la liste et l'onglet resterait bloqué sur le message d'erreur, sans critères pour corriger.
+      if (this._txStart && this._txEnd && this._txStart > this._txEnd) this._txEnd = "";
       if (this._txStart) query.start = this._txStart;
       if (this._txEnd) query.end = this._txEnd;
     } else {
@@ -1694,10 +1727,16 @@ class MyBankCard extends HTMLElement {
     filterForm.addEventListener("input", (ev) => { if (!ev.target.matches('[type="date"]')) readFilters(); });
     filterForm.addEventListener("change", (ev) => {
       if (!ev.target.matches('[type="date"]')) return readFilters();
-      // changer une date recharge la période (le solde après chaque ligne vient de l'API)
+      // changer une date recharge la période (le solde après chaque ligne vient de l'API) ; une plage inversée
+      // n'est pas envoyée (l'API la refuse) : message sous les dates, champs laissés en place pour la corriger.
+      const start = filterForm.querySelector('[name="start"]').value;
+      const end = filterForm.querySelector('[name="end"]').value;
+      const dateError = filterForm.querySelector(".f-date-error");
+      dateError.hidden = !(start && end && start > end);
+      if (!dateError.hidden) return;
       this._txRange = "custom";
-      this._txStart = filterForm.querySelector('[name="start"]').value;
-      this._txEnd = filterForm.querySelector('[name="end"]').value;
+      this._txStart = start;
+      this._txEnd = end;
       this._renderActive(true);
     });
     filterForm.addEventListener("submit", (ev) => ev.preventDefault());
@@ -1811,6 +1850,7 @@ class MyBankCard extends HTMLElement {
       <span class="panel-title">${t("Critères de recherche")}</span>
       <label>${t("Du")}<input type="date" name="start" value="${esc(query.start || "")}"></label>
       <label>${t("Au")}<input type="date" name="end" value="${esc(query.end || "")}"></label>
+      <div class="error full f-date-error" hidden>${t("La date « Du » doit être antérieure ou égale à la date « Au ».")}</div>
       <label>${t("Type")}${sel("type", [["", t("Tous")], ["expense", t("Dépenses")], ["income", t("Recettes")], ["transfer", t("Virements")]])}</label>
       <label>${t("Montant min.")}<input type="text" name="min" inputmode="decimal" value="${esc(f.min)}"></label>
       <label>${t("Montant max.")}<input type="text" name="max" inputmode="decimal" value="${esc(f.max)}"></label>
@@ -2102,6 +2142,24 @@ class MyBankCard extends HTMLElement {
     if (this._txRecon) this._paintRecon(); // le solde banque (pointé) vient de changer (pointage, rapprochement, suppression)
   }
 
+  // Badge et couleur « Impayée » / « À payer » d'une ligne, d'après son état actuel et les opérations à payer lues.
+  _paintRowDue(row, tx) {
+    const due = dueStatus(tx, this._due);
+    row.classList.remove("due-overdue", "due-soon");
+    if (due) row.classList.add(`due-${due}`);
+    const desc = row.querySelector(".tx-desc");
+    const old = desc && desc.querySelector(".due-badge");
+    if (old) old.remove();
+    if (desc && due) desc.insertAdjacentHTML("beforeend", dueBadgeHtml(due));
+  }
+
+  // Opérations à payer relues après un pointage : bandeau du haut de la liste redessiné.
+  async _refreshDue() {
+    this._due = await myBankDue(this._hass);
+    const banner = this._bodyEl && this._bodyEl.querySelector(".tx-due");
+    if (banner) banner.innerHTML = this._dueBannerHtml(this._txAccountId);
+  }
+
   // Pointage et rapprochement : deux boutons distincts (une rapprochée est forcément pointée).
   _stateButtonsHtml(state) {
     return `<button class="tx-state tx-point ${state >= 1 ? "on" : ""}" title="${state >= 1 ? t("Pointée") : t("Non pointée")}">${state >= 1 ? "☑" : "☐"}</button>
@@ -2127,13 +2185,16 @@ class MyBankCard extends HTMLElement {
     };
     tx.state = next;
     paint(next);
+    this._paintRowDue(row, tx);
     box.querySelectorAll(".tx-state").forEach((el) => (el.disabled = true));
     try {
       await this._call("set_transaction_state", { transaction_id: tx.id, state: next }, false);
-      await this._refreshSummary();
+      await Promise.all([this._refreshSummary(), this._refreshDue()]);
+      this._paintRowDue(row, tx);
     } catch (err) {
       tx.state = previous;
       paint(previous);
+      this._paintRowDue(row, tx);
       alert(errMsg(err));
     } finally {
       box.querySelectorAll(".tx-state").forEach((el) => (el.disabled = false));
@@ -2148,7 +2209,10 @@ class MyBankCard extends HTMLElement {
     try {
       await this._call("delete_transaction", { transaction_id: tx.id }, false);
       row.remove();
-      await this._refreshSummary();
+      if (this._txSelected) this._txSelected.delete(tx.id);
+      // Liste relue sur place : soldes après chaque ligne, nombre, total, export et opérations à payer à jour
+      // (l'opération supprimée — et l'autre jambe d'un virement — ne doivent plus réapparaître au filtrage).
+      await this._renderActive(true);
     } catch (err) {
       row.style.opacity = "";
       btn.disabled = false;
@@ -2570,6 +2634,7 @@ class MyBankCard extends HTMLElement {
       <form class="entity-form tx-bulk-form">
         <label>${t("Rubrique")}${treeSelect("category_id", L.categories)}</label>
         <label>${t("Classe")}${treeSelect("class_id", L.classes)}</label>
+        <label>${t("État")}<select name="state">${[[KEEP, t("Ne pas modifier")], ["0", t("Non pointée")], ["1", t("Pointée")], ["2", t("Rapprochée")]].map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select></label>
         <label class="tiers-field f-payee full">${t("Tiers|champ")}
           <input type="text" name="payee" placeholder="${t("Ne pas modifier")}" autocomplete="off">
           <div class="tiers-suggestions" style="display: none;"></div>
@@ -2595,14 +2660,23 @@ class MyBankCard extends HTMLElement {
       const payeeName = $('[name="payee"]').value.trim();
       if (payeeName) payload.payee_name = payeeName;
       else if ($('[name="clear_payee"]').checked) payload.payee_id = null;
-      if (Object.keys(payload).length === 1) {
-        alert(t("Choisir au moins un champ à modifier (rubrique, classe ou tiers)."));
+      const stateVal = $('[name="state"]').value;
+      const state = stateVal === KEEP ? null : Number(stateVal);
+      const categorize = Object.keys(payload).length > 1;
+      if (!categorize && state === null) {
+        alert(t("Choisir au moins un champ à modifier (rubrique, classe, tiers ou état)."));
         return;
       }
+      // Comme pour une seule opération : dé-rapprocher demande confirmation.
+      const unreconciled = state !== null && state < 2
+        ? ids.filter((id) => { const tx = this._txItems && this._txItems.get(id); return tx && tx.state === 2; }).length
+        : 0;
+      if (unreconciled && !confirm(t("{n} opération(s) rapprochée(s) dans la sélection : les dé-rapprocher ?", { n: unreconciled }))) return;
       const submit = form.querySelector('button[type="submit"]');
       submit.disabled = true;
       try {
-        const res = await this._call("categorize_transactions", payload, true);
+        const res = categorize ? await this._call("categorize_transactions", payload, true) : null;
+        if (state !== null) await this._call("set_transactions_state", { ids, state }, false);
         const skipped = (res && res.skipped_split_ids) || [];
         this._txSelected.clear();
         if (onClose) onClose();
@@ -4823,11 +4897,14 @@ class MyBankSimpleCard extends MyBankCard {
   connectedCallback() {
     if (!this._onProfile) this._onProfile = () => this._renderActive();
     PROFILE_CHANGES.addEventListener("changed", this._onProfile);
+    if (!this._onProfilesStale) this._onProfilesStale = () => refreshProfilesOnReturn(this);
+    PROFILES_STALE.addEventListener("stale", this._onProfilesStale);
     refreshProfilesOnReturn(this);
   }
 
   disconnectedCallback() {
     if (this._onProfile) PROFILE_CHANGES.removeEventListener("changed", this._onProfile);
+    if (this._onProfilesStale) PROFILES_STALE.removeEventListener("stale", this._onProfilesStale);
   }
 
   set hass(hass) {
@@ -5653,12 +5730,14 @@ class MyBankBudgetTrendCard extends MyBankSimpleCard {
     const W = 560, H = 250, pad = { l: 38, r: 44, t: 10, b: 22 };
     const n = months.length;
     const values = series.flatMap((s) => s.points.filter((p) => p && p.pct != null).map((p) => p.pct));
-    // Échelle de 0 (ou moins, si un réalisé est négatif) à au moins 150 %, bornée à [-100 %, 300 %] :
-    // un mois à 900 % écraserait tous les autres ; il est dessiné en butée, sa vraie valeur dans l'infobulle.
-    const rawHi = Math.min(300, Math.max(150, ...values));
-    const rawLo = Math.max(-100, Math.min(0, ...values));
-    const step = rawHi - rawLo > 250 ? 100 : 50;
-    const hi = Math.ceil(rawHi / step) * step, lo = Math.floor(rawLo / step) * step;
+    // Échelle symétrique autour de 100 % (la neutralité, donc centrée verticalement), étendue aux
+    // valeurs réelles, bornée à [-100 %, 300 %] : un mois à 900 % écraserait tous les autres ; il
+    // est dessiné en butée, sa vraie valeur dans l'infobulle.
+    const rawSpread = Math.max(50, Math.max(...values, 150) - 100, 100 - Math.min(...values, 0));
+    const spread = Math.min(200, rawSpread);
+    const step = spread > 125 ? 100 : 50;
+    const spreadRounded = Math.ceil(spread / step) * step;
+    const hi = 100 + spreadRounded, lo = 100 - spreadRounded;
     const x = (i) => pad.l + (n === 1 ? 0.5 : i / (n - 1)) * (W - pad.l - pad.r);
     const y = (v) => pad.t + ((hi - Math.max(lo, Math.min(hi, v))) / (hi - lo)) * (H - pad.t - pad.b);
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}` });
@@ -6382,7 +6461,9 @@ const I18N = {
     "— Aucune —": "— None —",
     "Vider le tiers (laisser le champ ci-dessus vide)": "Clear the payee (leave the field above empty)",
     "Appliquer à {n} opération(s)": "Apply to {n} transaction(s)",
-    "Choisir au moins un champ à modifier (rubrique, classe ou tiers).": "Choose at least one field to change (category, class, or payee).",
+    "Choisir au moins un champ à modifier (rubrique, classe, tiers ou état).": "Choose at least one field to change (category, class, payee, or status).",
+    "{n} opération(s) rapprochée(s) dans la sélection : les dé-rapprocher ?": "{n} reconciled transaction(s) in the selection: un-reconcile them?",
+    "La date « Du » doit être antérieure ou égale à la date « Au ».": "The “From” date must be on or before the “To” date.",
     "{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).": "{n} split transaction(s) skipped for category/class (the payee was still applied).",
     "Recette": "Income",
     "Recette de {amount} enregistrée{who} ({account}, {date}).": "Income of {amount} saved{who} ({account}, {date}).",
@@ -6958,7 +7039,9 @@ const I18N = {
     "— Aucune —": "— Keine —",
     "Vider le tiers (laisser le champ ci-dessus vide)": "Zahlungsempfänger leeren (das Feld oben leer lassen)",
     "Appliquer à {n} opération(s)": "Auf {n} Buchung(en) anwenden",
-    "Choisir au moins un champ à modifier (rubrique, classe ou tiers).": "Mindestens ein zu änderndes Feld wählen (Rubrik, Klasse oder Zahlungsempfänger).",
+    "Choisir au moins un champ à modifier (rubrique, classe, tiers ou état).": "Mindestens ein zu änderndes Feld wählen (Rubrik, Klasse, Zahlungsempfänger oder Status).",
+    "{n} opération(s) rapprochée(s) dans la sélection : les dé-rapprocher ?": "{n} abgestimmte Buchung(en) in der Auswahl: Abstimmung aufheben?",
+    "La date « Du » doit être antérieure ou égale à la date « Au ».": "Das Datum „Von“ muss vor dem oder am Datum „Bis“ liegen.",
     "{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).": "{n} aufgeteilte Buchung(en) für Rubrik/Klasse übersprungen (der Zahlungsempfänger wurde trotzdem angewendet).",
     "Recette": "Einnahme",
     "Recette de {amount} enregistrée{who} ({account}, {date}).": "Einnahme über {amount} gespeichert{who} ({account}, {date}).",
@@ -7534,7 +7617,9 @@ const I18N = {
     "— Aucune —": "— Ninguna —",
     "Vider le tiers (laisser le champ ci-dessus vide)": "Vaciar el beneficiario (dejar el campo anterior vacío)",
     "Appliquer à {n} opération(s)": "Aplicar a {n} movimiento(s)",
-    "Choisir au moins un champ à modifier (rubrique, classe ou tiers).": "Elegir al menos un campo a modificar (categoría, clase o beneficiario).",
+    "Choisir au moins un champ à modifier (rubrique, classe, tiers ou état).": "Elegir al menos un campo a modificar (categoría, clase, beneficiario o estado).",
+    "{n} opération(s) rapprochée(s) dans la sélection : les dé-rapprocher ?": "{n} operación(es) conciliada(s) en la selección: ¿deshacer la conciliación?",
+    "La date « Du » doit être antérieure ou égale à la date « Au ».": "La fecha «Desde» debe ser anterior o igual a la fecha «Hasta».",
     "{n} opération(s) ventilée(s) ignorée(s) pour la rubrique/classe (le tiers a quand même été appliqué).": "{n} movimiento(s) con desglose omitido(s) para categoría/clase (el beneficiario se aplicó de todos modos).",
     "Recette": "Ingreso",
     "Recette de {amount} enregistrée{who} ({account}, {date}).": "Ingreso de {amount} guardado{who} ({account}, {date}).",
