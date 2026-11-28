@@ -321,7 +321,7 @@ const STYLE = `
   .profiles button.active { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); font-weight: 500; }
   .tab-badge {
     display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; box-sizing: border-box;
-    font-size: 11px; line-height: 18px; text-align: center; background: var(--warning-color, #ffa600); color: #fff;
+    font-size: 11px; line-height: 18px; text-align: center; background: var(--warning-color, #ffa600); color: var(--text-primary-color, #fff);
   }
   .term-alert {
     display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 8px; padding: 2px 4px 2px 12px;
